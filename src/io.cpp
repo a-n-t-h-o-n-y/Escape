@@ -121,8 +121,10 @@ using Token = std::variant<Control_sequence, Escaped, UTF8, Window>;
 template <typename T, std::size_t index>
 auto parameter(std::string bytes) -> T
 {
-    for (auto count = 0uL; count < index; ++count)
-        bytes = bytes.substr(bytes.find(';', 0) + 1);
+    if constexpr (index != 0) {  // silence gcc warning
+        for (auto count = 0uL; count < index; ++count)
+            bytes = bytes.substr(bytes.find(';', 0) + 1);
+    }
 
     auto ss     = std::stringstream{bytes.substr(0, bytes.find(';', 0))};
     auto result = T{};

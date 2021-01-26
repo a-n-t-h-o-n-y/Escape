@@ -38,17 +38,13 @@ struct Window_resize {
     Area new_dimensions;
 };
 
-/// No Event, read() function timed-out.
-using None = std::monostate;
-
 /// Any input event type that can be returned from esc::read().
 using Event = std::variant<Mouse_press,
                            Mouse_release,
                            Scroll_wheel,
                            Mouse_move,
                            Key_press,
-                           Window_resize,
-                           None>;
+                           Window_resize>;
 
 }  // namespace esc
 #endif  // ESC_EVENT_HPP

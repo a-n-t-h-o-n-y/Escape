@@ -108,12 +108,5 @@ inline auto print(esc::Window_resize w, std::ostream& os) -> std::ostream&
     return os;
 }
 
-// TODO remove None
-inline auto print(esc::None, std::ostream& os) -> std::ostream&
-{
-    os << "No Event\n";
-    return os;
-}
-
 }  // namespace esc::debug
 #endif  // ESC_DEBUG_HPP

@@ -5,7 +5,9 @@
 #include <string>
 #include <type_traits>
 
+#include <esc/color_index.hpp>
 #include <esc/point.hpp>
+#include <esc/true_color.hpp>
 
 namespace esc {
 // CSI "\033[" "\033["
@@ -22,6 +24,9 @@ namespace esc {
     return "\033["
            "?1049l";
 }
+
+// TODO hide_cursor()
+// TODO show_cursor()
 
 [[nodiscard]] inline auto move_cursor(Point p) -> std::string
 {
@@ -70,7 +75,7 @@ template <typename... Traits,
     auto traits = (detail::to_string(t) + ...);
     traits.pop_back();  // remove trailing ';'
     return "\033["
-           "0;" +
+           "22;23;24;25;27;28;29;" +
            traits + "m";
 }
 
@@ -78,18 +83,63 @@ template <typename... Traits,
 [[nodiscard]] inline auto clear_traits() -> std::string
 {
     return "\033["
-           "0m";
+           "22;23;24;25;27;28;29m";
 }
 
-// struct Color {};
+/// Set the background color to the index \p i into the xterm palette.
+[[nodiscard]] inline auto set_background(Color_index i) -> std::string
+{
+    return "\033["
+           "48:5:" +
+           std::to_string(i.value) + "m";
+}
 
-// inline auto add_background(Color c) -> std::string;
+/// Set the background color to a terminal 'true color'.
+[[nodiscard]] inline auto set_background(True_color c) -> std::string
+{
+    return "\033["
+           "48:2::" +
+           std::to_string(c.red) + ":" + std::to_string(c.green) + ":" +
+           std::to_string(c.blue) + "m";
+}
 
-// inline auto add_foreground(Color c) -> std::string;
+/// Reset the background color to the terminal default.
+[[nodiscard]] inline auto reset_background() -> std::string
+{
+    return "\033["
+           "49m";
+}
 
-// inline auto remove_background() -> std::string;
+/// Set the foreground color to the index \p i into the xterm palette.
+[[nodiscard]] inline auto set_foreground(Color_index i) -> std::string
+{
+    return "\033["
+           "38:5:" +
+           std::to_string(i.value) + "m";
+}
 
-// inline auto remove_foreground() -> std::string;
+/// Set the foreground color to a terminal 'true color'.
+[[nodiscard]] inline auto set_foreground(True_color c) -> std::string
+{
+    return "\033["
+           "38:2::" +
+           std::to_string(c.red) + ":" + std::to_string(c.green) + ":" +
+           std::to_string(c.blue) + "m";
+}
+
+/// Reset the foreground color to the terminal default.
+[[nodiscard]] inline auto reset_foreground() -> std::string
+{
+    return "\033["
+           "39m";
+}
+
+/// Reset the foreground and background colors to the terminal default.
+[[nodiscard]] inline auto reset_colors() -> std::string
+{
+    return "\033["
+           "39;49m";
+}
 
 }  // namespace esc
 #endif  // ESC_ESC_HPP

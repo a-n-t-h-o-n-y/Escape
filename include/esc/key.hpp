@@ -19,11 +19,11 @@ enum class Key : char32_t {
     Acknowledge,                // Ctrl + f
     Bell,                       // Ctrl + g
     Backspace_1,                // Ctrl + h - Not necessarily the Backspace Key.
-    Tab,                        // Ctrl + i
-    Enter,                      // Ctrl + j OR Ctrl + m - AKA Line Feed
+    Tab,                        // Ctrl + i OR Tab Key
+    Enter,                      // Ctrl + j OR Ctrl + m OR Enter - AKA Line Feed
     Vertical_tab,               // Ctrl + k
     Form_feed,                  // Ctrl + l
-    Carriage_return_,           // Ctrl + m - Use Enter instead.
+    Carriage_return_,           // Ctrl + m - Usually not mapped to Enter key
     Shift_out,                  // Ctrl + n
     Shift_in,                   // Ctrl + o
     Data_link_escape,           // Ctrl + p
@@ -166,14 +166,14 @@ enum class Key : char32_t {
     // empty
     Function11 = 150,
     Function12,
-    Arrow_down,
+    Arrow_down,  // Cursor Keys
     Arrow_up,
     Arrow_left,
     Arrow_right,
-    Back_tab,
+    Back_tab,     // Shift + Tab
     Backspace_2,  // Numpad backspace and backspace on some laptops
     // empty
-    Begin = 159,
+    Begin = 159,  // Middle Numpad Key
 
     // 2+ Byte UTF8 Starts Here
     utf8 = 160
