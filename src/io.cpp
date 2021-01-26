@@ -1,6 +1,9 @@
 #include <esc/io.hpp>
 
 #include <algorithm>
+#include <array>
+#include <cstdint>
+#include <cuchar>
 #include <iterator>
 #include <optional>
 #include <sstream>
@@ -8,15 +11,13 @@
 #include <string>
 #include <variant>
 
-#include <iostream>  //temp
-
 #include <poll.h>
 #include <termios.h>
 #include <unistd.h>
 
 #include <esc/debug.hpp>
 #include <esc/event.hpp>
-#include "esc/key.hpp"
+#include <esc/key.hpp>
 
 namespace {
 
@@ -40,11 +41,11 @@ auto is_stdin_empty(int millisecond_timeout) -> bool
 }
 
 /// Read a single char from stdin.
-auto read_char() -> char
+auto read_byte() -> char
 {
-    auto c = char{};
-    read(STDIN_FILENO, &c, 1);
-    return c;
+    auto b = char{};
+    read(STDIN_FILENO, &b, 1);
+    return b;
 }
 
 // Token -----------------------------------------------------------------------
@@ -74,7 +75,11 @@ struct Escaped {
     char character;
 };
 
-using Token = std::variant<Control_sequence, Escaped, char>;
+struct UTF8 {
+    std::array<char, 4> bytes;
+};
+
+using Token = std::variant<Control_sequence, Escaped, UTF8>;
 
 // -----------------------------------------------------------------------------
 
@@ -153,29 +158,8 @@ auto parameter_count(std::string parameter_bytes) -> std::size_t
 auto parse_tilde(std::string parameter_bytes) -> esc::Key
 {
     if (parameter_count(parameter_bytes) == 0)
-        return esc::Key::Invalid;
-    auto const param = parameter<int, 0>(parameter_bytes);
-    // TODO this could be a cast to key if you lay it out correctly at some
-    // offset with gaps.
-    switch (param) {
-        using Key = esc::Key;
-        case 1: return Key::Home;
-        case 2: return Key::Insert;
-        case 3: return Key::Delete;
-        case 4: return Key::End;
-        case 5: return Key::Page_up;
-        case 6: return Key::Page_down;
-        case 15: return Key::Function5;
-        case 17: return Key::Function6;
-        case 18: return Key::Function7;
-        case 19: return Key::Function8;
-        case 20: return Key::Function9;
-        case 21: return Key::Function10;
-        case 23: return Key::Function11;
-        case 24: return Key::Function12;
-    }
-    throw std::runtime_error{"io.cpp parse_tilde(): Unknown param: " +
-                             std::to_string(param)};
+        throw std::runtime_error{"io.cpp: parse_tilde: No Parameter Bytes"};
+    return static_cast<esc::Key>(127 + parameter<int, 0>(parameter_bytes));
 }
 
 auto parse_key(Control_sequence cs) -> esc::Key
@@ -186,13 +170,17 @@ auto parse_key(Control_sequence cs) -> esc::Key
         case 'B': return Key::Arrow_down;
         case 'C': return Key::Arrow_right;
         case 'D': return Key::Arrow_left;
-        case 'H': return Key::Home;
+        case 'E': return Key::Begin;
         case 'F': return Key::End;
+        case 'G': return Key::Page_down;
+        case 'H': return Key::Home;
+        case 'I': return Key::Page_up;
+        case 'L': return Key::Insert;
         case 'P': return Key::Function1;
         case 'Q': return Key::Function2;
         case 'R': return Key::Function3;
         case 'S': return Key::Function4;
-        case 'E': return Key::Begin;
+        case 'Z': return Key::Back_tab;
         case '~': return parse_tilde(cs.parameter_bytes);
     }
     throw std::runtime_error{"io.cpp parse_key(): Unknown final_byte: " +
@@ -241,7 +229,15 @@ auto parse(Escaped e) -> esc::Event
                           {false, false, true}};
 }
 
-auto parse(char c) -> esc::Event { return esc::Key_press{esc::char_to_key(c)}; }
+auto parse(UTF8 x) -> esc::Event
+{
+    auto result   = char32_t{};
+    auto mb_state = std::mbstate_t{};
+    auto error    = std::mbrtoc32(&result, x.bytes.data(), 4, &mb_state);
+    if (error == std::size_t(-1))
+        throw std::runtime_error{"io.cpp: parse(UTF8): Bad Byte Sequence"};
+    return esc::Key_press{esc::char32_to_key(result)};
+}
 
 // Lexer -----------------------------------------------------------------------
 
@@ -264,7 +260,7 @@ struct CSI {
 };
 
 using Lexer =
-    std::variant<Initial, Final, Escape, Maybe_escaped, Maybe_CSI, CSI>;
+    std::variant<Initial, Final, Escape, Maybe_escaped, Maybe_CSI, CSI, UTF8>;
 
 // -----------------------------------------------------------------------------
 
@@ -272,10 +268,10 @@ auto constexpr escape = '\033';
 
 auto next_state(Initial) -> Lexer
 {
-    if (auto const c = read_char(); c == escape)
+    if (auto const b = read_byte(); b == escape)
         return Escape{};
     else
-        return Final{c};
+        return UTF8{{b}};
 }
 
 auto next_state(Final f) -> Lexer { return f; }
@@ -283,14 +279,14 @@ auto next_state(Final f) -> Lexer { return f; }
 auto next_state(Escape) -> Lexer
 {
     if (is_stdin_empty(0))
-        return Final{escape};
+        return Final{UTF8{{escape}}};
     else
         return Maybe_escaped{};
 }
 
 auto next_state(Maybe_escaped) -> Lexer
 {
-    auto const c = read_char();
+    auto const c = read_byte();
     if (c != '[' && c != 'O')
         return Final{Escaped{c}};
     else
@@ -307,10 +303,41 @@ auto next_state(Maybe_CSI state) -> Lexer
 
 auto next_state(CSI state) -> Lexer
 {
-    if (auto const c = read_char(); c >= 0x40 && c <= 0x7E)
-        return Final{Control_sequence{state.value + c}};
+    auto const b = read_byte();
+    if (b >= 0x40 && b <= 0x7E)
+        return Final{Control_sequence{state.value + std::string(1, b)}};
     else
-        return CSI{state.value + c};
+        return CSI{state.value + std::string(1, b)};
+}
+
+// Returns 1 if all set bits in \p mask match up with set bits in value, zeros
+// in the mask are treated as wildcards and can be anything in \p value.
+auto matches_mask(std::uint8_t mask, char value) -> std::uint8_t
+{
+    return (mask & value) == mask;
+}
+
+/// Returns the number of bytes left to read to form a complete utf8 character.
+/** Should be branchless. */
+auto bytes_left_to_read(char first) -> std::uint8_t
+{
+    // utf8 initial bytes
+    auto constexpr mask_1 = std::uint8_t{0b11000000};
+    auto constexpr mask_2 = std::uint8_t{0b11100000};
+    auto constexpr mask_3 = std::uint8_t{0b11110000};
+
+    auto count = matches_mask(mask_1, first);
+    count += matches_mask(mask_2, first);
+    count += matches_mask(mask_3, first);
+    return count;
+}
+
+auto next_state(UTF8 state) -> Lexer
+{
+    auto index = 1;
+    for (auto count = bytes_left_to_read(state.bytes[0]); count != 0; --count)
+        state.bytes[index++] = read_byte();
+    return Final{state};
 }
 
 // -----------------------------------------------------------------------------

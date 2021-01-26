@@ -7,43 +7,44 @@
 
 namespace esc {
 
-enum class Key : short {
-    // Control Characters
-    Null = 0,    // Ctrl + Space, or Ctrl + 2, OR Ctrl + @
-    Ctrl_a,      // Start of heading
-    Ctrl_b,      // Start of text
-    Ctrl_c,      // End of text
-    Ctrl_d,      // End of transmission
-    Ctrl_e,      // Enquiry
-    Ctrl_f,      // Acknowledge
-    Ctrl_g,      // Bell
-    Backspace_,  // Not used? ascii value 8 check with keypad
-    Tab,         // Ctrl + I
-    Enter,       // Ctrl + J, or Ctrl + M, AKA Line Feed, AKA Carriage Return
-    Ctrl_k,      // Vertical Tab
-    Ctrl_l,      // Form Feed
-    Carriage_return_,     // old, not on modern keyboards
-    Ctrl_n,               // Shift Out
-    Ctrl_o,               // Shift In
-    Ctrl_p,               // Data Link Escape
-    Ctrl_q,               // Device Control One
-    Ctrl_r,               // Device Control Two
-    Ctrl_s,               // Device Control Three
-    Ctrl_t,               // Device Control Four
-    Ctrl_u,               // Negative Acknowledge
-    Ctrl_v,               // Synchronous Idle
-    Ctrl_w,               // End of Transmission Block
-    Ctrl_x,               // Cancel
-    Ctrl_y,               // End of Medium
-    Ctrl_z,               // Substitute
-    Escape,               // Ctrl + [, or Ctrl + 3
-    Ctrl_backslash,       // Ctrl + 4, File Separator
-    Ctrl_closed_bracket,  // Ctrl + 5, Group Separator
-    Ctrl_caret,           // Ctrl + 6, Record Separator
-    Ctrl_underscore,      // Ctrl + 7, Unit Separator
-    Backspace = 127,      // Ctrl + 8
+/// Represents Keys on a keyboard, along with control codes they generate.
+enum class Key : char32_t {
+    // C0 Control Codes
+    Null = 0,                   // Ctrl + Space, or Ctrl + 2, OR Ctrl + @
+    Start_of_heading,           // Ctrl + a
+    Start_of_text,              // Ctrl + b
+    End_of_text,                // Ctrl + c
+    End_of_transmission,        // Ctrl + d
+    Enquiry,                    // Ctrl + e
+    Acknowledge,                // Ctrl + f
+    Bell,                       // Ctrl + g
+    Backspace_1,                // Ctrl + h - Not necessarily the Backspace Key.
+    Tab,                        // Ctrl + i
+    Enter,                      // Ctrl + j OR Ctrl + m - AKA Line Feed
+    Vertical_tab,               // Ctrl + k
+    Form_feed,                  // Ctrl + l
+    Carriage_return_,           // Ctrl + m - Use Enter instead.
+    Shift_out,                  // Ctrl + n
+    Shift_in,                   // Ctrl + o
+    Data_link_escape,           // Ctrl + p
+    Device_control_one,         // Ctrl + q
+    Device_control_two,         // Ctrl + r
+    Device_control_three,       // Ctrl + s
+    Device_control_four,        // Ctrl + t
+    Negative_acknowledge,       // Ctrl + u
+    Synchronous_idle,           // Ctrl + v
+    End_of_transmission_block,  // Ctrl + w
+    Cancel,                     // Ctrl + x
+    End_of_medium,              // Ctrl + y
+    Substitute,                 // Ctrl + z
+    Escape,                     // Ctrl + 3 OR Ctrl + [
+    File_separator,             // Ctrl + 4 OR Ctrl + Backslash
+    Group_separator,            // Ctrl + 5 OR Ctrl + ]
+    Record_separator,           // Ctrl + 6 OR Ctrl + ^
+    Unit_separator,             // Ctrl + 7 OR Ctrl + _
+    Backspace = 127,            // Ctrl + 8
 
-    // Printable Characters
+    // Graphic Characters
     Space = 32,
     Exclamation_mark,
     Double_quotation,
@@ -136,139 +137,76 @@ enum class Key : short {
     y,
     z,
     Left_curly_bracket,
-    Vertical_bar,  // pipe?
+    Pipe,
     Right_curly_bracket,
-    Tilde,
+    Tilde = 126,
 
-    // Curses Specialty Characters
-    Arrow_down = 258,
-    Arrow_up,
-    Arrow_left,
-    Arrow_right,
-    Home,
-    Backspace_2,  // numpad backspace and backspace on some laptops
-
-    Function = 264,
-    Function1,
+    // Special Keys - These overlap with C1 (128 - 159)
+    Home = 128,
+    Insert,
+    Delete,
+    End,
+    Page_up,
+    Page_down = 133,
+    // empty
+    // empty
+    // empty
+    // empty
+    Function1 = 138,
     Function2,
     Function3,
     Function4,
-    Function5,
-    Function6,
+    Function5 = 142,
+    // empty
+    Function6 = 144,
     Function7,
     Function8,
     Function9,
-    Function10,
-    Function11,
+    Function10 = 148,
+    // empty
+    Function11 = 150,
     Function12,
-
-    Delete_line = 328,
-    Insert_line,
-    Delete,
-    Insert,
-    EIC,  // sent by rmir or smir in insert mode
-    Clear_screen,
-    Clear_to_end_of_screen,
-    Clear_to_end_of_line,
-    Scroll_forward,
-    Scroll_backward,
-    Next_page,
-    Previous_page,
-    Set_tab,
-    Clear_tab,
-    Clear_all_tabs,
-    Possibly_keypad_enter_,  // int 343
-
-    Page_up,
-    Page_down,
-
-    Print = 346,
-    Home_down,
-    Keypad_7,
-    Keypad_9,
-    Keypad_5,
-    Keypad_1,
-    Keypad_3,
+    Arrow_down,
+    Arrow_up,
+    Arrow_left,
+    Arrow_right,
     Back_tab,
-    Begin,
-    Cancel_dup_,
-    Close,
-    Command,
-    Copy,
-    Create,
-    End,
-    Exit,
-    Find,
-    Help,
-    Mark,
-    Message,
-    Move,
-    Next,
-    Open,
-    Options,
-    Previous,
-    Redo,
-    Reference,
-    Refresh,
-    Replace,
-    Restart,
-    Resume,
-    Save,
-    Shift_begin,
-    Shift_cancel,
-    Shift_command,
-    Shift_copy,
-    Shift_create,
-    Shift_delete_character,
-    Shift_delete_line,
-    Select,
-    Shift_end,
-    Shift_clear_to_end_of_line,
-    Shift_exit,
-    Shift_find,
-    Shift_help,
-    Shift_home,
-    Shift_insert_character,
-    Shift_left_arrow,
-    Shift_message,
-    Shift_move,
-    Shift_next,
-    Shift_options,
-    Shift_previous,
-    Shift_print,
-    Shift_redo,
-    Shift_replace,
-    Shift_right_arrow,
-    Shift_resume,
-    Shift_save,
-    Shift_suspend,
-    Shift_undo,
-    Suspend,
-    Undo,
-    Invalid,  // 409
+    Backspace_2,  // Numpad backspace and backspace on some laptops
+    // empty
+    Begin = 159,
+
+    // 2+ Byte UTF8 Starts Here
+    utf8 = 160
 };
 
-/// Translate a char(below value 127) to a Key value; Key::Invalid otherwise.
-inline auto char_to_key(char c) -> Key
-{
-    return c > 127 ? Key::Invalid : static_cast<Key>(c);
-}
+/// Translate a char to one of the first 256 Key enum values.
+inline auto char_to_key(char c) -> Key { return static_cast<Key>(c); }
+
+/// Translate a char32_t to a Key value.
+inline auto char32_to_key(char32_t c) -> Key { return static_cast<Key>(c); }
 
 /// Translate a keycode \p k into its char representation.
-/** Return '\0' if \p k does not have a printable representation. */
+/** Return '\0' if \p k does not have a printable representation, or it's too
+ *  large to fit in a single char. See key_to_char32(Key). */
 inline auto key_to_char(Key k) -> char
 {
-    auto constexpr low  = short{32};
-    auto constexpr high = short{126};
-    auto const value    = static_cast<short>(k);
+    auto constexpr low  = 32;
+    auto constexpr high = 126;
+    auto const value    = static_cast<char32_t>(k);
     return (value < low || value > high) ? '\0' : static_cast<char>(value);
 }
 
 /// Translate a keycode \p k into its char32_t representation.
-/** Return U'\0' if \p k does not have a printable representation. */
-inline auto key_to_char32_t(Key k) -> char32_t
+/** Return '\0' if \p k is a ctrl char or special key. */
+inline auto key_to_char32(Key k) -> char32_t
 {
-    return static_cast<char32_t>(key_to_char(k));
+    auto constexpr low  = short{32};
+    auto constexpr mid  = short{126};
+    auto constexpr high = short{256};
+    auto const value    = static_cast<char32_t>(k);
+    return (value < low || (value > mid && value < high))
+               ? U'\0'
+               : static_cast<char32_t>(value);
 }
 
 /// Key code enum with modifier keys that were held down at time of keypress.

@@ -1,6 +1,6 @@
-# ESCAPE
+# EscapeLib 🕳️
 
-ANSI Escape Sequence Library
+ANSI/XTerm Escape Sequence Library
 
 Functions return their respective ANSI Escape Sequence to modify the terminal.
 

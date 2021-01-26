@@ -84,18 +84,6 @@ void enable_canonical_mode_and_echo();
            "?1003;1006l";
 }
 
-[[nodiscard]] inline auto enable_modifier_sequences() -> std::string
-{
-    return "\033["
-           ">4;1m";
-}
-
-[[nodiscard]] inline auto disable_modifier_sequences() -> std::string
-{
-    return "\033["
-           ">4m";
-}
-
 /// Sets the locale to utf8, Alt screen buffer, and stdout to use full buffer.
 inline void initialize_stdout()
 {
@@ -120,7 +108,6 @@ inline void initialize_stdin()
     // TODO should store current termios struct
     write(enable_mouse());
     disable_canonical_mode_and_echo();
-    write(enable_modifier_sequences());
 }
 
 inline void uninitialize_stdin()
@@ -128,7 +115,6 @@ inline void uninitialize_stdin()
     // TODO should reset locale to what it was at init
     // TODO should reset termios to what it was at init
     enable_canonical_mode_and_echo();
-    write(disable_modifier_sequences());
 }
 
 /// Perform setup, clears the screen.

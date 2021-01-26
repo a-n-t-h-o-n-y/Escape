@@ -1,11 +1,14 @@
 #ifndef ESC_DEBUG_HPP
 #define ESC_DEBUG_HPP
+#include <cstdint>
 #include <ios>
 #include <iostream>
 #include <sstream>
 #include <string>
 
 #include <esc/event.hpp>
+#include <esc/io.hpp>  //temp
+#include <esc/key.hpp>
 
 namespace esc::debug {
 
@@ -39,7 +42,13 @@ namespace esc::debug {
 
 inline auto print(esc::Key_press k, std::ostream& os) -> std::ostream&
 {
-    os << "Key::" << static_cast<short>(k.key) << '\n'
+    // if (k.key == esc::Key::Enter)
+    //     esc::io::write('\n');
+    // else
+    //     esc::io::write(key_to_char32(k.key));
+    // esc::io::flush();
+    // return os;
+    os << "Key::" << static_cast<std::uint32_t>(k.key) << '\n'
        << std::boolalpha << "shift: " << k.modifiers.shift << '\n'
        << "ctrl: " << k.modifiers.ctrl << '\n'
        << "alt: " << k.modifiers.alt << '\n';
