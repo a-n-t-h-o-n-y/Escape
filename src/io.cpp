@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <csignal>
 #include <cstdint>
 #include <cuchar>
 #include <iterator>
@@ -12,9 +13,11 @@
 #include <variant>
 
 #include <poll.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
+#include <esc/area.hpp>
 #include <esc/debug.hpp>
 #include <esc/event.hpp>
 #include <esc/key.hpp>
@@ -31,14 +34,23 @@ auto is_stdin_empty(int millisecond_timeout) -> bool
 
     auto const result = poll(&file, 1, millisecond_timeout);
 
-    if (result == -1)
-        throw std::runtime_error{"Error in is_stdin_empty(...);"};
-    if (result == 0)  // timeout
+    auto constexpr error   = -1;
+    auto constexpr timeout = 0;
+
+    if (result == error) {
+        if (errno == EINTR)  // A signal interrupted poll.
+            return true;
+        throw std::runtime_error{"io.cpp is_stdin_empty(): Poll Error"};
+    }
+    if (result == timeout)
         return true;
     if (result > 0 && (file.revents & POLLIN))
         return false;
-    throw std::logic_error{"is_stdin_empty() logic_error."};
+    throw std::logic_error{"io.cpp is_stdin_empty(): logic_error."};
 }
+
+// TODO make a timeout version of this function for use in checking if the
+// window has been resized or not.
 
 /// Read a single char from stdin.
 auto read_byte() -> char
@@ -46,6 +58,25 @@ auto read_byte() -> char
     auto b = char{};
     read(STDIN_FILENO, &b, 1);
     return b;
+}
+
+auto read_byte(int millisecond_timeout) -> std::optional<char>
+{
+    if (!is_stdin_empty(millisecond_timeout))
+        return read_byte();
+    return std::nullopt;
+}
+
+// SIGWINCH --------------------------------------------------------------------
+
+/// Notifies read() and next_state(Initial) that the window has been resized.
+bool window_resize_sig = false;
+
+/// Set the window_resize_sig flag to true on SIGWINCH signals.
+extern "C" void resize_handler(int sig)
+{
+    if (sig == SIGWINCH)
+        window_resize_sig = true;
 }
 
 // Token -----------------------------------------------------------------------
@@ -79,7 +110,9 @@ struct UTF8 {
     std::array<char, 4> bytes;
 };
 
-using Token = std::variant<Control_sequence, Escaped, UTF8>;
+struct Window {};
+
+using Token = std::variant<Control_sequence, Escaped, UTF8, Window>;
 
 // -----------------------------------------------------------------------------
 
@@ -239,6 +272,15 @@ auto parse(UTF8 x) -> esc::Event
     return esc::Key_press{esc::char32_to_key(result)};
 }
 
+auto parse(Window) -> esc::Event
+{
+    auto ws           = ::winsize{};
+    auto const result = ::ioctl(STDIN_FILENO, TIOCGWINSZ, &ws);
+    if (result == -1)
+        throw std::runtime_error{"io.cpp parse(Window) Can't Read Window Size"};
+    return esc::Window_resize{esc::Area{ws.ws_col, ws.ws_row}};
+}
+
 // Lexer -----------------------------------------------------------------------
 
 struct Initial {};
@@ -268,10 +310,19 @@ auto constexpr escape = '\033';
 
 auto next_state(Initial) -> Lexer
 {
-    if (auto const b = read_byte(); b == escape)
-        return Escape{};
-    else
-        return UTF8{{b}};
+    auto constexpr timeout = 30;  // milliseconds
+    while (true) {
+        if (window_resize_sig) {
+            window_resize_sig = false;
+            return Final{Window{}};
+        }
+        if (auto const b = read_byte(timeout); b.has_value()) {
+            if (*b == escape)
+                return Escape{};
+            else
+                return UTF8{{*b}};
+        }
+    }
 }
 
 auto next_state(Final f) -> Lexer { return f; }
@@ -363,7 +414,7 @@ auto read() -> esc::Event
 
 auto read(int millisecond_timeout) -> std::optional<esc::Event>
 {
-    if (!is_stdin_empty(millisecond_timeout))
+    if (window_resize_sig || !is_stdin_empty(millisecond_timeout))
         return esc::io::read();
     return std::nullopt;
 }
@@ -386,6 +437,15 @@ void enable_canonical_mode_and_echo()
     tty.c_cc[VMIN] = 1;
     tty.c_lflag |= ECHO;
     tcsetattr(STDIN_FILENO, TCSANOW, &tty);
+}
+
+void initialize_stdin()
+{
+    // TODO should store current termios struct
+    if (std::signal(SIGWINCH, &resize_handler) == SIG_ERR)
+        throw std::runtime_error{"io.cpp initialize_stdin(): std::signal call"};
+    write(enable_mouse());
+    disable_canonical_mode_and_echo();
 }
 
 }  // namespace esc::io

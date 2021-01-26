@@ -99,13 +99,16 @@ inline auto print(esc::Mouse_move m, std::ostream& os) -> std::ostream&
     return os;
 }
 
-inline auto print(esc::Window_resize /* w */, std::ostream& os) -> std::ostream&
+inline auto print(esc::Window_resize w, std::ostream& os) -> std::ostream&
 {
     os << "struct Window_resize {\n"
+       << "    Area{width: " << w.new_dimensions.width
+       << " height: " << w.new_dimensions.height << "}\n"
        << "};\n";
     return os;
 }
 
+// TODO remove None
 inline auto print(esc::None, std::ostream& os) -> std::ostream&
 {
     os << "No Event\n";

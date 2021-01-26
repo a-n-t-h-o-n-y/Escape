@@ -6,6 +6,7 @@
 #include <type_traits>
 #include <variant>
 
+#include <esc/area.hpp>
 #include <esc/key.hpp>
 #include <esc/mouse.hpp>
 #include <esc/point.hpp>
@@ -33,7 +34,9 @@ struct Mouse_move {
 };
 
 /// Terminal Window Resized
-struct Window_resize {};
+struct Window_resize {
+    Area new_dimensions;
+};
 
 /// No Event, read() function timed-out.
 using None = std::monostate;

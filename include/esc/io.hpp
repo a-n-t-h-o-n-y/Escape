@@ -103,12 +103,7 @@ inline void uninitialize_stdout()
 }
 
 /// Sets up mouse input mode etc...
-inline void initialize_stdin()
-{
-    // TODO should store current termios struct
-    write(enable_mouse());
-    disable_canonical_mode_and_echo();
-}
+void initialize_stdin();
 
 inline void uninitialize_stdin()
 {
