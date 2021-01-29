@@ -18,7 +18,7 @@
 #include <unistd.h>
 
 #include <esc/area.hpp>
-#include <esc/debug.hpp>
+#include <esc/detail/debug.hpp>
 #include <esc/event.hpp>
 #include <esc/key.hpp>
 
@@ -49,9 +49,6 @@ auto is_stdin_empty(int millisecond_timeout) -> bool
     throw std::logic_error{"io.cpp is_stdin_empty(): logic_error."};
 }
 
-// TODO make a timeout version of this function for use in checking if the
-// window has been resized or not.
-
 /// Read a single char from stdin.
 auto read_byte() -> char
 {
@@ -60,12 +57,18 @@ auto read_byte() -> char
     return b;
 }
 
+/// Read a single byte, blocking until a byte is read or timeout happens.
+/** Returns std::nullopt on timeout. */
 auto read_byte(int millisecond_timeout) -> std::optional<char>
 {
     if (!is_stdin_empty(millisecond_timeout))
         return read_byte();
     return std::nullopt;
 }
+
+// Mouse -----------------------------------------------------------------------
+
+auto previous_mouse_btn = esc::Mouse::Button{};
 
 // SIGWINCH --------------------------------------------------------------------
 
@@ -134,16 +137,22 @@ auto parameter(std::string bytes) -> T
 
 auto parse_mouse(Control_sequence cs) -> esc::Event
 {
-    using esc::Mouse;
-    auto const parameter_bytes = cs.parameter_bytes.substr(1);
-
-    auto const btn = parameter<int, 0>(parameter_bytes);
-    auto const at  = esc::Point{parameter<std::size_t, 1>(parameter_bytes) - 1,
-                               parameter<std::size_t, 2>(parameter_bytes) - 1
-
-    };
+    auto const is_sgr = cs.parameter_bytes.front() == '<';
+    auto const btn    = [&] {
+        // SGR Mode
+        if (is_sgr) {
+            cs.parameter_bytes = cs.parameter_bytes.substr(1);
+            return parameter<int, 0>(cs.parameter_bytes);
+        }
+        else  // URXVT Mode
+            return parameter<int, 0>(cs.parameter_bytes) - 32;
+    }();
+    auto const at =
+        esc::Point{parameter<std::size_t, 1>(cs.parameter_bytes) - 1,
+                   parameter<std::size_t, 2>(cs.parameter_bytes) - 1};
 
     // State
+    using esc::Mouse;
     auto mouse = Mouse{at, Mouse::Button::None, {}};
 
     // Modifiers
@@ -157,8 +166,7 @@ auto parse_mouse(Control_sequence cs) -> esc::Event
 
     // Button
     auto constexpr btn_mask = 0b11000011;
-
-    mouse.button = static_cast<Mouse::Button>(btn & btn_mask);
+    mouse.button            = static_cast<Mouse::Button>(btn & btn_mask);
 
     // Move Event
     auto constexpr move_event = 0b00100000;
@@ -171,13 +179,21 @@ auto parse_mouse(Control_sequence cs) -> esc::Event
         return esc::Scroll_wheel{mouse};
     }
 
-    // Press Event
-    if (cs.final_byte == 'M')
-        return esc::Mouse_press{mouse};
-
     // Release Event
     if (cs.final_byte == 'm')
         return esc::Mouse_release{mouse};
+
+    // urxvt btn release does not mention the button that was released.
+    if (!is_sgr && mouse.button == Mouse::Button::None) {
+        mouse.button = previous_mouse_btn;
+        return esc::Mouse_release{mouse};
+    }
+
+    // Press Event
+    previous_mouse_btn = mouse.button;
+    if (cs.final_byte == 'M')
+        return esc::Mouse_press{mouse};
+
     throw std::runtime_error{"io.cpp::parse_mouse(): Bad Mouse Event Parse"};
 }
 
@@ -358,7 +374,7 @@ auto next_state(CSI state) -> Lexer
 {
     auto const b = read_byte();
     if (b >= 0x40 && b <= 0x7E)
-        return Final{Control_sequence{state.value + std::string(1, b)}};
+        return Final{Control_sequence{state.value + b}};
     else
         return CSI{state.value + std::string(1, b)};
 }
@@ -446,7 +462,6 @@ void initialize_stdin()
     // TODO should store current termios struct
     if (std::signal(SIGWINCH, &resize_handler) == SIG_ERR)
         throw std::runtime_error{"io.cpp initialize_stdin(): std::signal call"};
-    write(enable_mouse());
     disable_canonical_mode_and_echo();
 }
 

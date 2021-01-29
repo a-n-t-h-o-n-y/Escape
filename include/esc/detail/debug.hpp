@@ -1,5 +1,5 @@
-#ifndef ESC_DEBUG_HPP
-#define ESC_DEBUG_HPP
+#ifndef ESC_DETAIL_DEBUG_HPP
+#define ESC_DETAIL_DEBUG_HPP
 #include <cstdint>
 #include <ios>
 #include <iostream>
@@ -7,10 +7,11 @@
 #include <string>
 
 #include <esc/event.hpp>
-#include <esc/io.hpp>  //temp
 #include <esc/key.hpp>
 
-namespace esc::debug {
+// TODO split this up into pieces, or if just print() name it print()
+
+namespace esc::detail {
 
 // char version
 /// Translate a single non-visible character into a visible string.
@@ -42,12 +43,6 @@ namespace esc::debug {
 
 inline auto print(esc::Key_press k, std::ostream& os) -> std::ostream&
 {
-    // if (k.key == esc::Key::Enter)
-    //     esc::io::write('\n');
-    // else
-    //     esc::io::write(key_to_char32(k.key));
-    // esc::io::flush();
-    // return os;
     os << "Key::" << static_cast<std::uint32_t>(k.key) << '\n'
        << std::boolalpha << "shift: " << k.modifiers.shift << '\n'
        << "ctrl: " << k.modifiers.ctrl << '\n'
@@ -108,5 +103,5 @@ inline auto print(esc::Window_resize w, std::ostream& os) -> std::ostream&
     return os;
 }
 
-}  // namespace esc::debug
-#endif  // ESC_DEBUG_HPP
+}  // namespace esc::detail
+#endif  // ESC_DETAIL_DEBUG_HPP

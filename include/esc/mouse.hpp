@@ -62,5 +62,13 @@ struct Mouse {
                              std::to_string(static_cast<std::uint16_t>(b))};
 }
 
+/// Defines all input modes for the Mouse.
+enum class Mouse_mode {
+    Off,    // No Mouse Events are generated, this is the default.
+    Basic,  // Mouse Press & Release Events for all Buttons and Scroll Wheel.
+    Drag,   // Basic, plus Move Events while a Button is pressed.
+    Move    // Basic, plus Move Events sent with or without a Button pressed.
+};
+
 }  // namespace esc
 #endif  // ESC_MOUSE_HPP

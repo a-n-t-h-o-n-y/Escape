@@ -11,8 +11,9 @@
 #include <string>
 #include <string_view>
 
-#include <esc/esc.hpp>
+#include <esc/detail/is_urxvt.hpp>
 #include <esc/event.hpp>
+#include <esc/terminfo.hpp>
 
 namespace esc::io {
 
@@ -68,39 +69,21 @@ void disable_canonical_mode_and_echo();
 
 void enable_canonical_mode_and_echo();
 
-[[nodiscard]] inline auto enable_mouse() -> std::string
-{
-    // 1003 all mouse movement events
-    // 1006 extended coordinate SGR mode
-    return "\033["
-           "?1003;1006h";
-    // TODO provide option to enable mouse move events with 1003, 1000 is no
-    // mouse move events.
-}
-
-[[nodiscard]] inline auto disable_mouse() -> std::string
-{
-    return "\033["
-           "?1003;1006l";
-}
+// TODO Signal Stuff - own header along with other term altering stuff
+// not terminfo but terminit? would also have a term_init and term_reset method?
 
 /// Sets the locale to utf8, Alt screen buffer, and stdout to use full buffer.
 inline void initialize_stdout()
 {
     // TODO store current locale in global
     std::setlocale(LC_ALL, "en_US.UTF-8");
-    write(esc::alternate_screen_buffer());
     std::setvbuf(stdout, nullptr, _IOFBF, 4'096);
     // TODO sigwinch handler, which somehow makes read() return the resize event
     // you'd want blocking read to return it as well, that'll be tricky.
 }
 
 /// Set the screen to the Normal buffer.
-inline void uninitialize_stdout()
-{
-    write(disable_mouse());
-    write(esc::normal_screen_buffer());
-}
+inline void uninitialize_stdout() {}
 
 /// Sets up mouse input mode etc...
 void initialize_stdin();

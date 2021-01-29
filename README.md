@@ -1,8 +1,25 @@
 # EscapeLib 🕳️
 
-ANSI/XTerm Escape Sequence Library
+__Terminal Escape Sequence Library__
 
-Functions return their respective ANSI Escape Sequence to modify the terminal.
+Consists mainly of functions returning escape sequence strings, that, when
+written to stdout, will alter the appearance or functionality of the terminal
+emulator.
 
-This is a hardcoded XTERM specific library, this does not try to parse the
-Terminfo database.
+Also provides a read() function that returns an Event variant for keyboard,
+mouse and window resize events.
+
+This library tries to be as general as possible and work with as many terminals
+as possible without relying on the terminfo database.
+
+Please open an issue if you find any bugs.
+
+## Future Features
+
+- Add `Terminal_focus_in` and `Terminal_focus_out` Events that are triggered on
+  `CSI I` and `CSI O` input sequences. Enabled by Focus Event Mouse 1004. Only
+  if most terminal emulators support this.
+
+- Add BELL modifier sequences for frequency and duration.
+
+- Sixel graphics, but only if most terminal emulators support this.
