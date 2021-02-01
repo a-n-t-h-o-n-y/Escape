@@ -1,11 +1,12 @@
 #ifndef ESC_SEQUENCE_HPP
 #define ESC_SEQUENCE_HPP
 #include <string>
+#include <variant>
 
 #include <esc/color_index.hpp>
+#include <esc/colors.hpp>
 #include <esc/detail/is_urxvt.hpp>
 #include <esc/detail/traits_to_int_sequence.hpp>
-#include <esc/mask.hpp>
 #include <esc/mouse.hpp>
 #include <esc/point.hpp>
 #include <esc/terminfo.hpp>
@@ -13,6 +14,8 @@
 #include <esc/true_color.hpp>
 
 namespace esc {
+
+// MOUSE MODE ------------------------------------------------------------------
 
 /// Set the mouse input mode; determines which Events are generated for mouse.
 inline auto set_mouse_mode(Mouse_mode mm) -> std::string
@@ -37,6 +40,8 @@ inline auto set_mouse_mode(Mouse_mode mm) -> std::string
     return result;
 }
 
+// SCREEN BUFFER ---------------------------------------------------------------
+
 /// Return control sequence to enable the alternate screen buffer.
 [[nodiscard]] inline auto alternate_screen_buffer() -> std::string
 {
@@ -50,6 +55,8 @@ inline auto set_mouse_mode(Mouse_mode mm) -> std::string
     return "\033["
            "?1049l";
 }
+
+// CURSOR ----------------------------------------------------------------------
 
 /// Return control sequence to hide the cursor on the screen.
 [[nodiscard]] inline auto hide_cursor() -> std::string
@@ -74,18 +81,18 @@ inline auto set_mouse_mode(Mouse_mode mm) -> std::string
            'H';
 }
 
+// TRAITS ----------------------------------------------------------------------
+
 namespace detail {
-
-inline auto current_traits = esc::Mask<esc::Trait>{};
-
+inline auto current_traits = esc::Traits{};
 }
 
 /// Set any number of Traits at the same time, clears existing set Traits.
 /** These Traits will be applied to any text written to the screen after this
  *  call, and before another call to set_traits() or clear_traits(). Traits can
- *  be built up into a Mask<Trait> with operator|, and can be implicitly
- *  converted into Mask<Trait> objects. */
-[[nodiscard]] inline auto set_traits(Mask<Trait> traits) -> std::string
+ *  be built up into a Traits object with operator|, and can be implicitly
+ *  converted into Traits objects. */
+[[nodiscard]] inline auto set_traits(Traits traits) -> std::string
 {
     detail::current_traits = traits;
     return "\033["
@@ -96,7 +103,7 @@ inline auto current_traits = esc::Mask<esc::Trait>{};
 // Remove all Traits currently set, any text written after will have no Traits.
 [[nodiscard]] inline auto clear_traits() -> std::string
 {
-    detail::current_traits = Mask<Trait>{};
+    detail::current_traits = Traits{};
     return "\033["
            "22;23;24;25;27;28;29m";
 }
@@ -104,14 +111,19 @@ inline auto current_traits = esc::Mask<esc::Trait>{};
 /// Returns the last Traits that were created with set_traits().
 /** May not represent what is on the screen if the last call to set_traits() was
  *  not written to stdout. */
-[[nodiscard]] inline auto get_traits() -> Mask<Trait>
-{
-    return detail::current_traits;
-}
+[[nodiscard]] inline auto traits() -> Traits { return detail::current_traits; }
+
+// COLORS ----------------------------------------------------------------------
+
+namespace detail {
+inline auto current_background = esc::Colors{esc::Default_color{}};
+inline auto current_foreground = esc::Colors{esc::Default_color{}};
+}  // namespace detail
 
 /// Set the background color to the index \p i into the xterm palette.
 [[nodiscard]] inline auto set_background(Color_index i) -> std::string
 {
+    detail::current_background = i;
     return "\033["
            "48;5;" +
            std::to_string(i.value) + 'm';
@@ -120,6 +132,7 @@ inline auto current_traits = esc::Mask<esc::Trait>{};
 /// Set the background color to a terminal 'true color'.
 [[nodiscard]] inline auto set_background(True_color c) -> std::string
 {
+    detail::current_background = c;
     return "\033["
            "48;2;" +
            std::to_string(c.red) + ';' + std::to_string(c.green) + ';' +
@@ -129,13 +142,23 @@ inline auto current_traits = esc::Mask<esc::Trait>{};
 /// Reset the background color to the terminal default.
 [[nodiscard]] inline auto reset_background() -> std::string
 {
+    detail::current_background = Default_color{};
     return "\033["
            "49m";
+}
+
+/// Returns the last color that was created with set_background().
+/** May not represent what is on the screen if the last call to set_background()
+ *  was not written to stdout. */
+[[nodiscard]] inline auto background_color() -> Colors
+{
+    return detail::current_background;
 }
 
 /// Set the foreground color to the index \p i into the xterm palette.
 [[nodiscard]] inline auto set_foreground(Color_index i) -> std::string
 {
+    detail::current_foreground = i;
     return "\033["
            "38;5;" +
            std::to_string(i.value) + 'm';
@@ -144,6 +167,7 @@ inline auto current_traits = esc::Mask<esc::Trait>{};
 /// Set the foreground color to a terminal 'true color'.
 [[nodiscard]] inline auto set_foreground(True_color c) -> std::string
 {
+    detail::current_foreground = c;
     return "\033["
            "38;2;" +
            std::to_string(c.red) + ';' + std::to_string(c.green) + ';' +
@@ -153,13 +177,24 @@ inline auto current_traits = esc::Mask<esc::Trait>{};
 /// Reset the foreground color to the terminal default.
 [[nodiscard]] inline auto reset_foreground() -> std::string
 {
+    detail::current_foreground = Default_color{};
     return "\033["
            "39m";
+}
+
+/// Returns the last color that was created with set_foreground().
+/** May not represent what is on the screen if the last call to set_foreground()
+ *  was not written to stdout. */
+[[nodiscard]] inline auto foreground_color() -> Colors
+{
+    return detail::current_foreground;
 }
 
 /// Reset the foreground and background colors to the terminal default.
 [[nodiscard]] inline auto reset_colors() -> std::string
 {
+    detail::current_background = Default_color{};
+    detail::current_foreground = Default_color{};
     return "\033["
            "39;49m";
 }

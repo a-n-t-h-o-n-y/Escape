@@ -1,10 +1,10 @@
-#ifndef ESC_MASK_HPP
-#define ESC_MASK_HPP
+#ifndef ESC_DETAIL_MASK_HPP
+#define ESC_DETAIL_MASK_HPP
 #include <type_traits>
 
 #include <esc/detail/is_scoped_enum.hpp>
 
-namespace esc {
+namespace esc::detail {
 
 /// Container for Scope Enum Flag Types.
 /** E must be a scoped enum and it is assumed each value in the enum is assigned
@@ -28,18 +28,18 @@ class Mask {
 
     /// Modifies the container by adding the flag \p e.
     /** Returns a copy of the container with the new flag inserted. */
-    constexpr auto insert(E e) -> Mask<E>
+    constexpr auto insert(E e) -> Mask
     {
         flags_ |= ut_cast(e);
-        return Mask<E>{static_cast<E>(flags_)};
+        return Mask{static_cast<E>(flags_)};
     }
 
     /// Modifies the container by removing the flag \p e.
     /** Returns a copy of the container with the given flag removed . */
-    constexpr auto remove(E e) -> Mask<E>
+    constexpr auto remove(E e) -> Mask
     {
         flags_ &= ~(ut_cast(e));
-        return Mask<E>{static_cast<E>(flags_)};
+        return Mask{static_cast<E>(flags_)};
     }
 
     /// Returns the underlying bitmask representation of the container.
@@ -59,21 +59,5 @@ class Mask {
     }
 };
 
-/// Mask creating insert operation, non-modifying, returns the new value.
-template <typename E,
-          typename = std::enable_if_t<detail::is_scoped_enum<E>, void>>
-[[nodiscard]] inline auto operator|(E a, E b) -> Mask<E>
-{
-    return Mask<E>{a}.insert(b);
-}
-
-/// Insert operation, non-modifying, returns the new value.
-template <typename E,
-          typename = std::enable_if_t<detail::is_scoped_enum<E>, void>>
-[[nodiscard]] inline auto operator|(Mask<E> a, E b) -> Mask<E>
-{
-    return a.insert(b);
-}
-
-}  // namespace esc
-#endif  // ESC_MASK_HPP
+}  // namespace esc::detail
+#endif  // ESC_DETAIL_MASK_HPP

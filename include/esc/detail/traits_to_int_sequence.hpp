@@ -1,9 +1,11 @@
 #ifndef ESC_DETAIL_TRAITS_TO_INT_SEQUENCE_HPP
 #define ESC_DETAIL_TRAITS_TO_INT_SEQUENCE_HPP
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 
 #include <esc/trait.hpp>
+
 namespace esc::detail {
 
 /// Translate a single Trait into its string control sequence parameter integer.
@@ -23,11 +25,11 @@ namespace esc::detail {
         case Trait::Crossed_out: return "9";
         case Trait::Double_underline: return "21";
     }
+    throw std::logic_error{"traits_to_int_sequence: Invalid Trait Value"};
 }
 
 /// Turn a mask of traits into a string control sequence of parameter integers.
-[[nodiscard]] inline auto traits_to_int_sequence(Mask<Trait> traits)
-    -> std::string
+[[nodiscard]] inline auto traits_to_int_sequence(Traits traits) -> std::string
 {
     auto constexpr last_trait = 512;
 
@@ -43,5 +45,5 @@ namespace esc::detail {
     return result;
 }
 
-}
-#endif //ESC_DETAIL_TRAITS_TO_INT_SEQUENCE_HPP
+}  // namespace esc::detail
+#endif  // ESC_DETAIL_TRAITS_TO_INT_SEQUENCE_HPP

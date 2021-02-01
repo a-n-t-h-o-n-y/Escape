@@ -2,7 +2,7 @@
 #define ESC_TRAIT_HPP
 #include <cstdint>
 
-#include <esc/mask.hpp>
+#include <esc/detail/mask.hpp>
 
 namespace esc {
 
@@ -19,6 +19,21 @@ enum class Trait : std::uint16_t {
     Crossed_out      = 256,
     Double_underline = 512,
 };
+
+/// Mask type for the Trait flag.
+using Traits = detail::Mask<Trait>;
+
+/// Mask creating insert operation, non-modifying, returns the new value.
+[[nodiscard]] inline auto operator|(Trait a, Trait b) -> Traits
+{
+    return Traits{a}.insert(b);
+}
+
+/// Insert operation, non-modifying, returns the new value.
+[[nodiscard]] inline auto operator|(Traits a, Trait b) -> Traits
+{
+    return a.insert(b);
+}
 
 }  // namespace esc
 #endif  // ESC_TRAIT_HPP

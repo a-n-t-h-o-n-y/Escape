@@ -4,11 +4,34 @@
 
 #include <esc/detail/debug.hpp>
 #include <esc/esc.hpp>
-#include "esc/sequence.hpp"
+
+// return false if should exit.
+template <typename T>
+auto process(T event) -> bool
+{
+    auto ss = std::ostringstream{};
+    esc::detail::print(event, ss);
+    esc::io::write(ss.str());
+    esc::io::flush();
+    return true;
+}
+
+template <>
+auto process<esc::Key_press>(esc::Key_press k) -> bool
+{
+    if (k.key == esc::Key::q)
+        return false;
+    auto ss = std::ostringstream{};
+    esc::detail::print(k, ss);
+    esc::io::write(ss.str());
+    esc::io::flush();
+    return true;
+}
 
 int main()
 {
-    esc::io::initialize();
+    esc::initialize_terminal(esc::Echo::Off, esc::Mode::Immediate,
+                             esc::Signals::Off);
 
     esc::io::write(esc::set_mouse_mode(esc::Mouse_mode::Basic));
     esc::io::write(esc::alternate_screen_buffer());
@@ -29,12 +52,12 @@ int main()
     esc::io::write("Light Purple Foreground, Lime Background; ");
     esc::io::write(U"Double Underline, Italic");
 
-    esc::io::write(esc::set_traits(esc::get_traits() | esc::Trait::Bold));
+    esc::io::write(esc::set_traits(esc::traits() | esc::Trait::Bold));
     esc::io::write(esc::move_cursor({1, 2}));
     esc::io::write("Light Purple Foreground, Lime Background; ");
     esc::io::write("Standout ѱ");
 
-    esc::io::write(esc::set_traits(esc::get_traits().remove(esc::Trait::Bold)));
+    esc::io::write(esc::set_traits(esc::traits().remove(esc::Trait::Bold)));
     esc::io::write(esc::move_cursor({1, 3}));
     esc::io::write(esc::clear_traits());
     esc::io::write("Light Purple Foreground, Lime Background; ");
@@ -66,18 +89,13 @@ int main()
     esc::io::write(esc::clear_traits());
     esc::io::flush();
 
-    while (true) {
-        std::visit(
-            [](auto r) {
-                auto ss = std::ostringstream{};
-                esc::detail::print(r, ss);
-                esc::io::write(ss.str());
-                esc::io::flush();
-            },
-            esc::io::read());
-    }
+    while (std::visit([](auto event) { return process(event); },
+                      esc::io::read())) {}
 
     esc::io::write(esc::set_mouse_mode(esc::Mouse_mode::Off));
     esc::io::write(esc::normal_screen_buffer());
-    esc::io::uninitialize();
+    esc::io::write(esc::show_cursor());
+    esc::io::flush();
+
+    esc::uninitialize_terminal();
 }

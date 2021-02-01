@@ -5,6 +5,7 @@ add_library(
     escape STATIC
         src/io.cpp
         src/terminfo.cpp
+        src/terminal.cpp
 )
 
 target_include_directories(escape PUBLIC include/)
