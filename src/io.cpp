@@ -19,6 +19,7 @@
 #include <esc/area.hpp>
 #include <esc/event.hpp>
 #include <esc/key.hpp>
+#include <esc/terminal.hpp>
 
 namespace {
 
@@ -287,11 +288,7 @@ auto parse(UTF8 x) -> esc::Event
 
 auto parse(Window) -> esc::Event
 {
-    auto ws           = ::winsize{};
-    auto const result = ::ioctl(STDIN_FILENO, TIOCGWINSZ, &ws);
-    if (result == -1)
-        throw std::runtime_error{"io.cpp parse(Window) Can't Read Window Size"};
-    return esc::Window_resize{esc::Area{ws.ws_col, ws.ws_row}};
+    return esc::Window_resize{esc::terminal_area()};
 }
 
 // Lexer -----------------------------------------------------------------------
@@ -432,4 +429,13 @@ auto read(int millisecond_timeout) -> std::optional<Event>
     return std::nullopt;
 }
 
+namespace detail {
+
+void register_SIGWINCH()
+{
+    if (std::signal(SIGWINCH, &resize_handler) == SIG_ERR)
+        throw std::runtime_error{"register_SIGWINCH(): std::signal call"};
+}
+
+}  // namespace detail
 }  // namespace esc

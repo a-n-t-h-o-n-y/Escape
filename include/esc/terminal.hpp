@@ -108,9 +108,9 @@ void set(Args... args)
  *  Cursor  - - - - Show: The Cursor will be displayed on screen.
  *                  Hide: The Cursor will not be displayed on screen.
  *
- *  Echo  - - - - - On  : Text characters will immediatly appear on screen at
+ *  Echo  - - - - - On:   Text characters will immediatly appear on screen at
  *                        the cursor position on key presses.
- *                  Off : Text will not be automatically displayed on key press.
+ *                  Off:  Text will not be automatically displayed on key press.
  *
  *  Input_buffer  - Canonical: Keyboard input will be buffered until the 'Enter'
  *                             key is pressed, or the buffer is filled.
@@ -150,7 +150,7 @@ inline void initialize_interactive_terminal(
 
 // UNINITIALIZE ----------------------------------------------------------------
 
-/// Restore terminal state to before initialize_terminal() was called.
+/// Restore terminal state to before any initialize...() functions were called.
 /** This is Input/Output settings and the C locale. This also sets the normal
  *  screen buffer, displays the cursor, and disables mouse input. */
 void uninitialize_terminal();

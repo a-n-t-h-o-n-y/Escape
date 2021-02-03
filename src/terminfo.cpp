@@ -199,7 +199,8 @@ auto color_palette_size() -> std::uint16_t
 
 auto has_true_color() -> bool
 {
-    return COLORTERM == "truecolor" || COLORTERM == "24bit";
+    return COLORTERM == "truecolor" || COLORTERM == "24bit" ||
+           TERM == "xterm-256color";
 }
 
 }  // namespace esc

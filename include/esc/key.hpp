@@ -202,7 +202,7 @@ inline auto key_to_char32(Key k) -> char32_t
 {
     auto constexpr low  = short{32};
     auto constexpr mid  = short{126};
-    auto constexpr high = short{256};
+    auto constexpr high = short{160};
     auto const value    = static_cast<char32_t>(k);
     return (value < low || (value > mid && value < high))
                ? U'\0'

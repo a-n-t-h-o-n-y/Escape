@@ -75,8 +75,10 @@ void write(Args&&... args)
     auto sv_cast = [](auto w) {
         if constexpr (std::is_convertible_v<decltype(w), std::string_view>)
             return std::string_view{w};
-        else if (std::is_convertible_v<decltype(w), std::u32string_view>)
+        else if constexpr (std::is_convertible_v<decltype(w),
+                                                 std::u32string_view>) {
             return std::u32string_view{w};
+        }
         else
             return w;
     };
@@ -95,5 +97,11 @@ auto read() -> Event;
 /** Returns std::nullopt if timeout passes without an Event. */
 auto read(int millisecond_timeout) -> std::optional<Event>;
 
+namespace detail {
+
+/// register handler for terminal window resize event signals.
+void register_SIGWINCH();
+
+}  // namespace detail
 }  // namespace esc
 #endif  // ESC_IO_HPP

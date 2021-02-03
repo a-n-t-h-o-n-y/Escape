@@ -1,6 +1,7 @@
 #include <esc/terminal.hpp>
 
 #include <clocale>
+#include <stdexcept>
 #include <string>
 #include <utility>
 
@@ -115,19 +116,22 @@ void set(Mouse_mode mm)
 {
     auto const ext_mode = detail::is_urxvt(TERM_var()) ? "1015" : "1006";
 
-    auto result = std::string{"\033[?"};
+    auto result = std::string{};
     switch (mm) {
         case Mouse_mode::Off:
-            result.append("1000;1002;1003;").append(ext_mode).append("l");
+            result.append("\033[?1000;1002;1003;").append(ext_mode).append("l");
             break;
         case Mouse_mode::Basic:
-            result.append("1000;").append(ext_mode).append("h");
+            result.append("\033[?1002;1003l");  // Off
+            result.append("\033[?1000;").append(ext_mode).append("h");
             break;
         case Mouse_mode::Drag:
-            result.append("1002;").append(ext_mode).append("h");
+            result.append("\033[?1000;1003l");  // Off
+            result.append("\033[?1002;").append(ext_mode).append("h");
             break;
         case Mouse_mode::Move:
-            result.append("1003;").append(ext_mode).append("h");
+            result.append("\033[?1000;1002l");  // Off
+            result.append("\033[?1003;").append(ext_mode).append("h");
             break;
     }
     write(result);
@@ -147,6 +151,7 @@ void initialize_terminal(Screen_buffer screen_buffer,
 
     std::setlocale(LC_ALL, "en_US.UTF-8");
     std::setvbuf(stdout, nullptr, _IOFBF, stdout_buf_size);
+    detail::register_SIGWINCH();
 
     fix_ctrl_m();
 
@@ -164,15 +169,23 @@ void uninitialize_terminal()
 
 auto terminal_width() -> std::size_t
 {
-    auto w = ::winsize{};
-    ::ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    auto w            = ::winsize{};
+    auto const result = ::ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    if (result == -1) {
+        throw std::runtime_error{
+            "terminal.cpp terminal_width(): Can't Read Window Size."};
+    }
     return w.ws_col;
 }
 
 auto terminal_height() -> std::size_t
 {
-    auto w = ::winsize{};
-    ::ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    auto w            = ::winsize{};
+    auto const result = ::ioctl(STDIN_FILENO, TIOCGWINSZ, &w);
+    if (result == -1) {
+        throw std::runtime_error{
+            "terminal.cpp terminal_height(): Can't Read Window Size."};
+    }
     return w.ws_row;
 }
 

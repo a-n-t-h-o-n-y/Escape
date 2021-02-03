@@ -70,5 +70,17 @@ enum class Mouse_mode {
     Move    // Basic, plus Move Events sent with or without a Button pressed.
 };
 
+/// Return a string display of the given Mouse_mode enum.
+[[nodiscard]] inline auto to_string(Mouse_mode mm) -> std::string
+{
+    switch (mm) {
+        case Mouse_mode::Off: return "Mouse_mode::Off";
+        case Mouse_mode::Basic: return "Mouse_mode::Basic";
+        case Mouse_mode::Drag: return "Mouse_mode::Drag";
+        case Mouse_mode::Move: return "Mouse_mode::Move";
+    }
+    throw std::logic_error{"to_string(Mouse_mode): Bad Enum Value."};
+}
+
 }  // namespace esc
 #endif  // ESC_MOUSE_HPP

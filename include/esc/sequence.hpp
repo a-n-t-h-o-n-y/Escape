@@ -23,6 +23,8 @@ struct Cursor_position {
    public:
     constexpr Cursor_position(std::size_t x, std::size_t y) : at{x, y} {}
 
+    constexpr Cursor_position(Point p) : at{p} {}
+
    public:
     Point at;
 };
