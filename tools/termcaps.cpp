@@ -314,7 +314,7 @@ struct Termcaps_app {
     Has_true_color has_true_color{{0, 3}};
     Term_size term_size{{0, 4}};
     UTF8_text utf8_text{{0, 5}};
-    Traits_display Traits_display{{0, 6}};
+    Traits_display traits_display{{0, 6}};
     Key_press_display key_press_display{{0, 12}};
     Mouse_display mouse_display{{0, 16}};
     Change_mouse_mode change_mouse_mode{{0, 21}};
