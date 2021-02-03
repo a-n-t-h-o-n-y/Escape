@@ -8,6 +8,7 @@ namespace esc {
 
 /// Visual Traits that can be applied to terminal text with set_traits(...).
 enum class Trait : std::uint16_t {
+    None             = 0,
     Standout         = 1,
     Bold             = 2,
     Dim              = 4,
@@ -24,13 +25,13 @@ enum class Trait : std::uint16_t {
 using Traits = detail::Mask<Trait>;
 
 /// Mask creating insert operation, non-modifying, returns the new value.
-[[nodiscard]] inline auto operator|(Trait a, Trait b) -> Traits
+[[nodiscard]] constexpr auto operator|(Trait a, Trait b) -> Traits
 {
     return Traits{a}.insert(b);
 }
 
 /// Insert operation, non-modifying, returns the new value.
-[[nodiscard]] inline auto operator|(Traits a, Trait b) -> Traits
+[[nodiscard]] constexpr auto operator|(Traits a, Trait b) -> Traits
 {
     return a.insert(b);
 }

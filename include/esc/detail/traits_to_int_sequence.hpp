@@ -15,6 +15,7 @@ namespace esc::detail {
         case Trait::Standout:
             return trait_to_int_sequence(Trait::Bold) + ';' +
                    trait_to_int_sequence(Trait::Inverse);
+        case Trait::None: return "";
         case Trait::Bold: return "1";
         case Trait::Dim: return "2";
         case Trait::Italic: return "3";

@@ -11,11 +11,12 @@
 #include <string>
 #include <string_view>
 
+#include <esc/detail/is_convertible_to_any_of.hpp>
 #include <esc/detail/is_urxvt.hpp>
 #include <esc/event.hpp>
 #include <esc/terminfo.hpp>
 
-namespace esc::io {
+namespace esc {
 
 // -------------------------- Write to Screen ----------------------------------
 
@@ -38,7 +39,7 @@ inline void write(char32_t c) noexcept(false)
 }
 
 /// Writes each char of \p sv to the console via stdout.
-inline auto write(std::string_view const& sv) -> void
+inline auto write(std::string_view sv) -> void
 {
     for (auto c : sv)
         write(c);
@@ -50,6 +51,36 @@ inline void write(std::u32string_view sv)
 {
     for (auto c : sv)
         write(c);
+}
+
+// CONVENIENCE -----------------------------------------------------------------
+
+template <typename T>
+bool constexpr is_writable =
+    detail::is_convertible_to_any_of<T,
+                                     char,
+                                     char32_t,
+                                     std::string_view,
+                                     std::u32string_view>;
+
+/// Writes any number of writable objects, in paramter order.
+template <typename... Args>
+void write(Args&&... args)
+{
+    static_assert(sizeof...(Args) > 0,
+                  "write(...): Must have at least one argument.");
+    static_assert((is_writable<Args> && ...),
+                  "write(...): All Args... must be writable types.");
+
+    auto sv_cast = [](auto w) {
+        if constexpr (std::is_convertible_v<decltype(w), std::string_view>)
+            return std::string_view{w};
+        else if (std::is_convertible_v<decltype(w), std::u32string_view>)
+            return std::u32string_view{w};
+        else
+            return w;
+    };
+    (write(sv_cast(args)), ...);
 }
 
 /// Send all buffered bytes from calls to write(...) to the console device.
@@ -64,52 +95,5 @@ auto read() -> Event;
 /** Returns std::nullopt if timeout passes without an Event. */
 auto read(int millisecond_timeout) -> std::optional<Event>;
 
-// --------------------------- Init/UnInit -------------------------------------
-void disable_canonical_mode_and_echo();
-
-void enable_canonical_mode_and_echo();
-
-// TODO Signal Stuff - own header along with other term altering stuff
-// not terminfo but terminit? would also have a term_init and term_reset method?
-
-/// Sets the locale to utf8, Alt screen buffer, and stdout to use full buffer.
-inline void initialize_stdout()
-{
-    // TODO store current locale in global
-    std::setlocale(LC_ALL, "en_US.UTF-8");
-    std::setvbuf(stdout, nullptr, _IOFBF, 4'096);
-    // TODO sigwinch handler, which somehow makes read() return the resize event
-    // you'd want blocking read to return it as well, that'll be tricky.
-}
-
-/// Set the screen to the Normal buffer.
-inline void uninitialize_stdout() {}
-
-/// Sets up mouse input mode etc...
-void initialize_stdin();
-
-inline void uninitialize_stdin()
-{
-    // TODO should reset locale to what it was at init
-    // TODO should reset termios to what it was at init
-    enable_canonical_mode_and_echo();
-}
-
-/// Perform setup, clears the screen.
-inline void initialize()
-{
-    initialize_stdout();
-    initialize_stdin();
-    flush();
-}
-
-/// Performs teardown, reset the screen to the state before initialize() called.
-inline void uninitialize()
-{
-    uninitialize_stdout();
-    uninitialize_stdin();
-    flush();
-}
-
-}  // namespace esc::io
+}  // namespace esc
 #endif  // ESC_IO_HPP

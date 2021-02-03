@@ -7,7 +7,6 @@
 #include <cuchar>
 #include <iterator>
 #include <optional>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <variant>
@@ -18,7 +17,6 @@
 #include <unistd.h>
 
 #include <esc/area.hpp>
-#include <esc/detail/debug.hpp>
 #include <esc/event.hpp>
 #include <esc/key.hpp>
 
@@ -44,7 +42,7 @@ auto is_stdin_empty(int millisecond_timeout) -> bool
     }
     if (result == timeout)
         return true;
-    if (result > 0 && (file.revents & POLLIN))
+    if (result > 0 && static_cast<bool>(file.revents & POLLIN))
         return false;
     throw std::logic_error{"io.cpp is_stdin_empty(): logic_error."};
 }
@@ -91,7 +89,7 @@ class Control_sequence {
     char final_byte;
 
    public:
-    Control_sequence(std::string sequence)
+    explicit Control_sequence(std::string sequence)
     {
         if (sequence.empty())
             throw std::runtime_error{"Control_sequence(): Invalid Input"};
@@ -119,7 +117,7 @@ using Token = std::variant<Control_sequence, Escaped, UTF8, Window>;
 
 // -----------------------------------------------------------------------------
 
-/// Retrieves the parameter at \p index, read at type T.
+/// Retrieves the integer type parameter at \p index, returns a type T.
 /** \p bytes should only be the parameter bytes. */
 template <typename T, std::size_t index>
 auto parameter(std::string bytes) -> T
@@ -129,10 +127,7 @@ auto parameter(std::string bytes) -> T
             bytes = bytes.substr(bytes.find(';', 0) + 1);
     }
 
-    auto ss     = std::stringstream{bytes.substr(0, bytes.find(';', 0))};
-    auto result = T{};
-    ss >> result;
-    return result;
+    return std::stoul(bytes.substr(0, bytes.find(';', 0)));
 }
 
 auto parse_mouse(Control_sequence cs) -> esc::Event
@@ -144,8 +139,8 @@ auto parse_mouse(Control_sequence cs) -> esc::Event
             cs.parameter_bytes = cs.parameter_bytes.substr(1);
             return parameter<int, 0>(cs.parameter_bytes);
         }
-        else  // URXVT Mode
-            return parameter<int, 0>(cs.parameter_bytes) - 32;
+        // URXVT Mode
+        return parameter<int, 0>(cs.parameter_bytes) - 32;
     }();
     auto const at =
         esc::Point{parameter<std::size_t, 1>(cs.parameter_bytes) - 1,
@@ -266,7 +261,7 @@ auto parse_key_modifiers(std::string parameter_bytes)
                              std::to_string(mod)};
 }
 
-auto parse(Control_sequence cs) -> esc::Event
+auto parse(Control_sequence const& cs) -> esc::Event
 {
     if (cs.final_byte == 'M' || cs.final_byte == 'm')
         return parse_mouse(cs);
@@ -370,7 +365,7 @@ auto next_state(Maybe_CSI state) -> Lexer
         return CSI{""};
 }
 
-auto next_state(CSI state) -> Lexer
+auto next_state(CSI const& state) -> Lexer
 {
     auto const b = read_byte();
     if (b >= 0x40 && b <= 0x7E)
@@ -383,7 +378,7 @@ auto next_state(CSI state) -> Lexer
 // in the mask are treated as wildcards and can be anything in \p value.
 auto matches_mask(std::uint8_t mask, char value) -> std::uint8_t
 {
-    return (mask & value) == mask;
+    return static_cast<std::uint8_t>((mask & value) == mask);
 }
 
 /// Returns the number of bytes left to read to form a complete utf8 character.
@@ -422,47 +417,19 @@ auto read_single_token() -> Token
 
 }  // namespace
 
-namespace esc::io {
+namespace esc {
 
-auto read() -> esc::Event
+auto read() -> Event
 {
     auto const token = read_single_token();
     return std::visit([](auto t) { return parse(t); }, token);
 }
 
-auto read(int millisecond_timeout) -> std::optional<esc::Event>
+auto read(int millisecond_timeout) -> std::optional<Event>
 {
     if (window_resize_sig || !is_stdin_empty(millisecond_timeout))
-        return esc::io::read();
+        return esc::read();
     return std::nullopt;
 }
 
-void disable_canonical_mode_and_echo()
-{
-    auto tty = termios{};
-    tcgetattr(STDIN_FILENO, &tty);
-    tty.c_lflag &= ~ICANON;
-    tty.c_cc[VMIN] = 1;
-    tty.c_lflag &= ~ECHO;
-    tcsetattr(STDIN_FILENO, TCSANOW, &tty);
-}
-
-void enable_canonical_mode_and_echo()
-{
-    auto tty = termios{};
-    tcgetattr(STDIN_FILENO, &tty);
-    tty.c_lflag |= ICANON;
-    tty.c_cc[VMIN] = 1;
-    tty.c_lflag |= ECHO;
-    tcsetattr(STDIN_FILENO, TCSANOW, &tty);
-}
-
-void initialize_stdin()
-{
-    // TODO should store current termios struct
-    if (std::signal(SIGWINCH, &resize_handler) == SIG_ERR)
-        throw std::runtime_error{"io.cpp initialize_stdin(): std::signal call"};
-    disable_canonical_mode_and_echo();
-}
-
-}  // namespace esc::io
+}  // namespace esc

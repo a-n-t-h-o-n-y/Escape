@@ -14,6 +14,8 @@ as possible without relying on the terminfo database.
 
 Please open an issue if you find any bugs.
 
+Note that not all terminals implement these features in the same way.
+
 ## Future Features
 
 - Add `Terminal_focus_in` and `Terminal_focus_out` Events that are triggered on
@@ -23,3 +25,5 @@ Please open an issue if you find any bugs.
 - Add BELL modifier sequences for frequency and duration.
 
 - Sixel graphics, but only if most terminal emulators support this.
+
+- Check MacOS support

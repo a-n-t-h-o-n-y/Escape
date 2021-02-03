@@ -1,11 +1,15 @@
-#include <clocale>
 #include <esc/terminal.hpp>
 
+#include <clocale>
 #include <string>
 #include <utility>
 
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
+
+#include <esc/io.hpp>
+#include <esc/mouse.hpp>
 
 namespace {
 
@@ -30,7 +34,7 @@ auto original_clocale = std::string{};
 
 namespace esc {
 
-void set_echo(Echo e)
+void set(Echo e)
 {
     auto const echo_flag = [e] {
         if (e == esc::Echo::On)
@@ -44,10 +48,10 @@ void set_echo(Echo e)
     ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &settings);
 }
 
-void set_mode(Mode m)
+void set(Input_buffer ib)
 {
-    auto const canon_flag = [m] {
-        if (m == esc::Mode::Canonical)
+    auto const canon_flag = [ib] {
+        if (ib == esc::Input_buffer::Canonical)
             return ICANON;
         else
             return ~(ICANON);
@@ -55,10 +59,12 @@ void set_mode(Mode m)
 
     auto settings = current_termios();
     settings.c_lflag &= canon_flag;
+    if (ib == esc::Input_buffer::Immediate)
+        settings.c_cc[VMIN] = 1;  // Min. number of bytes before sending.
     ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &settings);
 }
 
-void set_signals(Signals s)
+void set(Signals s)
 {
     // ctrl-c, ctrl-z, ctrl-s, ctrl-q, ctrl-v all send their ctrl byte value
     // rather than changing the terminal's behaviour.
@@ -77,25 +83,97 @@ void set_signals(Signals s)
     ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &settings);
 }
 
-void initialize_terminal(Echo e, Mode m, Signals s)
+void set(Screen_buffer sb)
 {
+    if (sb == Screen_buffer::Normal) {
+        write(
+            "\033["
+            "?1049l");
+    }
+    else {
+        write(
+            "\033["
+            "?1049h");
+    }
+}
+
+void set(Cursor c)
+{
+    if (c == Cursor::Show) {
+        write(
+            "\033["
+            "?25h");
+    }
+    else {
+        write(
+            "\033["
+            "?25l");
+    }
+}
+
+void set(Mouse_mode mm)
+{
+    auto const ext_mode = detail::is_urxvt(TERM_var()) ? "1015" : "1006";
+
+    auto result = std::string{"\033[?"};
+    switch (mm) {
+        case Mouse_mode::Off:
+            result.append("1000;1002;1003;").append(ext_mode).append("l");
+            break;
+        case Mouse_mode::Basic:
+            result.append("1000;").append(ext_mode).append("h");
+            break;
+        case Mouse_mode::Drag:
+            result.append("1002;").append(ext_mode).append("h");
+            break;
+        case Mouse_mode::Move:
+            result.append("1003;").append(ext_mode).append("h");
+            break;
+    }
+    write(result);
+}
+
+void initialize_terminal(Screen_buffer screen_buffer,
+                         Mouse_mode mouse_mode,
+                         Cursor cursor,
+                         Echo echo,
+                         Input_buffer input_buffer,
+                         Signals signals)
+{
+    auto constexpr stdout_buf_size = 4'096;
+
     original_clocale = std::setlocale(LC_ALL, nullptr);
     original_termios = current_termios();
 
     std::setlocale(LC_ALL, "en_US.UTF-8");
-    std::setvbuf(stdout, nullptr, _IOFBF, 4'096);
-
-    set_echo(e);
-    set_mode(m);
-    set_signals(s);
+    std::setvbuf(stdout, nullptr, _IOFBF, stdout_buf_size);
 
     fix_ctrl_m();
+
+    set(echo, input_buffer, signals, screen_buffer, mouse_mode, cursor);
+    flush();
 }
 
 void uninitialize_terminal()
 {
+    set(Screen_buffer::Normal, Mouse_mode::Off, Cursor::Show);
+    flush();
     std::setlocale(LC_ALL, original_clocale.c_str());
     ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &original_termios);
+}
+
+auto terminal_width() -> std::size_t
+{
+    auto w = ::winsize{};
+    ::ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    return w.ws_col;
+}
+
+auto terminal_height() -> std::size_t
+{
+    auto w = ::winsize{};
+    ::ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    return w.ws_row;
 }
 
 }  // namespace esc

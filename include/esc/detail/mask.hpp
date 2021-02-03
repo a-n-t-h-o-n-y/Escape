@@ -53,7 +53,7 @@ class Mask {
 
    private:
     /// Return \p e as its underlying type.
-    static auto ut_cast(E e) -> std::underlying_type_t<E>
+    static constexpr auto ut_cast(E e) -> std::underlying_type_t<E>
     {
         return static_cast<std::underlying_type_t<E>>(e);
     }

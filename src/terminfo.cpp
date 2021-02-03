@@ -163,27 +163,34 @@ inline auto const terminfo_db = std::array<Terminfo, 140>{
     Terminfo{"cons25", 8},
 };
 
-[[nodiscard]] auto get_terminfo(std::string_view term_name) -> Terminfo
+[[nodiscard]] auto find_terminfo(std::string_view term_name) -> Terminfo
 {
     auto at = std::find_if(
         std::cbegin(terminfo_db), std::cend(terminfo_db),
         [&term_name](auto const& ti) { return ti.TERM_name == term_name; });
     if (at == std::cend(terminfo_db))
-        throw std::runtime_error{"get_terminfo(): term_name not found."};
+        throw std::runtime_error{"find_terminfo(): term_name not found."};
     return *at;
 }
 
-auto const TERM = std::string{std::getenv("TERM")};
+/// Return env variable, or empty string if it doesn't exist.
+auto get_env(char const* name) -> std::string
+{
+    char const* const v = std::getenv(name);
+    return v == nullptr ? "" : v;
+};
 
-auto const COLORTERM = std::string{std::getenv("COLORTERM")};
+auto const TERM = get_env("TERM");
 
-auto const terminfo = get_terminfo(TERM);
+auto const COLORTERM = get_env("COLORTERM");
+
+auto const terminfo = find_terminfo(TERM);
 
 }  // namespace
 
 namespace esc {
 
-auto get_TERM() -> std::string_view { return TERM; }
+auto TERM_var() -> std::string_view { return TERM; }
 
 auto color_palette_size() -> std::uint16_t
 {

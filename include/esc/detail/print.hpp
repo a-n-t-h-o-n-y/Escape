@@ -1,5 +1,5 @@
-#ifndef ESC_DETAIL_DEBUG_HPP
-#define ESC_DETAIL_DEBUG_HPP
+#ifndef ESC_DETAIL_PRINT_HPP
+#define ESC_DETAIL_PRINT_HPP
 #include <cstdint>
 #include <ios>
 #include <iostream>
@@ -8,39 +8,11 @@
 
 #include <esc/event.hpp>
 #include <esc/key.hpp>
-
-// TODO split this up into pieces, or if just print() name it print()
+#include <esc/mouse.hpp>
 
 namespace esc::detail {
 
-// char version
-/// Translate a single non-visible character into a visible string.
-/** Visible chars pass through unchanged, into a string. */
-[[nodiscard]] inline auto display(char c) -> std::string
-{
-    switch (c) {
-        case '\x9b': return "CSI";
-        case '\033': return "\\033";
-        case '\n': return "\\n";
-        case '\t': return "\\t";
-        case '\0': return "\\0";
-        case '\010': return "\\010";
-        default: return std::string(1, c);
-    }
-}
-
-/// Translate any control characters to a visible byte string.
-/** Visible chars pass through unchanged. */
-[[nodiscard]] inline auto display(std::string const& sequence) -> std::string
-{
-    auto result = std::string{};
-    for (auto c : sequence)
-        result.append(display(c));
-    return result;
-}
-
-// -----------------------------------------------------------------------------
-
+/// Print Key_press struct display to \p os.
 inline auto print(esc::Key_press k, std::ostream& os) -> std::ostream&
 {
     os << "Key::" << static_cast<std::uint32_t>(k.key) << '\n'
@@ -70,30 +42,35 @@ inline auto print(esc::Key_press k, std::ostream& os) -> std::ostream&
     return ss.str();
 }
 
+/// Print Mouse_press struct display to \p os.
 inline auto print(esc::Mouse_press m, std::ostream& os) -> std::ostream&
 {
     os << "struct Mouse_press {\n" << to_string(m.state, "\t") << "\n};\n";
     return os;
 }
 
+/// Print Mouse_release struct display to \p os.
 inline auto print(esc::Mouse_release m, std::ostream& os) -> std::ostream&
 {
     os << "struct Mouse_release {\n" << to_string(m.state, "\t") << "\n};\n";
     return os;
 }
 
+/// Print Scroll_wheel struct display to \p os.
 inline auto print(esc::Scroll_wheel m, std::ostream& os) -> std::ostream&
 {
     os << "struct Scroll_wheel {\n" << to_string(m.state, "\t") << "\n};\n";
     return os;
 }
 
+/// Print Mouse_move struct display to \p os.
 inline auto print(esc::Mouse_move m, std::ostream& os) -> std::ostream&
 {
     os << "struct Mouse_move {\n" << to_string(m.state, "\t") << "\n};\n";
     return os;
 }
 
+/// Print Window_resize struct display to \p os.
 inline auto print(esc::Window_resize w, std::ostream& os) -> std::ostream&
 {
     os << "struct Window_resize {\n"
@@ -104,4 +81,4 @@ inline auto print(esc::Window_resize w, std::ostream& os) -> std::ostream&
 }
 
 }  // namespace esc::detail
-#endif  // ESC_DETAIL_DEBUG_HPP
+#endif  // ESC_DETAIL_PRINT_HPP

@@ -119,5 +119,27 @@ class True_color {
     constexpr True_color(HSL x) : True_color{hsl_to_rgb(x)} {}
 };
 
+/// Tag type for True_color that is used as a background.
+struct BG_True_color {
+    True_color value;
+};
+
+/// Tag type for True_color that is used as a foreground.
+struct FG_True_color {
+    True_color value;
+};
+
+/// Return a background tag type to use with escape(...) function.
+[[nodiscard]] inline auto background(True_color x) -> BG_True_color
+{
+    return {x};
+}
+
+/// Return a foreground tag type to use with escape(...) function.
+[[nodiscard]] inline auto foreground(True_color x) -> FG_True_color
+{
+    return {x};
+}
+
 }  // namespace esc
 #endif  // ESC_TRUE_COLOR_HPP

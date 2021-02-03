@@ -6,7 +6,7 @@
 namespace esc {
 
 /// Return the TERM environment variable from app startup.
-[[nodiscard]] auto get_TERM() -> std::string_view;
+[[nodiscard]] auto TERM_var() -> std::string_view;
 
 /// Return the number of colors in the terminal's color palette.
 /** This is the number of possible Color_index values that will work with the

@@ -2,8 +2,10 @@
 #define ESC_ESC_HPP
 
 #include <esc/area.hpp>
+#include <esc/brush.hpp>
+#include <esc/color.hpp>
 #include <esc/color_index.hpp>
-#include <esc/colors.hpp>
+#include <esc/default_color.hpp>
 #include <esc/event.hpp>
 #include <esc/io.hpp>
 #include <esc/key.hpp>
