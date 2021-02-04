@@ -228,8 +228,9 @@ class Color_palette_display {
    public:
     Color_palette_display(Point offset) : offset_{offset}
     {
-        write(escape(Cursor_position{offset_}, Trait::Bold), "Color Palette",
-              escape(Trait::None));
+        write(escape(Cursor_position{offset_}, Trait::Bold,
+                     background(Default_color{})),
+              "Color Palette", escape(Trait::None));
         auto const color_count = color_palette_size();
         for (std::uint16_t i = 0; i < color_count; ++i) {
             write(escape(Cursor_position{offset_.x + (i % width),
@@ -316,8 +317,8 @@ struct Termcaps_app {
     UTF8_text utf8_text{{0, 5}};
     Traits_display traits_display{{0, 6}};
     Key_press_display key_press_display{{0, 12}};
-    Mouse_display mouse_display{{0, 16}};
-    Change_mouse_mode change_mouse_mode{{0, 21}};
+    Mouse_display mouse_display{{0, 17}};
+    Change_mouse_mode change_mouse_mode{{0, 23}};
     True_color_display true_color_display{{column_two, 0}};
     Color_palette_display color_palette_display{{column_two, 5}};
 };

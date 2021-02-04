@@ -27,3 +27,8 @@ Note that not all terminals implement these features in the same way.
 - Sixel graphics, but only if most terminal emulators support this.
 
 - Check MacOS support
+
+## Known Issues
+
+- Does not work with: aterm, eterm
+- Some terminal emulators mouse input is always in `Mouse_mode::Drag`.
