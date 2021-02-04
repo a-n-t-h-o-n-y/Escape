@@ -24,11 +24,12 @@ Note that not all terminals implement these features in the same way.
 
 - Add BELL modifier sequences for frequency and duration.
 
-- Sixel graphics, but only if most terminal emulators support this.
-
 - Check MacOS support
+
+- Sixel graphics, but only if most terminal emulators support this.
 
 ## Known Issues
 
 - Does not work with: aterm, eterm
-- Some terminal emulators mouse input is always in `Mouse_mode::Drag`.
+
+- Some terminal emulators(Konsole) mouse input is always in `Mouse_mode::Drag`.
