@@ -149,7 +149,8 @@ void initialize_terminal(Screen_buffer screen_buffer,
     original_clocale = std::setlocale(LC_ALL, nullptr);
     original_termios = current_termios();
 
-    std::setlocale(LC_ALL, "en_US.UTF-8");
+    if (std::setlocale(LC_ALL, "en_US.UTF-8") == nullptr)
+        throw std::runtime_error{"initialize_terminal: setlocale() failed."};
     std::setvbuf(stdout, nullptr, _IOFBF, stdout_buf_size);
     detail::register_SIGWINCH();
 
@@ -163,7 +164,8 @@ void uninitialize_terminal()
 {
     set(Screen_buffer::Normal, Mouse_mode::Off, Cursor::Show);
     flush();
-    std::setlocale(LC_ALL, original_clocale.c_str());
+    if (std::setlocale(LC_ALL, original_clocale.c_str()) == nullptr)
+        throw std::runtime_error{"uninitialize_terminal: set_locale() failed."};
     ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &original_termios);
 }
 
