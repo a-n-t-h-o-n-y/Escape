@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cerrno>
 #include <climits>
 #include <csignal>
 #include <cstdint>
