@@ -171,8 +171,8 @@ jobs:
       - run: |
           mkdir build && cd build
           comp="$(brew --prefix llvm)/bin/clang"
-          export CC=comp
-          export CXX=comp"++"
+          export CC="${comp}"
+          export CXX="${comp}++"
           cmake .. && make termcaps
 
   # MacOS-10.15 GCC
