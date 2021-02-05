@@ -147,8 +147,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.1
       - env:
-          CC: clang-6
-          CXX: clang++-6
+          CC: clang-6.0
+          CXX: clang++-6.0
         run: |
           mkdir build && cd build
           cmake .. && make termcaps
@@ -159,8 +159,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.1
       - env:
-          CC: clang-12
-          CXX: clang++-12
+          CC: clang
+          CXX: clang++
         run: |
           mkdir build && cd build
           cmake .. && make termcaps
@@ -168,11 +168,11 @@ jobs:
     runs-on: macos-10.15
     steps:
       - uses: actions/checkout@v2.3.1
-      - env:
-          CC: '$(brew --prefix llvm)/bin/clang'
-          CXX: '$(brew --prefix llvm)/bin/clang++'
-        run: |
+      - run: |
           mkdir build && cd build
+          local -r comp="$(brew --prefix llvm)/bin/clang"
+          export CC=comp
+          export CXX=comp"++"
           cmake .. && make termcaps
 
   # MacOS-10.15 GCC
