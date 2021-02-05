@@ -125,6 +125,11 @@ class Key_press_display {
             return result;
         };
 
+        auto const display = [&kp] {
+            auto const d = key_to_char32(kp.key);
+            return d == U'\0' ? U' ' : d;
+        }();
+
         // clang-format off
         write(escape(Cursor_position{offset_}, Trait::Inverse),
             "Last Key Press -----",
@@ -132,7 +137,7 @@ class Key_press_display {
             "    Enum Value: ", escape(Trait::None), std::to_string(
                 static_cast<std::underlying_type_t<Key>>(kp.key)), "    ",
             escape(Cursor_position{offset_.x, offset_.y + 2}, Trait::Bold),
-            "    Display:    ", escape(Trait::None), key_to_char32(kp.key),
+            "    Display:    ", escape(Trait::None), display,
             escape(Cursor_position{offset_.x, offset_.y + 3}, Trait::Bold,
                 Blank_row{}),
             "    Modifiers:  ", escape(Trait::None),

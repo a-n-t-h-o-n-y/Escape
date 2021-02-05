@@ -5,7 +5,6 @@
 #include <clocale>
 #include <cstddef>
 #include <cstdio>
-#include <cuchar>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -13,6 +12,7 @@
 
 #include <esc/detail/is_convertible_to_any_of.hpp>
 #include <esc/detail/is_urxvt.hpp>
+#include <esc/detail/to_bytes.hpp>
 #include <esc/event.hpp>
 #include <esc/terminfo.hpp>
 
@@ -29,11 +29,7 @@ inline void write(char c) { std::putchar(c); }
  *  Throws std::runtime_error if there is an error during conversion. */
 inline void write(char32_t c) noexcept(false)
 {
-    auto chars       = std::array<char, MB_LEN_MAX>{};
-    auto state       = std::mbstate_t{};
-    auto const count = std::c32rtomb(chars.data(), c, &state);
-    if (count == std::size_t(-1))
-        throw std::runtime_error{"Invalid char32_t to MB conversion."};
+    auto const [count, chars] = esc::detail::to_bytes(c);
     for (auto i = std::size_t{0}; i < count; ++i)
         write(chars[i]);
 }

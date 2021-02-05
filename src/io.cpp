@@ -2,9 +2,9 @@
 
 #include <algorithm>
 #include <array>
+#include <climits>
 #include <csignal>
 #include <cstdint>
-#include <cuchar>
 #include <iterator>
 #include <optional>
 #include <stdexcept>
@@ -17,6 +17,7 @@
 #include <unistd.h>
 
 #include <esc/area.hpp>
+#include <esc/detail/to_char32_t.hpp>
 #include <esc/event.hpp>
 #include <esc/key.hpp>
 #include <esc/terminal.hpp>
@@ -109,7 +110,7 @@ struct Escaped {
 };
 
 struct UTF8 {
-    std::array<char, 4> bytes;
+    std::array<char, MB_LEN_MAX> bytes;
 };
 
 struct Window {};
@@ -278,12 +279,8 @@ auto parse(Escaped e) -> esc::Event
 
 auto parse(UTF8 x) -> esc::Event
 {
-    auto result   = char32_t{};
-    auto mb_state = std::mbstate_t{};
-    auto error    = std::mbrtoc32(&result, x.bytes.data(), 4, &mb_state);
-    if (error == std::size_t(-1))
-        throw std::runtime_error{"io.cpp: parse(UTF8): Bad Byte Sequence"};
-    return esc::Key_press{esc::char32_to_key(result)};
+    return esc::Key_press{
+        esc::char32_to_key(esc::detail::to_char32_t(x.bytes))};
 }
 
 auto parse(Window) -> esc::Event
