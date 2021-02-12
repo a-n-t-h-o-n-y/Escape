@@ -1,7 +1,5 @@
 #ifndef ESC_TERMINAL_HPP
 #define ESC_TERMINAL_HPP
-#include <cstddef>
-
 #include <esc/area.hpp>
 #include <esc/detail/is_any_of.hpp>
 #include <esc/mouse.hpp>
@@ -45,7 +43,7 @@ void set(Signals);
 enum class Screen_buffer { Normal, Alternate };
 
 /// Enable the given screen buffer type.
-/** Calls on io::write internally, but does not call io::flush(). */
+/** Calls on write internally, but does not call flush(). */
 void set(Screen_buffer);
 
 // CURSOR ----------------------------------------------------------------------
@@ -54,13 +52,13 @@ void set(Screen_buffer);
 enum class Cursor { Show, Hide };
 
 /// Enable the given cursor display type.
-/** Calls on io::write internally, but does not call io::flush(). */
+/** Calls on write internally, but does not call flush(). */
 void set(Cursor);
 
 // MOUSE MODE ------------------------------------------------------------------
 
 /// Set the mouse input mode; determines which Events are generated for mouse.
-/** Calls on io::write internally, but does not call io::flush(). */
+/** Calls on write internally, but does not call flush(). */
 void set(Mouse_mode);
 
 // CONVENIENCE -----------------------------------------------------------------
@@ -158,10 +156,10 @@ void uninitialize_terminal();
 // QUERY -----------------------------------------------------------------------
 
 /// Return the width of the terminal screen.
-auto terminal_width() -> std::size_t;
+auto terminal_width() -> int;
 
 /// Return the height of the terminal screen.
-auto terminal_height() -> std::size_t;
+auto terminal_height() -> int;
 
 /// Return the width and height of the terminal screen.
 [[nodiscard]] inline auto terminal_area() -> Area

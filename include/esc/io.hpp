@@ -12,7 +12,7 @@
 
 #include <esc/detail/is_convertible_to_any_of.hpp>
 #include <esc/detail/is_urxvt.hpp>
-#include <esc/detail/to_bytes.hpp>
+#include <esc/detail/u32_to_mb.hpp>
 #include <esc/event.hpp>
 #include <esc/terminfo.hpp>
 
@@ -29,7 +29,7 @@ inline void write(char c) { std::putchar(c); }
  *  Throws std::runtime_error if there is an error during conversion. */
 inline void write(char32_t c) noexcept(false)
 {
-    auto const [count, chars] = esc::detail::to_bytes(c);
+    auto const [count, chars] = esc::detail::u32_to_mb(c);
     for (auto i = std::size_t{0}; i < count; ++i)
         write(chars[i]);
 }

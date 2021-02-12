@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <array>
 #include <cerrno>
-#include <climits>
 #include <csignal>
 #include <cstdint>
 #include <iterator>
@@ -18,7 +17,7 @@
 #include <unistd.h>
 
 #include <esc/area.hpp>
-#include <esc/detail/to_char32_t.hpp>
+#include <esc/detail/mb_to_u32.hpp>
 #include <esc/event.hpp>
 #include <esc/key.hpp>
 #include <esc/terminal.hpp>
@@ -111,7 +110,7 @@ struct Escaped {
 };
 
 struct UTF8 {
-    std::array<char, MB_LEN_MAX> bytes;
+    std::array<char, 4> bytes;
 };
 
 struct Window {};
@@ -145,9 +144,8 @@ auto parse_mouse(Control_sequence cs) -> esc::Event
         // URXVT Mode
         return parameter<int, 0>(cs.parameter_bytes) - 32;
     }();
-    auto const at =
-        esc::Point{parameter<std::size_t, 1>(cs.parameter_bytes) - 1,
-                   parameter<std::size_t, 2>(cs.parameter_bytes) - 1};
+    auto const at = esc::Point{parameter<int, 1>(cs.parameter_bytes) - 1,
+                               parameter<int, 2>(cs.parameter_bytes) - 1};
 
     // State
     using esc::Mouse;
@@ -236,29 +234,28 @@ auto parse_key(Control_sequence cs) -> esc::Key
                              std::string(1, cs.final_byte)};
 }
 
-auto parse_key_modifiers(std::string parameter_bytes)
-    -> esc::Key_press::Modifiers
+auto parse_key_modifiers(std::string parameter_bytes) -> esc::Mod
 {
     if (parameter_count(parameter_bytes) < 2)
-        return {};
+        return static_cast<esc::Mod>(0);
     auto const mod = parameter<int, 1>(parameter_bytes);
     switch (mod) {
-        // {shift, ctrl, alt, meta}
-        case 2: return {true};
-        case 3: return {false, false, true};
-        case 4: return {true, false, true};
-        case 5: return {false, true};
-        case 6: return {true, true};
-        case 7: return {false, true, true};
-        case 8: return {true, true, true};
-        case 9: return {false, false, false, true};
-        case 10: return {true, false, false, true};
-        case 11: return {false, false, true, true};
-        case 12: return {true, false, true, true};
-        case 13: return {false, true, false, true};
-        case 14: return {true, true, false, true};
-        case 15: return {false, true, true, true};
-        case 16: return {true, true, true, true};
+        using esc::Mod;
+        case 2: return Mod::Shift;
+        case 3: return Mod::Alt;
+        case 4: return Mod::Shift | Mod::Alt;
+        case 5: return Mod::Ctrl;
+        case 6: return Mod::Shift | Mod::Ctrl;
+        case 7: return Mod::Ctrl | Mod::Alt;
+        case 8: return Mod::Shift | Mod::Ctrl | Mod::Alt;
+        case 9: return Mod::Meta;
+        case 10: return Mod::Shift | Mod::Meta;
+        case 11: return Mod::Alt | Mod::Meta;
+        case 12: return Mod::Shift | Mod::Alt | Mod::Meta;
+        case 13: return Mod::Ctrl | Mod::Meta;
+        case 14: return Mod::Shift | Mod::Ctrl | Mod::Meta;
+        case 15: return Mod::Ctrl | Mod::Alt | Mod::Meta;
+        case 16: return Mod::Shift | Mod::Ctrl | Mod::Alt | Mod::Meta;
     }
     throw std::runtime_error{"io.cpp parse_key_modifiers(): Unknown Mod: " +
                              std::to_string(mod)};
@@ -268,20 +265,18 @@ auto parse(Control_sequence const& cs) -> esc::Event
 {
     if (cs.final_byte == 'M' || cs.final_byte == 'm')
         return parse_mouse(cs);
-    return esc::Key_press{parse_key(cs),
+    return esc::Key_press{parse_key(cs) |
                           parse_key_modifiers(cs.parameter_bytes)};
 }
 
 auto parse(Escaped e) -> esc::Event
 {
-    return esc::Key_press{static_cast<esc::Key>(e.character),
-                          {false, false, true}};
+    return esc::Key_press{static_cast<esc::Key>(e.character)};
 }
 
 auto parse(UTF8 x) -> esc::Event
 {
-    return esc::Key_press{
-        esc::char32_to_key(esc::detail::to_char32_t(x.bytes))};
+    return esc::Key_press{esc::char32_to_key(esc::detail::mb_to_u32(x.bytes))};
 }
 
 auto parse(Window) -> esc::Event

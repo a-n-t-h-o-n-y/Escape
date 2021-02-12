@@ -33,6 +33,11 @@ struct Mouse_move {
     Mouse state;
 };
 
+/// Key Press Event
+struct Key_press {
+    Key key;
+};
+
 /// Terminal Window Resized
 struct Window_resize {
     Area new_dimensions;

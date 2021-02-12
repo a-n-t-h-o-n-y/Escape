@@ -1,7 +1,7 @@
 #ifndef ESC_SEQUENCE_HPP
 #define ESC_SEQUENCE_HPP
-#include <cstddef>
 #include <string>
+#include <variant>
 
 #include <esc/brush.hpp>
 #include <esc/color.hpp>
@@ -21,7 +21,7 @@ namespace esc {
 /// Tag type to move the cursor to a Point.
 struct Cursor_position {
    public:
-    constexpr Cursor_position(std::size_t x, std::size_t y) : at{x, y} {}
+    constexpr Cursor_position(int x, int y) : at{x, y} {}
 
     constexpr Cursor_position(Point p) : at{p} {}
 

@@ -1,6 +1,5 @@
 #ifndef ESC_POINT_HPP
 #define ESC_POINT_HPP
-#include <cstddef>
 #include <functional>
 
 namespace esc {
@@ -9,8 +8,8 @@ namespace esc {
 /** Top-left cell of the terminal is Point{x:0, y:0}. x is horizontal and y is
  *  vertical. */
 struct Point {
-    std::size_t x;
-    std::size_t y;
+    int x;
+    int y;
 };
 
 /// Return true if lhs and rhs have the same values for x and y.
@@ -39,7 +38,7 @@ inline auto operator+(Point const& lhs, Point const& rhs) -> Point
 
 }  // namespace esc
 
-/// Custom specialization of std::hash for esc::point.
+/// Custom specialization of std::hash for esc::Point.
 namespace std {
 template <>
 struct hash<esc::Point> {

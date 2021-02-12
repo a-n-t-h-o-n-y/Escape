@@ -179,6 +179,42 @@ enum class Key : char32_t {
     utf8 = 160
 };
 
+/// Modifier Keys
+enum class Mod : std::underlying_type_t<Key> {
+    // Last bit of unicode currently used is (1 << 20).
+    Shift = (char32_t{1} << 30),
+    Ctrl  = (char32_t{1} << 29),
+    Alt   = (char32_t{1} << 28),
+    Meta  = (char32_t{1} << 27)
+};
+
+/// Insert \p mod into \p key and return a new Key with the modifier added.
+constexpr auto operator|(Mod mod, Key key) -> Key
+{
+    return static_cast<Key>(static_cast<std::underlying_type_t<Mod>>(mod) |
+                            static_cast<std::underlying_type_t<Key>>(key));
+}
+
+/// Insert \p mod into \p key and return a new Key with the modifier added.
+constexpr auto operator|(Key key, Mod mod) -> Key
+{
+    return esc::operator|(mod, key);
+}
+
+/// Insert \p mod into \p key and return a new Key with the modifier added.
+constexpr auto operator|(Mod a, Mod b) -> Mod
+{
+    return static_cast<Mod>(static_cast<std::underlying_type_t<Mod>>(a) |
+                            static_cast<std::underlying_type_t<Mod>>(b));
+}
+
+/// Return true if \p mod is set on the given \p key.
+constexpr auto is_set(Key key, Mod mod) -> bool
+{
+    return (static_cast<std::underlying_type_t<Key>>(key) &
+            static_cast<std::underlying_type_t<Mod>>(mod)) > 0;
+}
+
 /// Translate a char to one of the first 256 Key enum values.
 inline auto char_to_key(char c) -> Key { return static_cast<Key>(c); }
 
@@ -209,36 +245,11 @@ inline auto key_to_char32(Key k) -> char32_t
                : static_cast<char32_t>(value);
 }
 
-/// Key code enum with modifier keys that were held down at time of keypress.
-struct Key_press {
-    /// Key Pressed
-    Key key;
-
-    /// Keyboard Modifiers
-    struct Modifiers {
-        bool shift = false;
-        bool ctrl  = false;
-        bool alt   = false;
-        bool meta  = false;
-    } modifiers = {};
-};
-
-constexpr auto operator==(Key_press const& a, Key_press const& b) -> bool
-{
-    return std::tie(a.key, a.modifiers.alt, a.modifiers.ctrl, a.modifiers.meta,
-                    a.modifiers.shift) ==
-           std::tie(b.key, b.modifiers.alt, b.modifiers.ctrl, b.modifiers.meta,
-                    b.modifiers.shift);
-}
-
-constexpr auto operator!=(Key_press const& a, Key_press const& b) -> bool
-{
-    return !(a == b);
-}
-
 }  // namespace esc
 
 namespace std {
+
+// Required for gcc < 6.1 and sometimes clang 7?
 
 /// For use in Hash-Maps.
 template <>

@@ -1,7 +1,6 @@
-#ifndef ESC_DETAIL_TO_BYTES_HPP
-#define ESC_DETAIL_TO_BYTES_HPP
+#ifndef ESC_DETAIL_U32_TO_MB_HPP
+#define ESC_DETAIL_U32_TO_MB_HPP
 #include <array>
-#include <climits>
 #include <cstddef>
 #include <stdexcept>
 #include <utility>
@@ -16,10 +15,10 @@ namespace esc::detail {
 
 /// Convert the given char32_t into a multi-byte array of chars.
 /** Depends on the currently set clocale to transform the char32_t. */
-[[nodiscard]] inline auto to_bytes(char32_t c)
-    -> std::pair<std::size_t, std::array<char, MB_LEN_MAX>>
+[[nodiscard]] inline auto u32_to_mb(char32_t c)
+    -> std::pair<std::size_t, std::array<char, 4>>
 {
-    auto result = std::array<char, MB_LEN_MAX>{};
+    auto result = std::array<char, 4>{};
     auto state  = std::mbstate_t{};
 
 #ifdef __APPLE__
@@ -31,9 +30,9 @@ namespace esc::detail {
     auto const count = std::c32rtomb(result.data(), c, &state);
 #endif
     if (count == std::size_t(-1))
-        throw std::runtime_error{"to_bytes(char32_t): Error in Conversion."};
+        throw std::runtime_error{"u32_to_mb(char32_t): Error in Conversion."};
     return {count, result};
 }
 
 }  // namespace esc::detail
-#endif  // ESC_DETAIL_TO_BYTES_HPP
+#endif  // ESC_DETAIL_U32_TO_MB_HPP

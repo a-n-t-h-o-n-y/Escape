@@ -1,13 +1,12 @@
 #ifndef ESC_AREA_HPP
 #define ESC_AREA_HPP
-#include <cstddef>
 
 namespace esc {
 
-/// Holds a width and height as std::size_t objects.
+/// Holds a width and height as `int`s.
 struct Area {
-    std::size_t width;
-    std::size_t height;
+    int width;
+    int height;
 };
 
 /// Compares the dimension values, not calculated areas.

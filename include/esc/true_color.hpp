@@ -10,6 +10,19 @@ struct RGB {
     std::uint8_t red;
     std::uint8_t green;
     std::uint8_t blue;
+
+    /// Direct contstruction with red, green and blue values.
+    constexpr RGB(std::uint8_t r, std::uint8_t g, std::uint8_t b)
+        : red{r}, green{g}, blue{b}
+    {}
+
+    /// Takes a (hex) value and pulls out 8 byte segments for RGB.
+    /** RGB{0x7f9860} 0x7f is red, 0x98 is green, 0x60 is blue. */
+    constexpr RGB(std::uint32_t hex)
+        : red{static_cast<std::uint8_t>(hex >> 16 & 0xFF)},
+          green{static_cast<std::uint8_t>(hex >> 8 & 0xFF)},
+          blue{static_cast<std::uint8_t>(hex & 0xFF)}
+    {}
 };
 
 /// Holds Hue, Saturation, Lightness values of a color.

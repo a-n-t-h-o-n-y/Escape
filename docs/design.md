@@ -131,13 +131,13 @@ namespace esc::debug {
 #include <esc/esc.hpp>
 
 int main() {
-    esc::io::initialize();
+    esc::initialize();
     auto count = 0;
     while (count < 4) {
-        auto const e = esc::io::read();
+        auto const e = esc::read();
         std::visit([](auto const& x){ esc::debug::print(x, std::cerr); }, e);
         ++count;
     }
-    esc::io::uninitialize();
+    esc::uninitialize();
 }
 ```

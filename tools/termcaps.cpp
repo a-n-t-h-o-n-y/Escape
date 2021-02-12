@@ -116,12 +116,12 @@ class Key_press_display {
    public:
     void update(Key_press kp) const
     {
-        auto mods_to_string = [](auto mods) {
+        auto mods_to_string = [](auto k) {
             auto result = std::string{};
-            result.append(mods.shift ? "Shift " : "");
-            result.append(mods.ctrl ? "Ctrl " : "");
-            result.append(mods.alt ? "Atl " : "");
-            result.append(mods.meta ? "Meta" : "");
+            result.append(is_set(k, Mod::Shift) ? "Shift " : "");
+            result.append(is_set(k, Mod::Ctrl) ? "Ctrl " : "");
+            result.append(is_set(k, Mod::Alt) ? "Alt " : "");
+            result.append(is_set(k, Mod::Meta) ? "Meta" : "");
             return result;
         };
 
@@ -141,7 +141,7 @@ class Key_press_display {
             escape(Cursor_position{offset_.x, offset_.y + 3}, Trait::Bold,
                 Blank_row{}),
             "    Modifiers:  ", escape(Trait::None),
-                mods_to_string(kp.modifiers)
+                mods_to_string(kp.key)
         );
         // clang-format on
         flush();
@@ -207,7 +207,7 @@ class Change_mouse_mode {
     }
 
    public:
-    auto row() const -> std::size_t { return offset_.y; }
+    auto row() const -> int { return offset_.y; }
 
     auto current_mode() const -> Mouse_mode { return current_; }
 
@@ -237,19 +237,13 @@ class Color_palette_display {
                      background(Default_color{})),
               "Color Palette", escape(Trait::None));
         auto const color_count = color_palette_size();
-        for (std::uint16_t i = 0; i < color_count; ++i) {
+        for (auto i = 0; i < color_count; ++i) {
             write(escape(Cursor_position{offset_.x + (i % width),
                                          offset_.y + (i / width) + 1},
                          background(Color_index{static_cast<std::uint8_t>(i)})),
                   ' ');
         }
         write(escape(background(Default_color{})));
-    }
-
-   public:
-    auto height() const -> std::size_t
-    {
-        return (color_palette_size() / width) + 1;
     }
 
    private:

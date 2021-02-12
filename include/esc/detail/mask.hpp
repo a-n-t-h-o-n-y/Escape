@@ -23,23 +23,39 @@ class Mask {
     /// Return true if \p e is contained within the mask.
     [[nodiscard]] constexpr auto contains(E e) const -> bool
     {
-        return static_cast<bool>(flags_ & ut_cast(e));
+        return (flags_ & ut_cast(e)) > 0;
     }
 
     /// Modifies the container by adding the flag \p e.
-    /** Returns a copy of the container with the new flag inserted. */
-    constexpr auto insert(E e) -> Mask
+    /** Returns a reference to the container with the new flag inserted. */
+    constexpr auto insert(E e) -> Mask&
     {
         flags_ |= ut_cast(e);
-        return Mask{static_cast<E>(flags_)};
+        return *this;
+    }
+
+    /// Modifies the container by adding all flags from the Mask \p m.
+    /** Returns a reference to the container with the new flag inserted. */
+    constexpr auto insert(Mask m) -> Mask&
+    {
+        flags_ |= m.data();
+        return *this;
     }
 
     /// Modifies the container by removing the flag \p e.
-    /** Returns a copy of the container with the given flag removed . */
-    constexpr auto remove(E e) -> Mask
+    /** Returns a reference to the container. */
+    constexpr auto remove(E e) -> Mask&
     {
         flags_ &= ~(ut_cast(e));
-        return Mask{static_cast<E>(flags_)};
+        return *this;
+    }
+
+    /// Modifies the container by removing the flags contained within \p m.
+    /** Returns a reference to the container. */
+    constexpr auto remove(Mask m) -> Mask&
+    {
+        flags_ &= ~(m.data());
+        return *this;
     }
 
     /// Returns the underlying bitmask representation of the container.
@@ -58,6 +74,13 @@ class Mask {
         return static_cast<std::underlying_type_t<E>>(e);
     }
 };
+
+/// Return true if data() members are equal.
+template <typename E>
+constexpr auto operator==(Mask<E> a, Mask<E> b) -> bool
+{
+    return a.data() == b.data();
+}
 
 }  // namespace esc::detail
 #endif  // ESC_DETAIL_MASK_HPP

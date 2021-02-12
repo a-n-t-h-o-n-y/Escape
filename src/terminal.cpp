@@ -169,7 +169,7 @@ void uninitialize_terminal()
     ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &original_termios);
 }
 
-auto terminal_width() -> std::size_t
+auto terminal_width() -> int
 {
     auto w            = ::winsize{};
     auto const result = ::ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
@@ -180,7 +180,7 @@ auto terminal_width() -> std::size_t
     return w.ws_col;
 }
 
-auto terminal_height() -> std::size_t
+auto terminal_height() -> int
 {
     auto w            = ::winsize{};
     auto const result = ::ioctl(STDIN_FILENO, TIOCGWINSZ, &w);
