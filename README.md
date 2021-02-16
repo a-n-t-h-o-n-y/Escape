@@ -1,4 +1,4 @@
-# EscapeLib 🕳️
+# Escape 🕳️
 
 __Terminal Escape Sequence Library__
 

@@ -28,6 +28,10 @@ void fix_ctrl_m()
     ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &settings);
 }
 
+[[nodiscard]] auto turn_off_auto_wrap() -> std::string { return "\033[?7l"; }
+
+[[nodiscard]] auto turn_on_auto_wrap() -> std::string { return "\033[?7h"; }
+
 auto original_termios = ::termios{};
 auto original_clocale = std::string{};
 
@@ -100,15 +104,17 @@ void set(Screen_buffer sb)
 
 void set(Cursor c)
 {
-    if (c == Cursor::Show) {
-        write(
-            "\033["
-            "?25h");
-    }
-    else {
-        write(
-            "\033["
-            "?25l");
+    switch (c) {
+        case Cursor::Show:
+            write(
+                "\033["
+                "?25h");
+            break;
+        case Cursor::Hide:
+            write(
+                "\033["
+                "?25l");
+            break;
     }
 }
 
@@ -155,6 +161,7 @@ void initialize_terminal(Screen_buffer screen_buffer,
     detail::register_SIGWINCH();
 
     fix_ctrl_m();
+    write(turn_off_auto_wrap());
 
     set(echo, input_buffer, signals, screen_buffer, mouse_mode, cursor);
     flush();
@@ -162,6 +169,7 @@ void initialize_terminal(Screen_buffer screen_buffer,
 
 void uninitialize_terminal()
 {
+    write(turn_on_auto_wrap());
     set(Screen_buffer::Normal, Mouse_mode::Off, Cursor::Show);
     flush();
     if (std::setlocale(LC_ALL, original_clocale.c_str()) == nullptr)
