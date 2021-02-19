@@ -20,10 +20,10 @@ enum class Key : char32_t {
     Bell,                       // Ctrl + g
     Backspace_1,                // Ctrl + h - Not necessarily the Backspace Key.
     Tab,                        // Ctrl + i OR Tab Key
-    Enter,                      // Ctrl + j OR Ctrl + m OR Enter - AKA Line Feed
+    New_line,                   // Ctrl + j AKA Line Feed
     Vertical_tab,               // Ctrl + k
     Form_feed,                  // Ctrl + l
-    Carriage_return_,           // Ctrl + m - Usually not mapped to Enter key
+    Enter,                      // Ctrl + m - Mapped to Enter key
     Shift_out,                  // Ctrl + n
     Shift_in,                   // Ctrl + o
     Data_link_escape,           // Ctrl + p
@@ -240,6 +240,10 @@ inline auto key_to_char32(Key k) -> char32_t
     auto constexpr mid  = short{126};
     auto constexpr high = short{160};
     auto const value    = static_cast<char32_t>(k);
+    if (is_set(k, Mod::Shift) || is_set(k, Mod::Ctrl) || is_set(k, Mod::Alt) ||
+        is_set(k, Mod::Meta)) {
+        return U'\0';
+    }
     return (value < low || (value > mid && value < high))
                ? U'\0'
                : static_cast<char32_t>(value);

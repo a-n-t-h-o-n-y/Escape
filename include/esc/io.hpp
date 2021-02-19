@@ -41,6 +41,15 @@ inline auto write(std::string_view sv) -> void
         write(c);
 }
 
+/// Writes each char of \p s to the console via stdout.
+inline auto write(std::string const& s) -> void
+{
+    std::fputs(s.c_str(), stdout);
+}
+
+/// Writes each char of \p s to the console via stdout.
+inline auto write(char const* s) -> void { std::fputs(s, stdout); }
+
 /// Writes each char32_t of \p sv to the console via stdout.
 /** Calls write(char32_t) for each element of \p sv. */
 inline void write(std::u32string_view sv)
@@ -56,29 +65,19 @@ bool constexpr is_writable =
     detail::is_convertible_to_any_of<T,
                                      char,
                                      char32_t,
+                                     std::string,
                                      std::string_view,
+                                     char const*,
                                      std::u32string_view>;
 
 /// Writes any number of writable objects, in paramter order.
-template <typename... Args>
+template <typename... Args,
+          typename = std::enable_if_t<(sizeof...(Args) > 1), void>>
 void write(Args&&... args)
 {
-    static_assert(sizeof...(Args) > 0,
-                  "write(...): Must have at least one argument.");
     static_assert((is_writable<Args> && ...),
                   "write(...): All Args... must be writable types.");
-
-    auto sv_cast = [](auto w) {
-        if constexpr (std::is_convertible_v<decltype(w), std::string_view>)
-            return std::string_view{w};
-        else if constexpr (std::is_convertible_v<decltype(w),
-                                                 std::u32string_view>) {
-            return std::u32string_view{w};
-        }
-        else
-            return w;
-    };
-    (write(sv_cast(args)), ...);
+    (write(args), ...);
 }
 
 /// Send all buffered bytes from calls to write(...) to the console device.
