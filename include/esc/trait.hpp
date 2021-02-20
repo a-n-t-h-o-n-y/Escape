@@ -78,9 +78,15 @@ constexpr auto operator|=(Traits& a, Traits b) -> Traits&
 }
 
 /// Return true if \p a has exactly the same set of Traits as \p b.
-constexpr auto operator==(Traits a, Traits b) -> bool
+[[nodiscard]] constexpr auto operator==(Traits a, Traits b) -> bool
 {
     return a.data() == b.data();
+}
+
+/// Return true if \p a doesn't have exactly the same set of Traits as \p b.
+[[nodiscard]] constexpr auto operator!=(Traits a, Traits b) -> bool
+{
+    return a.data() != b.data();
 }
 
 }  // namespace esc
