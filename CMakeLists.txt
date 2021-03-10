@@ -8,6 +8,19 @@ add_library(
         src/terminal.cpp
 )
 
+include(GNUInstallDirs)
+install(TARGETS escape
+        ARCHIVE
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        CONFIGURATIONS Release
+)
+install(
+    DIRECTORY
+        ${PROJECT_SOURCE_DIR}/include/esc
+    DESTINATION
+        ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
 target_include_directories(escape PUBLIC include/)
 target_compile_features(escape PUBLIC cxx_std_17)
 target_compile_options(escape PUBLIC -Wall -Wextra)
