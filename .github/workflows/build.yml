@@ -26,26 +26,6 @@ jobs:
         run: |
           mkdir build && cd build
           cmake .. && make termcaps
-  gcc-build-ubuntu20-gcc8:
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.1
-      - env:
-          CC: gcc-8
-          CXX: g++-8
-        run: |
-          mkdir build && cd build
-          cmake .. && make termcaps
-  gcc-build-ubuntu20-gcc7:
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.1
-      - env:
-          CC: gcc-7
-          CXX: g++-7
-        run: |
-          mkdir build && cd build
-          cmake .. && make termcaps
 
   # Ubuntu-20 Clang
   clang-build-ubuntu20-clang10:
@@ -65,16 +45,6 @@ jobs:
       - env:
           CC: clang-9
           CXX: clang++-9
-        run: |
-          mkdir build && cd build
-          cmake .. && make termcaps
-  clang-build-ubuntu20-clang8:
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.1
-      - env:
-          CC: clang-8
-          CXX: clang++-8
         run: |
           mkdir build && cd build
           cmake .. && make termcaps
@@ -100,16 +70,6 @@ jobs:
         run: |
           mkdir build && cd build
           cmake .. && make termcaps
-  gcc-build-ubuntu18-gcc8:
-    runs-on: ubuntu-18.04
-    steps:
-      - uses: actions/checkout@v2.3.1
-      - env:
-          CC: gcc-8
-          CXX: g++-8
-        run: |
-          mkdir build && cd build
-          cmake .. && make termcaps
   gcc-build-ubuntu18-gcc7:
     runs-on: ubuntu-18.04
     steps:
@@ -132,26 +92,6 @@ jobs:
         run: |
           mkdir build && cd build
           cmake .. && make termcaps
-  clang-build-ubuntu18-clang8:
-    runs-on: ubuntu-18.04
-    steps:
-      - uses: actions/checkout@v2.3.1
-      - env:
-          CC: clang-8
-          CXX: clang++-8
-        run: |
-          mkdir build && cd build
-          cmake .. && make termcaps
-  # clang-build-ubuntu18-clang6: # std::variant bug with io.cpp std::get<>
-  #   runs-on: ubuntu-18.04
-  #   steps:
-  #     - uses: actions/checkout@v2.3.1
-  #     - env:
-  #         CC: clang-6.0
-  #         CXX: clang++-6.0
-  #       run: |
-  #         mkdir build && cd build
-  #         cmake .. && make termcaps
 
   # MacOS-10.15 Clang
   clang-build-MacOS10-clang12:
