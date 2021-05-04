@@ -12,13 +12,13 @@ struct BG_Default_color {};
 struct FG_Default_color {};
 
 /// Return a background tag type to use with escape(...) function.
-[[nodiscard]] inline auto background(Default_color) -> BG_Default_color
+[[nodiscard]] auto constexpr background(Default_color) -> BG_Default_color
 {
     return {};
 }
 
 /// Return a foreground tag type to use with escape(...) function.
-[[nodiscard]] inline auto foreground(Default_color) -> FG_Default_color
+[[nodiscard]] auto constexpr foreground(Default_color) -> FG_Default_color
 {
     return {};
 }

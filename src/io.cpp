@@ -5,6 +5,7 @@
 #include <cerrno>
 #include <csignal>
 #include <cstdint>
+#include <cstdio>
 #include <iterator>
 #include <optional>
 #include <stdexcept>
@@ -18,6 +19,7 @@
 
 #include <esc/area.hpp>
 #include <esc/detail/mb_to_u32.hpp>
+#include <esc/detail/u32_to_mb.hpp>
 #include <esc/event.hpp>
 #include <esc/key.hpp>
 #include <esc/terminal.hpp>
@@ -409,6 +411,33 @@ auto read_single_token() -> Token
 
 namespace esc {
 
+void write(char c) { std::putchar(c); }
+
+void write(char32_t c) noexcept(false)
+{
+    auto const [count, chars] = esc::detail::u32_to_mb(c);
+    for (auto i = std::size_t{0}; i < count; ++i)
+        write(chars[i]);
+}
+
+void write(std::string_view sv)
+{
+    for (auto c : sv)
+        write(c);
+}
+
+void write(std::string const& s) { std::fputs(s.c_str(), stdout); }
+
+void write(char const* s) { std::fputs(s, stdout); }
+
+void write(std::u32string_view sv)
+{
+    for (auto c : sv)
+        write(c);
+}
+
+void flush() { std::fflush(::stdout); }
+
 auto read() -> Event
 {
     auto const token = read_single_token();
@@ -422,7 +451,9 @@ auto read(int millisecond_timeout) -> std::optional<Event>
     return std::nullopt;
 }
 
-namespace detail {
+}  // namespace esc
+
+namespace esc::detail {
 
 void register_SIGWINCH()
 {
@@ -430,5 +461,4 @@ void register_SIGWINCH()
         throw std::runtime_error{"register_SIGWINCH(): std::signal call"};
 }
 
-}  // namespace detail
-}  // namespace esc
+}  // namespace esc::detail

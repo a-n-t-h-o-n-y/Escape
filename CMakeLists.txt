@@ -7,20 +7,34 @@ add_library(
         src/io.cpp
         src/terminfo.cpp
         src/terminal.cpp
+        src/trait.cpp
+        src/sequence.cpp
+        src/point.cpp
+        src/mouse.cpp
+        src/detail/display.cpp
+        src/detail/is_urxvt.cpp
+        src/detail/mb_to_u32.cpp
+        src/detail/print.cpp
+        src/detail/traits_to_int_sequence.cpp
+        src/detail/u32_to_mb.cpp
 )
 
 target_include_directories(escape PUBLIC include/)
 target_compile_features(escape PUBLIC cxx_std_17)
 target_compile_options(escape PUBLIC -Wall -Wextra)
 
+option(LTO "Turn Link Time Optimization ON/OFF" ON)
+
 # Link-Time Optimization
 include(CheckIPOSupported)
 check_ipo_supported(RESULT has_lto OUTPUT error)
-if(has_lto)
-    set_property(TARGET escape PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
-    message("LTO Enabled for EscapeLib")
-else()
+if(has_lto AND LTO)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    message("LTO Enabled Globally")
+elseif(NOT has_lto)
     message(WARNING "LTO is not supported: ${error}")
+else()
+    message("LTO Not Enabled")
 endif()
 
 include(GNUInstallDirs)

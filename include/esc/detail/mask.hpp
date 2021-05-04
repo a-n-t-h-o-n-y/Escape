@@ -21,14 +21,14 @@ class Mask {
 
    public:
     /// Return true if \p e is contained within the mask.
-    [[nodiscard]] constexpr auto contains(E e) const -> bool
+    [[nodiscard]] auto constexpr contains(E e) const -> bool
     {
         return (flags_ & ut_cast(e)) > 0;
     }
 
     /// Modifies the container by adding the flag \p e.
     /** Returns a reference to the container with the new flag inserted. */
-    constexpr auto insert(E e) -> Mask&
+    auto constexpr insert(E e) -> Mask&
     {
         flags_ |= ut_cast(e);
         return *this;
@@ -36,7 +36,7 @@ class Mask {
 
     /// Modifies the container by adding all flags from the Mask \p m.
     /** Returns a reference to the container with the new flag inserted. */
-    constexpr auto insert(Mask m) -> Mask&
+    auto constexpr insert(Mask m) -> Mask&
     {
         flags_ |= m.data();
         return *this;
@@ -44,7 +44,7 @@ class Mask {
 
     /// Modifies the container by removing the flag \p e.
     /** Returns a reference to the container. */
-    constexpr auto remove(E e) -> Mask&
+    auto constexpr remove(E e) -> Mask&
     {
         flags_ &= ~(ut_cast(e));
         return *this;
@@ -52,14 +52,14 @@ class Mask {
 
     /// Modifies the container by removing the flags contained within \p m.
     /** Returns a reference to the container. */
-    constexpr auto remove(Mask m) -> Mask&
+    auto constexpr remove(Mask m) -> Mask&
     {
         flags_ &= ~(m.data());
         return *this;
     }
 
     /// Returns the underlying bitmask representation of the container.
-    [[nodiscard]] constexpr auto data() const -> std::underlying_type_t<E>
+    [[nodiscard]] auto constexpr data() const -> std::underlying_type_t<E>
     {
         return flags_;
     }
@@ -69,7 +69,7 @@ class Mask {
 
    private:
     /// Return \p e as its underlying type.
-    static constexpr auto ut_cast(E e) -> std::underlying_type_t<E>
+    static auto constexpr ut_cast(E e) -> std::underlying_type_t<E>
     {
         return static_cast<std::underlying_type_t<E>>(e);
     }
@@ -77,7 +77,7 @@ class Mask {
 
 /// Return true if data() members are equal.
 template <typename E>
-constexpr auto operator==(Mask<E> a, Mask<E> b) -> bool
+auto constexpr operator==(Mask<E> a, Mask<E> b) -> bool
 {
     return a.data() == b.data();
 }

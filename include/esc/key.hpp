@@ -189,42 +189,42 @@ enum class Mod : std::underlying_type_t<Key> {
 };
 
 /// Insert \p mod into \p key and return a new Key with the modifier added.
-constexpr auto operator|(Mod mod, Key key) -> Key
+auto constexpr operator|(Mod mod, Key key) -> Key
 {
     return static_cast<Key>(static_cast<std::underlying_type_t<Mod>>(mod) |
                             static_cast<std::underlying_type_t<Key>>(key));
 }
 
 /// Insert \p mod into \p key and return a new Key with the modifier added.
-constexpr auto operator|(Key key, Mod mod) -> Key
+auto constexpr operator|(Key key, Mod mod) -> Key
 {
     return esc::operator|(mod, key);
 }
 
 /// Insert \p mod into \p key and return a new Key with the modifier added.
-constexpr auto operator|(Mod a, Mod b) -> Mod
+auto constexpr operator|(Mod a, Mod b) -> Mod
 {
     return static_cast<Mod>(static_cast<std::underlying_type_t<Mod>>(a) |
                             static_cast<std::underlying_type_t<Mod>>(b));
 }
 
 /// Return true if \p mod is set on the given \p key.
-constexpr auto is_set(Key key, Mod mod) -> bool
+auto constexpr is_set(Key key, Mod mod) -> bool
 {
     return (static_cast<std::underlying_type_t<Key>>(key) &
             static_cast<std::underlying_type_t<Mod>>(mod)) > 0;
 }
 
 /// Translate a char to one of the first 256 Key enum values.
-inline auto char_to_key(char c) -> Key { return static_cast<Key>(c); }
+auto constexpr char_to_key(char c) -> Key { return static_cast<Key>(c); }
 
 /// Translate a char32_t to a Key value.
-inline auto char32_to_key(char32_t c) -> Key { return static_cast<Key>(c); }
+auto constexpr char32_to_key(char32_t c) -> Key { return static_cast<Key>(c); }
 
 /// Translate a keycode \p k into its char representation.
 /** Return '\0' if \p k does not have a printable representation, or it's too
  *  large to fit in a single char. See key_to_char32(Key). */
-inline auto key_to_char(Key k) -> char
+auto constexpr key_to_char(Key k) -> char
 {
     auto constexpr low  = 32;
     auto constexpr high = 126;
@@ -234,7 +234,7 @@ inline auto key_to_char(Key k) -> char
 
 /// Translate a keycode \p k into its char32_t representation.
 /** Return '\0' if \p k is a ctrl char or special key. */
-inline auto key_to_char32(Key k) -> char32_t
+auto constexpr key_to_char32(Key k) -> char32_t
 {
     auto constexpr low  = short{32};
     auto constexpr mid  = short{126};

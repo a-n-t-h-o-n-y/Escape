@@ -9,6 +9,7 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include <esc/detail/is_urxvt.hpp>
 #include <esc/io.hpp>
 #include <esc/mouse.hpp>
 
@@ -167,6 +168,18 @@ void initialize_terminal(Screen_buffer screen_buffer,
     flush();
 }
 
+void initialize_normal_terminal()
+{
+    initialize_terminal(Screen_buffer::Normal, Mouse_mode::Off, Cursor::Show,
+                        Echo::On, Input_buffer::Canonical, Signals::On);
+}
+
+void initialize_interactive_terminal(Mouse_mode mouse_mode, Signals signals)
+{
+    initialize_terminal(Screen_buffer::Alternate, mouse_mode, Cursor::Hide,
+                        Echo::Off, Input_buffer::Immediate, signals);
+}
+
 void uninitialize_terminal()
 {
     write(turn_on_auto_wrap());
@@ -198,5 +211,7 @@ auto terminal_height() -> int
     }
     return w.ws_row;
 }
+
+auto terminal_area() -> Area { return {terminal_width(), terminal_height()}; }
 
 }  // namespace esc

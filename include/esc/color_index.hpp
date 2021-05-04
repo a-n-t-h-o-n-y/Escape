@@ -10,13 +10,13 @@ struct Color_index {
 };
 
 /// Return true if \p a and \p b contain the same index value.
-inline auto operator==(Color_index a, Color_index b) -> bool
+auto constexpr operator==(Color_index a, Color_index b) -> bool
 {
     return a.value == b.value;
 }
 
 /// Return false if \p a and \p b contain the same index value.
-inline auto operator!=(Color_index a, Color_index b) -> bool
+auto constexpr operator!=(Color_index a, Color_index b) -> bool
 {
     return a.value != b.value;
 }
@@ -49,13 +49,13 @@ struct FG_Color_index {
 };
 
 /// Return a background tag type to use with escape(...) function.
-[[nodiscard]] inline auto background(Color_index x) -> BG_Color_index
+[[nodiscard]] auto constexpr background(Color_index x) -> BG_Color_index
 {
     return {x};
 }
 
 /// Return a foreground tag type to use with escape(...) function.
-[[nodiscard]] inline auto foreground(Color_index x) -> FG_Color_index
+[[nodiscard]] auto constexpr foreground(Color_index x) -> FG_Color_index
 {
     return {x};
 }

@@ -129,22 +129,13 @@ void initialize_terminal(Screen_buffer,
 /// Initialize the terminal with 'normal' settings.
 /** The terminal should mimic normal terminal input/output activity, leaving the
  *  screen buffer as is and echoing key presses, among other things. */
-inline void initialize_normal_terminal()
-{
-    initialize_terminal(Screen_buffer::Normal, Mouse_mode::Off, Cursor::Show,
-                        Echo::On, Input_buffer::Canonical, Signals::On);
-}
+void initialize_normal_terminal();
 
 /// Initialize the terminal with 'interactive' settings.
 /** This is for typical console full-screen applications, the alternate screen
  *  buffer is set, key press echo is off, and the input buffer is immediate. */
-inline void initialize_interactive_terminal(
-    Mouse_mode mouse_mode = Mouse_mode::Basic,
-    Signals signals       = Signals::On)
-{
-    initialize_terminal(Screen_buffer::Alternate, mouse_mode, Cursor::Hide,
-                        Echo::Off, Input_buffer::Immediate, signals);
-}
+void initialize_interactive_terminal(Mouse_mode mouse_mode = Mouse_mode::Basic,
+                                     Signals signals       = Signals::On);
 
 // UNINITIALIZE ----------------------------------------------------------------
 
@@ -162,10 +153,7 @@ auto terminal_width() -> int;
 auto terminal_height() -> int;
 
 /// Return the width and height of the terminal screen.
-[[nodiscard]] inline auto terminal_area() -> Area
-{
-    return {terminal_width(), terminal_height()};
-}
+[[nodiscard]] auto terminal_area() -> Area;
 
 }  // namespace esc
 #endif  // ESC_TERMINAL_HPP

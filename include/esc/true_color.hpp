@@ -36,14 +36,14 @@ namespace detail {
 
 /// constexpr Absolute Value
 template <typename T>
-constexpr auto abs(T x) -> T
+auto constexpr abs(T x) -> T
 {
     return (x == T(0) ? T(0) : x < T(0) ? -x : x);
 }
 
 /// constexpr Modulo
 template <typename T>
-constexpr auto fmod(const T x, const T y) -> T
+auto constexpr fmod(const T x, const T y) -> T
 {
     return (x - T(static_cast<long long>(x / y)) * y);
 }
@@ -51,7 +51,7 @@ constexpr auto fmod(const T x, const T y) -> T
 }  // namespace detail
 
 /// Convert HSL to RGB
-constexpr auto hsl_to_rgb(HSL v) -> RGB
+auto constexpr hsl_to_rgb(HSL v) -> RGB
 {
     double const lightness  = v.lightness / 100.;
     double const saturation = v.saturation / 100.;
@@ -82,7 +82,7 @@ constexpr auto hsl_to_rgb(HSL v) -> RGB
 }
 
 /// Convert RGB to HSL
-constexpr auto rgb_to_hsl(RGB x) -> HSL
+auto constexpr rgb_to_hsl(RGB x) -> HSL
 {
     double const r_prime = x.red / 255.;
     double const g_prime = x.green / 255.;

@@ -4,15 +4,12 @@
 #include <climits>
 #include <clocale>
 #include <cstddef>
-#include <cstdio>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 
 #include <esc/detail/is_convertible_to_any_of.hpp>
-#include <esc/detail/is_urxvt.hpp>
-#include <esc/detail/u32_to_mb.hpp>
 #include <esc/event.hpp>
 #include <esc/terminfo.hpp>
 
@@ -21,42 +18,26 @@ namespace esc {
 // -------------------------- Write to Screen ----------------------------------
 
 /// Writes a single byte to the console via stdout.
-inline void write(char c) { std::putchar(c); }
+void write(char c);
 
 /// Writes a 4 byte char to the console via stdout.
 /** Converts the character to a multi-byte array via std::c32rtomb() and sends
  *  each resulting char to write(). The conversion uses the current C locale.
  *  Throws std::runtime_error if there is an error during conversion. */
-inline void write(char32_t c) noexcept(false)
-{
-    auto const [count, chars] = esc::detail::u32_to_mb(c);
-    for (auto i = std::size_t{0}; i < count; ++i)
-        write(chars[i]);
-}
+void write(char32_t c) noexcept(false);
 
 /// Writes each char of \p sv to the console via stdout.
-inline auto write(std::string_view sv) -> void
-{
-    for (auto c : sv)
-        write(c);
-}
+void write(std::string_view sv);
 
 /// Writes each char of \p s to the console via stdout.
-inline auto write(std::string const& s) -> void
-{
-    std::fputs(s.c_str(), stdout);
-}
+auto write(std::string const& s) -> void;
 
 /// Writes each char of \p s to the console via stdout.
-inline auto write(char const* s) -> void { std::fputs(s, stdout); }
+void write(char const* s);
 
 /// Writes each char32_t of \p sv to the console via stdout.
 /** Calls write(char32_t) for each element of \p sv. */
-inline void write(std::u32string_view sv)
-{
-    for (auto c : sv)
-        write(c);
-}
+void write(std::u32string_view sv);
 
 // CONVENIENCE -----------------------------------------------------------------
 
@@ -81,7 +62,7 @@ void write(Args&&... args)
 }
 
 /// Send all buffered bytes from calls to write(...) to the console device.
-inline void flush() { std::fflush(::stdout); }
+void flush();
 
 // ----------------------------- Reading --------------------------------------
 
@@ -92,11 +73,12 @@ auto read() -> Event;
 /** Returns std::nullopt if timeout passes without an Event. */
 auto read(int millisecond_timeout) -> std::optional<Event>;
 
-namespace detail {
+}  // namespace esc
+
+namespace esc::detail {
 
 /// register handler for terminal window resize event signals.
 void register_SIGWINCH();
 
-}  // namespace detail
-}  // namespace esc
+}  // namespace esc::detail
 #endif  // ESC_IO_HPP

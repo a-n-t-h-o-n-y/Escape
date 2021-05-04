@@ -8,8 +8,6 @@
 #include <esc/color_index.hpp>
 #include <esc/default_color.hpp>
 #include <esc/detail/is_any_of.hpp>
-#include <esc/detail/is_urxvt.hpp>
-#include <esc/detail/traits_to_int_sequence.hpp>
 #include <esc/point.hpp>
 #include <esc/trait.hpp>
 #include <esc/true_color.hpp>
@@ -32,11 +30,7 @@ struct Cursor_position {
 /// Return control sequence to move the cursor to the specified Point.
 /** Top-left cell of the terminal is Point{x:0, y:0}. x is horizontal and y is
  *  vertical. The next string output to stdout will happen starting at \p p. */
-[[nodiscard]] inline auto escape(Cursor_position p) -> std::string
-{
-    return "\033[" + std::to_string(p.at.y + 1) + ';' +
-           std::to_string(p.at.x + 1) + 'H';
-}
+[[nodiscard]] auto escape(Cursor_position p) -> std::string;
 
 // CLEAR -----------------------------------------------------------------------
 
@@ -45,160 +39,71 @@ struct Blank_row {};
 
 /// Return control sequence to clear the row the cursor is currently at.
 /** Write escape(Cursor_position) result before to pick which line to clear. */
-[[nodiscard]] inline auto escape(Blank_row) -> std::string
-{
-    return "\033["
-           "2K";
-}
+[[nodiscard]] auto escape(Blank_row) -> std::string;
 
 /// Tag type to clear the entire screen.
 struct Blank_screen {};
 
 /// Return control sequence to erase everything on the screen.
-[[nodiscard]] inline auto escape(Blank_screen) -> std::string
-{
-    return "\033["
-           "?2J";
-}
+[[nodiscard]] auto escape(Blank_screen) -> std::string;
 
 // TRAITS ----------------------------------------------------------------------
-
-namespace detail {
-inline auto current_traits = esc::Traits{Trait::None};
-}
 
 /// Return control sequence to set any number of Traits, clears existing Traits.
 /** These Traits will be applied to any text written to the screen after this
  *  call, and before another call to escape(Traits). Traits can be built up into
  *  a Traits object with operator|, and can be implicitly converted into Traits
  *  objects. A single Trait::None will clear the set traits. */
-[[nodiscard]] inline auto escape(Traits traits) -> std::string
-{
-    detail::current_traits = traits;
-    if (traits.data() == 0) {  // Trait::None
-        // Clear Traits
-        return "\033["
-               "22;23;24;25;27;28;29m";
-    }
-    else {
-        return "\033["
-               "22;23;24;25;27;28;29;" +
-               detail::traits_to_int_sequence(traits) + 'm';
-    }
-}
+[[nodiscard]] auto escape(Traits traits) -> std::string;
 
 /// Overloaded needed so variadic escape() does not inf. recurse.
-[[nodiscard]] inline auto escape(Trait trait) -> std::string
-{
-    return escape(Traits{trait});
-}
+[[nodiscard]] auto escape(Trait trait) -> std::string;
 
 /// Return control sequence to remove all Traits currently set.
 /** Any text written after will have no Traits. */
-[[nodiscard]] inline auto clear_traits() -> std::string
-{
-    detail::current_traits = Traits{};
-    return "\033["
-           "22;23;24;25;27;28;29m";
-}
+[[nodiscard]] auto clear_traits() -> std::string;
 
 /// Returns the last Traits that were created with escape(Traits).
 /** May not represent what is on the screen if the last call to escape(Traits)
  *  was not written to stdout. */
-[[nodiscard]] inline auto traits() -> Traits { return detail::current_traits; }
-
-// COLORS ----------------------------------------------------------------------
-
-namespace detail {
-inline auto current_background = esc::Color{esc::Default_color{}};
-inline auto current_foreground = esc::Color{esc::Default_color{}};
-}  // namespace detail
+[[nodiscard]] auto traits() -> Traits;
 
 // BACKGROUND COLOR ------------------------------------------------------------
 
 /// Return control sequence to set background to given xterm palette index.
-[[nodiscard]] inline auto escape(BG_Color_index x) -> std::string
-{
-    detail::current_background = x.value;
-    return "\033["
-           "48;5;" +
-           std::to_string(x.value.value) + 'm';
-}
+[[nodiscard]] auto escape(BG_Color_index x) -> std::string;
 
 /// Return control sequence to set background to given terminal true color.
-[[nodiscard]] inline auto escape(BG_True_color x) -> std::string
-{
-    detail::current_background = x.value;
-    return "\033["
-           "48;2;" +
-           std::to_string(x.value.red) + ';' + std::to_string(x.value.green) +
-           ';' + std::to_string(x.value.blue) + 'm';
-}
+[[nodiscard]] auto escape(BG_True_color x) -> std::string;
 
 /// Return control sequence to reset the background to the terminal default
-[[nodiscard]] inline auto escape(BG_Default_color) -> std::string
-{
-    detail::current_background = Default_color{};
-    return "\033["
-           "49m";
-}
+[[nodiscard]] auto escape(BG_Default_color) -> std::string;
 
 /// Returns the last color that was created with set_background().
 /** May not represent what is on the screen if the last call to set_background()
  *  was not written to stdout. */
-[[nodiscard]] inline auto background_color() -> Color
-{
-    return detail::current_background;
-}
+[[nodiscard]] auto background_color() -> Color;
 
 // FOREGROUND COLOR ------------------------------------------------------------
 
 /// Return control sequence to set foreground to given xterm palette index.
-[[nodiscard]] inline auto escape(FG_Color_index x) -> std::string
-{
-    detail::current_foreground = x.value;
-    return "\033["
-           "38;5;" +
-           std::to_string(x.value.value) + 'm';
-}
+[[nodiscard]] auto escape(FG_Color_index x) -> std::string;
 
 /// Return control sequence to set foreground to given terminal true color.
-[[nodiscard]] inline auto escape(FG_True_color x) -> std::string
-{
-    detail::current_foreground = x.value;
-    return "\033["
-           "38;2;" +
-           std::to_string(x.value.red) + ';' + std::to_string(x.value.green) +
-           ';' + std::to_string(x.value.blue) + 'm';
-}
+[[nodiscard]] auto escape(FG_True_color x) -> std::string;
 
 /// Return control sequence to reset the foreground to the terminal default
-[[nodiscard]] inline auto escape(FG_Default_color) -> std::string
-{
-    detail::current_foreground = Default_color{};
-    return "\033["
-           "39m";
-}
+[[nodiscard]] auto escape(FG_Default_color) -> std::string;
 
 /// Returns the last color that was created with set_foreground().
 /** May not represent what is on the screen if the last call to set_foreground()
  *  was not written to stdout. */
-[[nodiscard]] inline auto foreground_color() -> Color
-{
-    return detail::current_foreground;
-}
+[[nodiscard]] auto foreground_color() -> Color;
 
 // BRUSH -----------------------------------------------------------------------
 
 /// Return control sequence to set Brush Colors and Traits.
-[[nodiscard]] inline auto escape(Brush b) -> std::string
-{
-    auto const bg =
-        std::visit([](auto c) { return escape(background(c)); }, b.background);
-    auto const fg =
-        std::visit([](auto c) { return escape(foreground(c)); }, b.foreground);
-    return bg + fg + escape(b.traits);
-}
+[[nodiscard]] auto escape(Brush b) -> std::string;
 
 // CONVENIENCE -----------------------------------------------------------------
 
