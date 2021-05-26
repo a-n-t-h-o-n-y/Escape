@@ -1,7 +1,7 @@
 #ifndef ESC_POINT_HPP
 #define ESC_POINT_HPP
-#include <functional>
 #include <cstddef>
+#include <functional>
 
 namespace esc {
 
@@ -14,25 +14,29 @@ struct Point {
 };
 
 /// Return true if lhs and rhs have the same values for x and y.
-auto constexpr operator==(Point const& lhs, Point const& rhs) -> bool
+[[nodiscard]] auto constexpr operator==(Point const& lhs, Point const& rhs)
+    -> bool
 {
     return lhs.x == rhs.x && lhs.y == rhs.y;
 }
 
 /// Return false if lhs and rhs have the same values for x and y.
-auto constexpr operator!=(Point const& lhs, Point const& rhs) -> bool
+[[nodiscard]] auto constexpr operator!=(Point const& lhs, Point const& rhs)
+    -> bool
 {
     return !(lhs == rhs);
 }
 
 /// Only useful for total ordering, y is considered first, then x.
-auto constexpr operator<(Point const& lhs, Point const& rhs) -> bool
+[[nodiscard]] auto constexpr operator<(Point const& lhs, Point const& rhs)
+    -> bool
 {
     return (lhs.y < rhs.y) || (lhs.y == rhs.y && lhs.x < rhs.x);
 }
 
 /// Adds x coordinates and y coordinates together.
-auto constexpr operator+(Point const& lhs, Point const& rhs) -> Point
+[[nodiscard]] auto constexpr operator+(Point const& lhs, Point const& rhs)
+    -> Point
 {
     return {lhs.x + rhs.x, lhs.y + rhs.y};
 }
