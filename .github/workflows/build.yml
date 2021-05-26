@@ -6,6 +6,16 @@ on:
 
 jobs:
   # Ubuntu-20 GCC
+  build-ubuntu20-gcc11:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2.3.1
+      - env:
+          CC: gcc-11
+          CXX: g++-11
+        run: |
+          mkdir build && cd build
+          cmake .. && make termcaps
   gcc-build-ubuntu20-gcc10:
     runs-on: ubuntu-20.04
     steps:
@@ -28,6 +38,26 @@ jobs:
           cmake .. && make termcaps
 
   # Ubuntu-20 Clang
+  build-ubuntu20-clang12:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2.3.1
+      - env:
+          CC: clang-12
+          CXX: clang++-12
+        run: |
+          mkdir build && cd build
+          cmake .. && make termcaps
+  build-ubuntu20-clang11:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2.3.1
+      - env:
+          CC: clang-11
+          CXX: clang++-11
+        run: |
+          mkdir build && cd build
+          cmake .. && make termcaps
   clang-build-ubuntu20-clang10:
     runs-on: ubuntu-20.04
     steps:
@@ -35,16 +65,6 @@ jobs:
       - env:
           CC: clang-10
           CXX: clang++-10
-        run: |
-          mkdir build && cd build
-          cmake .. && make termcaps
-  clang-build-ubuntu20-clang9:
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.1
-      - env:
-          CC: clang-9
-          CXX: clang++-9
         run: |
           mkdir build && cd build
           cmake .. && make termcaps
@@ -104,18 +124,18 @@ jobs:
         run: |
           mkdir build && cd build
           cmake .. && make termcaps
-  clang-build-MacOS10-clang11:
+
+  # MacOS-10.15 GCC
+  build-MacOS10-gcc11:
     runs-on: macos-10.15
     steps:
       - uses: actions/checkout@v2.3.1
-      - run: |
+      - env:
+          CC: gcc-11
+          CXX: g++-11
+        run: |
           mkdir build && cd build
-          comp="$(brew --prefix llvm)/bin/clang"
-          export CC="${comp}"
-          export CXX="${comp}++"
           cmake .. && make termcaps
-
-  # MacOS-10.15 GCC
   clang-build-MacOS10-gcc10:
     runs-on: macos-10.15
     steps:
