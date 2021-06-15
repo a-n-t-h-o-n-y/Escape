@@ -38,7 +38,7 @@ namespace detail {
 template <typename T>
 auto constexpr abs(T x) -> T
 {
-    return (x == T(0) ? T(0) : x < T(0) ? -x : x);
+    return x < T(0) ? -x : x;
 }
 
 /// constexpr Modulo
@@ -99,7 +99,7 @@ auto constexpr rgb_to_hsl(RGB x) -> HSL
         double const den = 1. - detail::abs(2. * lightness - 1.);
         return delta / den;
     }();
-    std::uint16_t const hue = [&] {
+    double const hue = [&] {
         if (delta == 0.)
             return 0.;
         if (c_max == r_prime)
@@ -108,7 +108,7 @@ auto constexpr rgb_to_hsl(RGB x) -> HSL
             return 60. * (((b_prime - r_prime) / delta) + 2.);
         if (c_max == b_prime)
             return 60. * (((r_prime - g_prime) / delta) + 4.);
-        return .0;
+        return 0.;
     }();
     return {static_cast<std::uint16_t>(hue),
             static_cast<std::uint8_t>(saturation * 100),
