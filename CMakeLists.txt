@@ -2,26 +2,38 @@ cmake_minimum_required(VERSION 3.9)
 project(escape LANGUAGES CXX)
 
 # Escape Library
-add_library(
-    escape STATIC
-        src/io.cpp
-        src/terminfo.cpp
-        src/terminal.cpp
-        src/trait.cpp
-        src/sequence.cpp
-        src/point.cpp
-        src/mouse.cpp
-        src/detail/display.cpp
-        src/detail/is_urxvt.cpp
-        src/detail/mb_to_u32.cpp
-        src/detail/print.cpp
-        src/detail/traits_to_int_sequence.cpp
-        src/detail/u32_to_mb.cpp
+add_library(escape STATIC
+    src/io.cpp
+    src/terminfo.cpp
+    src/terminal.cpp
+    src/trait.cpp
+    src/sequence.cpp
+    src/point.cpp
+    src/mouse.cpp
+    src/detail/display.cpp
+    src/detail/is_urxvt.cpp
+    src/detail/mb_to_u32.cpp
+    src/detail/print.cpp
+    src/detail/traits_to_int_sequence.cpp
+    src/detail/u32_to_mb.cpp
 )
 
-target_include_directories(escape PUBLIC include/)
-target_compile_features(escape PUBLIC cxx_std_17)
-target_compile_options(escape PUBLIC -Wall -Wextra)
+target_include_directories(escape
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_compile_features(escape
+    PUBLIC
+        cxx_std_17
+)
+
+target_compile_options(escape
+    PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+)
 
 option(LTO "Turn Link Time Optimization ON/OFF" ON)
 
@@ -51,5 +63,19 @@ install(
 )
 
 # TermCaps Executable
-add_executable(termcaps EXCLUDE_FROM_ALL tools/termcaps.cpp)
-target_link_libraries(termcaps PRIVATE escape)
+add_executable(termcaps EXCLUDE_FROM_ALL
+    tools/termcaps.cpp
+)
+
+target_link_libraries(termcaps
+    PRIVATE
+        escape
+)
+
+target_compile_options(termcaps
+    PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+)
+
