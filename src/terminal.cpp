@@ -1,6 +1,8 @@
 #include <esc/terminal.hpp>
 
 #include <clocale>
+#include <cstdlib>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -9,9 +11,12 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include <esc/detail/console_file.hpp>
 #include <esc/detail/is_urxvt.hpp>
 #include <esc/io.hpp>
 #include <esc/mouse.hpp>
+
+#include "detail/tty_file.hpp"
 
 namespace {
 
@@ -56,12 +61,8 @@ void set(Echo e)
 
 void set(Input_buffer ib)
 {
-    auto const canon_flag = [ib] {
-        if (ib == esc::Input_buffer::Canonical)
-            return ICANON;
-        else
-            return ~(ICANON);
-    }();
+    auto const canon_flag =
+        (ib == esc::Input_buffer::Canonical) ? ICANON : ~(ICANON);
 
     auto settings = current_termios();
     settings.c_lflag &= canon_flag;
@@ -91,15 +92,27 @@ void set(Signals s)
 
 void set(Screen_buffer sb)
 {
-    if (sb == Screen_buffer::Normal) {
-        write(
-            "\033["
-            "?1049l");
+    switch (sb) {
+        case Screen_buffer::Normal:
+            write(
+                "\033["
+                "?1049l");
+            break;
+        case Screen_buffer::Alternate:
+            write(
+                "\033["
+                "?1049h");
+            break;
     }
-    else {
-        write(
-            "\033["
-            "?1049h");
+}
+
+void set(Key_mode km)
+{
+    switch (km) {
+        case Key_mode::Normal: break;
+        case Key_mode::Alternate:
+            detail::tty_file_descriptor = detail::open_console_file();
+            break;
     }
 }
 
@@ -149,39 +162,54 @@ void initialize_terminal(Screen_buffer screen_buffer,
                          Cursor cursor,
                          Echo echo,
                          Input_buffer input_buffer,
-                         Signals signals)
+                         Signals signals,
+                         Key_mode key_mode)
 {
     auto constexpr stdout_buf_size = 4'096;
+    // TODO record current settings before calling set, this is ioctl things and
+    // tcsetaddr things and locale. termios? probably from tcsetaddr
 
     original_clocale = std::setlocale(LC_ALL, nullptr);
     original_termios = current_termios();
 
     if (std::setlocale(LC_ALL, "en_US.UTF-8") == nullptr)
-        throw std::runtime_error{"initialize_terminal: setlocale() failed."};
+        throw std::runtime_error{"initialize_terminal(): setlocale() failed."};
     std::setvbuf(stdout, nullptr, _IOFBF, stdout_buf_size);
     detail::register_SIGWINCH();
 
     fix_ctrl_m();
     write(turn_off_auto_wrap());
 
-    set(echo, input_buffer, signals, screen_buffer, mouse_mode, cursor);
+    try {
+        set(echo, input_buffer, signals, screen_buffer, mouse_mode, cursor,
+            key_mode);
+    }
+    catch (std::runtime_error const& e) {
+        uninitialize_terminal();
+        std::cerr << "Error: " << e.what() << '\n';
+        std::exit(1);
+    }
     flush();
 }
 
 void initialize_normal_terminal()
 {
     initialize_terminal(Screen_buffer::Normal, Mouse_mode::Off, Cursor::Show,
-                        Echo::On, Input_buffer::Canonical, Signals::On);
+                        Echo::On, Input_buffer::Canonical, Signals::On,
+                        Key_mode::Normal);
 }
 
 void initialize_interactive_terminal(Mouse_mode mouse_mode, Signals signals)
 {
     initialize_terminal(Screen_buffer::Alternate, mouse_mode, Cursor::Hide,
-                        Echo::Off, Input_buffer::Immediate, signals);
+                        Echo::Off, Input_buffer::Immediate, signals,
+                        Key_mode::Alternate);
 }
 
 void uninitialize_terminal()
 {
+    // TODO take settings parameter and use that to reset the terminal to
+    // settings before.
     write(turn_on_auto_wrap());
     set(Screen_buffer::Normal, Mouse_mode::Off, Cursor::Show);
     flush();

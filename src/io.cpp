@@ -24,11 +24,22 @@
 #include <esc/key.hpp>
 #include <esc/terminal.hpp>
 
+#include "detail/tty_file.hpp"
+
+// TODO
+// for read
+//     auto const fd = open_tty_fd();
+//     set_keyboard_mode(MEDIUM_RAW);
+
+//     char byte;
+//     ssize_t size = read(fd, &byte, 1);
+//     printf("fd3 Read byte   %c\n", byte);
+
 namespace {
 
 /// Return true if there is nothing to ready from stdin.
 /** Waits up to \p timeout for bytes to be written to stdin. */
-auto is_stdin_empty(int millisecond_timeout) -> bool
+[[nodiscard]] auto is_stdin_empty(int millisecond_timeout) -> bool
 {
     auto file   = pollfd{};
     file.fd     = STDIN_FILENO;
@@ -438,6 +449,44 @@ void write(std::u32string_view sv)
 
 void flush() { std::fflush(::stdout); }
 
+// you want to read from console and stdin, which will have duplicates and stdin
+// will throw out keyboard events, but how do you separate this out and read as
+// many times as needed? just always check console first and if there is nothing
+// move onto stdin and if there are events in both, you will read from console
+// and return and from stdin and return, but this returns an Event, not an
+// optional, and that second read is going to be thrown out.. maybe you can do a
+// duplicate check somehow.. like if you are reading from ... console is going
+// to have two events for every single key event from stdin. so you can't just
+// ignore stdin for each event. maybe take a step back and think about the
+// higher level. Read from two inputs, some will be thrown out, and you want to
+// timeout so you can check if there is an event ready, that won't be thrown
+// out.
+
+// you should have two separate sections, you have to handle this from a higher
+// level, but you have the functions you need to work with.
+
+// you have a timeout function that checks if there is input, one function for
+// each fd.
+// then you have a read function for both, so that when there is input, you let
+// it read an event from that particular fd read_stdin() read_tty() and these
+// both return events.
+
+// then at the callsite of read you determine if you want to use the mouse
+// events from stdin or not, and if you event want to call to the tty() version.
+
+// so where is read() called from? might be in in termox.
+
+// so the user of read() has to now call read_stdin() and read_tty() ?
+
+// so you have these is something ready and read functions, and you can use them
+// at the proper call site, you will have to enable it in escape, initialize it,
+// and you will have to also know at termox level to throw own and to not call
+// tty
+
+// auto read_stdin() -> Event;
+
+// auto read_tty() -> Event;
+
 auto read() -> Event
 {
     auto const token = read_single_token();
@@ -446,6 +495,7 @@ auto read() -> Event
 
 auto read(int millisecond_timeout) -> std::optional<Event>
 {
+    // TODO if special up/down mode is on, check if console fd is not empty too
     if (window_resize_sig || !is_stdin_empty(millisecond_timeout))
         return esc::read();
     return std::nullopt;

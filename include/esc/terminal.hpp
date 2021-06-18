@@ -46,6 +46,17 @@ enum class Screen_buffer { Normal, Alternate };
 /** Calls on write internally, but does not call flush(). */
 void set(Screen_buffer);
 
+// KEY RELEASE ---------------------------------------------------------------
+
+/// Alternate key mode enables Key_release Events.
+/** Alternate mode makes the read() call more complex, only enable if needed.
+ *  Normal mode has auto repeat of Key_press Events, Alternate does not. */
+enum class Key_mode : bool { Normal, Alternate };
+
+/// Enable the given Key_mode value.
+/** Calls on ioctl internally. */
+void set(Key_mode);
+
 // CURSOR ----------------------------------------------------------------------
 
 /// Types of Cursor display.
@@ -70,7 +81,8 @@ bool constexpr is_setable = detail::is_any_of<T,
                                               Signals,
                                               Screen_buffer,
                                               Cursor,
-                                              Mouse_mode>;
+                                              Mouse_mode,
+                                              Key_mode>;
 
 /// Convenience function to set multiple properties at once.
 template <typename... Args>
@@ -118,13 +130,21 @@ void set(Args... args)
  *                       instance ctrl-c will send SIGINT instead of byte 3.
  *                  Off: Signals will not be generated on ctrl-[key] presses,
  *                       sending the byte value of the ctrl character instead.
+ *
+ *  Key_mode  - - - Normal:    Key_press Events generated and auto-repeated if
+ *                             key is held down.
+ *                  Alternate: Key_press and Key_release Events are generated,
+ *                             Key_press is not auto-repeating. Useful for games
+ *                             and where you need to keep track of multiple keys
+ *                             held down at once.
  */
 void initialize_terminal(Screen_buffer,
                          Mouse_mode,
                          Cursor,
                          Echo,
                          Input_buffer,
-                         Signals);
+                         Signals,
+                         Key_mode);
 
 /// Initialize the terminal with 'normal' settings.
 /** The terminal should mimic normal terminal input/output activity, leaving the
@@ -142,6 +162,10 @@ void initialize_interactive_terminal(Mouse_mode mouse_mode = Mouse_mode::Basic,
 /// Restore terminal state to before any initialize...() functions were called.
 /** This is Input/Output settings and the C locale. This also sets the normal
  *  screen buffer, displays the cursor, and disables mouse input. */
+
+// TODO should this take the old settings? maybe initialize_terminal() returns
+// the previous values before initialization as a struct, then the client is
+// responsible for storing this and passing it to uninitialize.
 void uninitialize_terminal();
 
 // QUERY -----------------------------------------------------------------------

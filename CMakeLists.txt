@@ -16,6 +16,7 @@ add_library(escape STATIC
     src/detail/print.cpp
     src/detail/traits_to_int_sequence.cpp
     src/detail/u32_to_mb.cpp
+    src/detail/console_file.cpp
 )
 
 target_include_directories(escape
