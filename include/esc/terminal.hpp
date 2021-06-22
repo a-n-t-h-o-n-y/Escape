@@ -48,10 +48,11 @@ void set(Screen_buffer);
 
 // KEY RELEASE ---------------------------------------------------------------
 
-/// Alternate key mode enables Key_release Events.
-/** Alternate mode makes the read() call more complex, only enable if needed.
- *  Normal mode has auto repeat of Key_press Events, Alternate does not. */
-enum class Key_mode : bool { Normal, Alternate };
+/// Raw key mode enables Key_release Events and does not combine shift with key.
+/** Raw mode makes the read() call more complex, only enable if needed. All keys
+ *  returned in Raw mode are lower-case. Has only been tested on a single laptop
+ *  keyboard. */
+enum class Key_mode : bool { Normal, Raw };
 
 /// Enable the given Key_mode value.
 /** Calls on ioctl internally. */
@@ -131,12 +132,15 @@ void set(Args... args)
  *                  Off: Signals will not be generated on ctrl-[key] presses,
  *                       sending the byte value of the ctrl character instead.
  *
- *  Key_mode  - - - Normal:    Key_press Events generated and auto-repeated if
- *                             key is held down.
- *                  Alternate: Key_press and Key_release Events are generated,
- *                             Key_press is not auto-repeating. Useful for games
- *                             and where you need to keep track of multiple keys
- *                             held down at once.
+ *  Key_mode  - - - Normal: Key_press Events generated and auto-repeated if key
+ *                          is held down.
+ *                  Raw:    Key_press and Key_release Events are generated, the
+ *                          shift key is not applied with other keys, each key
+ *                          press and release is its own event. Useful for games
+ *                          and where you need to keep track of multiple keys
+ *                          held down at once. All keys returned in Raw mode are
+ *                          lower-case. Has only been tested on a single laptop
+ *                          keyboard.
  */
 void initialize_terminal(Screen_buffer,
                          Mouse_mode,
@@ -155,17 +159,14 @@ void initialize_normal_terminal();
 /** This is for typical console full-screen applications, the alternate screen
  *  buffer is set, key press echo is off, and the input buffer is immediate. */
 void initialize_interactive_terminal(Mouse_mode mouse_mode = Mouse_mode::Basic,
-                                     Signals signals       = Signals::On);
+                                     Signals signals       = Signals::On,
+                                     Key_mode key_mode     = Key_mode::Normal);
 
 // UNINITIALIZE ----------------------------------------------------------------
 
 /// Restore terminal state to before any initialize...() functions were called.
 /** This is Input/Output settings and the C locale. This also sets the normal
  *  screen buffer, displays the cursor, and disables mouse input. */
-
-// TODO should this take the old settings? maybe initialize_terminal() returns
-// the previous values before initialization as a struct, then the client is
-// responsible for storing this and passing it to uninitialize.
 void uninitialize_terminal();
 
 // QUERY -----------------------------------------------------------------------

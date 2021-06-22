@@ -114,6 +114,39 @@ class Key_press_display {
     }
 
    public:
+    void update(Key_release kr) const
+    {
+        auto mods_to_string = [](auto k) {
+            auto result = std::string{};
+            result.append(is_set(k, Mod::Shift) ? "Shift " : "");
+            result.append(is_set(k, Mod::Ctrl) ? "Ctrl " : "");
+            result.append(is_set(k, Mod::Alt) ? "Alt " : "");
+            result.append(is_set(k, Mod::Meta) ? "Meta" : "");
+            return result;
+        };
+
+        auto const display = [&kr] {
+            auto const d = key_to_char32(kr.key);
+            return d == U'\0' ? U' ' : d;
+        }();
+
+        // clang-format off
+        write(escape(Cursor_position{offset_}, Trait::Inverse),
+            "Last Key Release -----",
+            escape(Cursor_position{offset_.x, offset_.y + 1}, Trait::Bold),
+            "    Enum Value: ", escape(Trait::None), std::to_string(
+                static_cast<std::underlying_type_t<Key>>(kr.key)), "    ",
+            escape(Cursor_position{offset_.x, offset_.y + 2}, Trait::Bold),
+            "    Display:    ", escape(Trait::None), display,
+            escape(Cursor_position{offset_.x, offset_.y + 3}, Trait::Bold,
+                Blank_row{}),
+            "    Modifiers:  ", escape(Trait::None),
+                mods_to_string(kr.key)
+        );
+        // clang-format on
+        flush();
+    }
+
     void update(Key_press kp) const
     {
         auto mods_to_string = [](auto k) {
@@ -371,6 +404,12 @@ auto process(Key_press k, Termcaps_app& app) -> bool
     return true;
 }
 
+auto process(Key_release kr, Termcaps_app& app) -> bool
+{
+    app.key_press_display.update(kr);
+    return true;
+}
+
 auto process(Window_resize ws, Termcaps_app& app) -> bool
 {
     app.term_size.update(ws.new_dimensions);
@@ -379,7 +418,8 @@ auto process(Window_resize ws, Termcaps_app& app) -> bool
 
 int main()
 {
-    initialize_interactive_terminal(Mouse_mode::Basic, Signals::Off);
+    initialize_interactive_terminal(Mouse_mode::Basic, Signals::Off,
+                                    Key_mode::Raw);
 
     auto app = Termcaps_app{};
     flush();

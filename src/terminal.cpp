@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 
+#include <linux/kd.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
@@ -110,8 +111,9 @@ void set(Key_mode km)
 {
     switch (km) {
         case Key_mode::Normal: break;
-        case Key_mode::Alternate:
+        case Key_mode::Raw:
             detail::tty_file_descriptor = detail::open_console_file();
+            detail::set_keyboard_mode(*detail::tty_file_descriptor, K_RAW);
             break;
     }
 }
@@ -199,11 +201,12 @@ void initialize_normal_terminal()
                         Key_mode::Normal);
 }
 
-void initialize_interactive_terminal(Mouse_mode mouse_mode, Signals signals)
+void initialize_interactive_terminal(Mouse_mode mouse_mode,
+                                     Signals signals,
+                                     Key_mode key_mode)
 {
     initialize_terminal(Screen_buffer::Alternate, mouse_mode, Cursor::Hide,
-                        Echo::Off, Input_buffer::Immediate, signals,
-                        Key_mode::Alternate);
+                        Echo::Off, Input_buffer::Immediate, signals, key_mode);
 }
 
 void uninitialize_terminal()

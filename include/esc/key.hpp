@@ -176,7 +176,57 @@ enum class Key : char32_t {
     Begin = 159,  // Middle Numpad Key
 
     // 2+ Byte UTF8 Starts Here
-    utf8 = 160
+    utf8 = 160,
+
+    // Unicode planes 4-13 are unassigned
+    // Below are only used in Key_mode::Raw
+    LCtrl = 0x40000,
+    RCtrl,
+    LShift,
+    LShift_fake,
+    RShift,
+    RShift_fake,
+    LAlt,
+    RAlt,
+    CapsLock,
+    NumLock,
+    ScrollLock,
+
+    Print_screen,
+    Print_screen_ctrl,
+    Print_screen_alt,
+    Print_screen_shift,
+    Pause,
+    Pause_ctrl,
+    Ctrl_break,
+    Home_gray,
+    Up_gray,
+    Page_up_gray,
+    Left_gray,
+    Right_gray,
+    End_gray,
+    Down_gray,
+    Page_down_gray,
+    Insert_gray,
+    Delete_gray,
+
+    Keypad_enter,
+    Keypad_asterisk,
+    Keypad_minus,
+    Keypad_plus,
+    Keypad_period,
+    Keypad_forward_slash,
+    Keypad0,
+    Keypad1,
+    Keypad2,
+    Keypad3,
+    Keypad4,
+    Keypad5,
+    Keypad6,
+    Keypad7,
+    Keypad8,
+    Keypad9,
+    Alt_system_request,
 };
 
 /// Modifier Keys

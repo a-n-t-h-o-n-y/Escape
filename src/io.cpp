@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cerrno>
 #include <csignal>
 #include <cstdint>
@@ -11,6 +12,8 @@
 #include <stdexcept>
 #include <string>
 #include <variant>
+
+#include <iostream>  //temp
 
 #include <poll.h>
 #include <sys/ioctl.h>
@@ -26,23 +29,203 @@
 
 #include "detail/tty_file.hpp"
 
-// TODO
-// for read
-//     auto const fd = open_tty_fd();
-//     set_keyboard_mode(MEDIUM_RAW);
-
-//     char byte;
-//     ssize_t size = read(fd, &byte, 1);
-//     printf("fd3 Read byte   %c\n", byte);
-
 namespace {
 
-/// Return true if there is nothing to ready from stdin.
-/** Waits up to \p timeout for bytes to be written to stdin. */
-[[nodiscard]] auto is_stdin_empty(int millisecond_timeout) -> bool
+using esc::Key;
+constexpr auto keymap =
+    std::array<esc::Key, 128>{Key::Null,
+                              Key::Escape,
+                              Key::One,
+                              Key::Two,
+                              Key::Three,
+                              Key::Four,
+                              Key::Five,
+                              Key::Six,
+                              Key::Seven,
+                              Key::Eight,
+                              Key::Nine,
+                              Key::Zero,
+                              Key::Minus,
+                              Key::Equals,
+                              Key::Backspace,
+                              Key::Tab,
+                              Key::q,
+                              Key::w,
+                              Key::e,
+                              Key::r,
+                              Key::t,
+                              Key::y,
+                              Key::u,
+                              Key::i,
+                              Key::o,
+                              Key::p,
+                              Key::Left_bracket,
+                              Key::Right_bracket,
+                              Key::Enter,
+                              Key::LCtrl,
+                              Key::a,
+                              Key::s,
+                              Key::d,
+                              Key::f,
+                              Key::g,
+                              Key::h,
+                              Key::j,
+                              Key::k,
+                              Key::l,
+                              Key::Semicolon,
+                              Key::Apostrophe,
+                              Key::Accent,
+                              Key::LShift,
+                              Key::Backslash,
+                              Key::z,
+                              Key::x,
+                              Key::c,
+                              Key::v,
+                              Key::b,
+                              Key::n,
+                              Key::m,
+                              Key::Comma,
+                              Key::Period,
+                              Key::Forward_slash,
+                              Key::RShift,
+                              Key::Keypad_asterisk,
+                              Key::LAlt,
+                              Key::Space,
+                              Key::CapsLock,
+                              Key::Function1,
+                              Key::Function2,
+                              Key::Function3,
+                              Key::Function4,
+                              Key::Function5,
+                              Key::Function6,
+                              Key::Function7,
+                              Key::Function8,
+                              Key::Function9,
+                              Key::Function10,
+                              Key::NumLock,
+                              Key::ScrollLock,
+                              Key::Keypad7,
+                              Key::Keypad8,
+                              Key::Keypad9,
+                              Key::Keypad_minus,
+                              Key::Keypad4,
+                              Key::Keypad5,
+                              Key::Keypad6,
+                              Key::Keypad_plus,
+                              Key::Keypad1,
+                              Key::Keypad2,
+                              Key::Keypad3,
+                              Key::Keypad0,
+                              Key::Keypad_period,
+                              Key::Alt_system_request,  // "magic SysRq key"
+                              Key::Null,                // Not commonly used.
+                              Key::Null,  // Unlabeled key on non-us keyboards
+                              Key::Function11,
+                              Key::Function12,
+                              Key::Null,  // Random assignments, unused
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null,
+                              Key::Null};
+
+constexpr auto escape_keymap =
+    std::array<esc::Key, 56>{Key::Keypad_enter,
+                             Key::RCtrl,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::LShift_fake,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Keypad_forward_slash,
+                             Key::RShift_fake,
+                             Key::Print_screen_ctrl,
+                             Key::RAlt,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Null,
+                             Key::Ctrl_break,
+                             Key::Home_gray,
+                             Key::Up_gray,
+                             Key::Page_up_gray,
+                             Key::Null,
+                             Key::Left_gray,
+                             Key::Null,
+                             Key::Right_gray,
+                             Key::End_gray,
+                             Key::Down_gray,
+                             Key::Page_down_gray,
+                             Key::Insert_gray,
+                             Key::Delete_gray};
+
+/// Return true if there is nothing to read from file descriptor \p fd.
+/** Waits up to \p timeout for bytes to be written to the file. */
+[[nodiscard]] auto is_file_readable(int fd, int millisecond_timeout) -> bool
 {
     auto file   = pollfd{};
-    file.fd     = STDIN_FILENO;
+    file.fd     = fd;
     file.events = POLLIN;
 
     auto const result = poll(&file, 1, millisecond_timeout);
@@ -53,29 +236,41 @@ namespace {
     if (result == error) {
         if (errno == EINTR)  // A signal interrupted poll.
             return true;
-        throw std::runtime_error{"io.cpp is_stdin_empty(): Poll Error"};
+        throw std::runtime_error{"io.cpp is_file_readable(): Poll Error"};
     }
     if (result == timeout)
         return true;
     if (result > 0 && static_cast<bool>(file.revents & POLLIN))
         return false;
-    throw std::logic_error{"io.cpp is_stdin_empty(): logic_error."};
+    throw std::logic_error{"io.cpp is_file_readable(): logic_error."};
 }
 
-/// Read a single char from stdin.
-auto read_byte() -> char
+/// Return true if there is nothing to read from stdin.
+/** Waits up to \p timeout for bytes to be written to stdin. */
+[[nodiscard]] auto is_stdin_empty(int millisecond_timeout) -> bool
 {
-    auto b = char{};
-    read(STDIN_FILENO, &b, 1);
-    return b;
+    return is_file_readable(STDIN_FILENO, millisecond_timeout);
+}
+
+/// Read a single byte from file descriptor \p fd.
+/** Throws std::runtime_error if there is an error reading from \p fd. */
+auto read_byte(int fd) -> unsigned char
+{
+    unsigned char byte = '\0';
+    auto size          = ::read(fd, &byte, 1);
+    if (size != 1) {
+        throw std::runtime_error{"read_byte(fd): Failed: " +
+                                 std::to_string(errno)};
+    }
+    return byte;
 }
 
 /// Read a single byte, blocking until a byte is read or timeout happens.
 /** Returns std::nullopt on timeout. */
-auto read_byte(int millisecond_timeout) -> std::optional<char>
+auto read_byte(int fd, int millisecond_timeout) -> std::optional<char>
 {
     if (!is_stdin_empty(millisecond_timeout))
-        return read_byte();
+        return read_byte(fd);
     return std::nullopt;
 }
 
@@ -332,7 +527,7 @@ auto next_state(Initial) -> Lexer
             window_resize_sig = false;
             return Final{Window{}};
         }
-        if (auto const b = read_byte(timeout); b.has_value()) {
+        if (auto const b = read_byte(STDIN_FILENO, timeout); b.has_value()) {
             if (*b == escape)
                 return Escape{};
             else
@@ -353,11 +548,11 @@ auto next_state(Escape) -> Lexer
 
 auto next_state(Maybe_escaped) -> Lexer
 {
-    auto const c = read_byte();
+    auto const c = read_byte(STDIN_FILENO);
     if (c != '[' && c != 'O')
-        return Final{Escaped{c}};
+        return Final{Escaped{(char)c}};
     else
-        return Maybe_CSI{c};
+        return Maybe_CSI{(char)c};
 }
 
 auto next_state(Maybe_CSI state) -> Lexer
@@ -370,9 +565,9 @@ auto next_state(Maybe_CSI state) -> Lexer
 
 auto next_state(CSI const& state) -> Lexer
 {
-    auto const b = read_byte();
+    auto const b = read_byte(STDIN_FILENO);
     if (b >= 0x40 && b <= 0x7E)
-        return Final{Control_sequence{state.value + b}};
+        return Final{Control_sequence{state.value + (char)b}};
     else
         return CSI{state.value + std::string(1, b)};
 }
@@ -403,7 +598,7 @@ auto next_state(UTF8 state) -> Lexer
 {
     auto index = 1;
     for (auto count = bytes_left_to_read(state.bytes[0]); count != 0; --count)
-        state.bytes[index++] = read_byte();
+        state.bytes[index++] = read_byte(STDIN_FILENO);
     return Final{state};
 }
 
@@ -416,6 +611,221 @@ auto read_single_token() -> Token
     while (!std::holds_alternative<Final>(state))
         state = std::visit([](auto s) { return next_state(s); }, state);
     return std::get<Final>(state).result;
+}
+
+// -----------------------------------------------------------------------------
+
+/// Read a single Event from stdin.
+[[nodiscard]] auto do_blocking_read() -> esc::Event
+{
+    auto const token = read_single_token();
+    return std::visit([](auto t) { return parse(t); }, token);
+}
+
+/// Return true if \p byte is a key release or false if it is a key press.
+[[nodiscard]] auto is_release(unsigned char byte) -> bool
+{
+    return byte & 0x80;
+}
+
+/// Read and parse a keyboard scancode into a Key_press or a Key_release event.
+/** Throws std::runtime_error if read fails. */
+[[nodiscard]] auto read_and_parse_scancode(int fd) -> std::optional<esc::Event>
+{
+    // TODO Cleanup and insert and delete don't quite work.
+    // TODO Test on other keyboards.
+    auto const byte = read_byte(fd);
+    switch (byte) {
+        using namespace esc;
+        case 0xE0: {
+            // Print Screen Press: e0 2a e0 37
+            if (auto const byte2 = read_byte(fd); byte2 == 0x2A) {
+                if (auto const byte3 = read_byte(fd); byte3 == 0xE0) {
+                    if (auto const byte4 = read_byte(fd); byte4 == 0x37)
+                        return Key_press{Key::Print_screen};
+                }
+            }
+            // Print Screen Release: e0 2a+0x80 e0 37+0x80
+            else if ((byte2 - 0x80) == 0x2A) {
+                if (auto const byte3 = read_byte(fd); byte3 == 0xE0) {
+                    if (auto const byte4 = read_byte(fd) - 0x80; byte4 == 0x37)
+                        return Key_release{Key::Print_screen};
+                }
+            }
+
+            // Print Screen w/Shift: e0 37
+            else if (byte2 == 0x37)
+                return Key_press{Key::Print_screen_shift};
+
+            // Print Screen w/Shift: e0 37+0x80
+            else if ((byte2 & 0x7F) == 0x37)
+                return Key_release{Key::Print_screen_shift};
+
+            // Pause w/left or right ctrl: e0 46 e0 c6
+            else if (byte2 == 0x46) {
+                if (auto const byte3 = read_byte(fd); byte3 == 0xE0) {
+                    if (auto const byte4 = read_byte(fd); byte4 == 0xC6) {
+                        return Key_press{Key::Pause_ctrl};
+                    }
+                }
+            }
+        }
+        case 0xE1: {
+            auto const byte2    = read_byte(fd);
+            auto const key_byte = byte2 & 0x7F;
+
+            // Pause: e1 1d 45 e1 9d c5
+            if (byte2 == 0x1D) {
+                if (auto const byte3 = read_byte(fd); byte3 == 0x45) {
+                    if (auto const byte4 = read_byte(fd); byte4 == 0xE1) {
+                        if (auto const byte5 = read_byte(fd); byte5 == 0x9D) {
+                            if (auto const byte6 = read_byte(fd);
+                                byte6 == 0xC5) {
+                                return Key_press{Key::Pause};
+                            }
+                        }
+                    }
+                }
+            }
+            if (key_byte > 0x53)
+                return std::nullopt;
+            return is_release(byte2)
+                       ? Event{Key_release{escape_keymap[key_byte - 0x1C]}}
+                       : Event{Key_press{escape_keymap[key_byte - 0x1C]}};
+        }
+
+        case 0x54: return Key_press{Key::Print_screen_alt};
+        case 0x54 + 0x80: return Key_release{Key::Print_screen_alt};
+
+        case 0x00:  // Keyboard Error
+        case 0xAA:  // Basic Assurance Test OK
+        case 0xEE:  // Result of echo command
+        case 0xF1:  // Reply to command a4:Password not installed
+        case 0xFA:  // Acknowledge from kbd
+        case 0xFC:  // BAT error or Mouse transmit error
+        case 0xFD:  // Internal failure
+        case 0xFE:  // Keyboard fails to ack, please resend
+        case 0xFF:  // Keyboard erro
+            return std::nullopt;
+
+        default:
+            return is_release(byte) ? Event{Key_release{keymap[byte & 0x7F]}}
+                                    : Event{Key_press{keymap[byte]}};
+    }
+}
+
+/// Blocks until timeout for a read available for either file
+/// descriptor.
+/** Returns the file descriptor that is ready, or -1 if timeout or
+ * error. */
+[[nodiscard]] auto timeout_wait_for_reads(int fd_a, int fd_b, int timeout_ms)
+    -> int
+{
+    auto constexpr error   = -1;
+    auto constexpr timeout = 0;
+
+    auto files = std::array<pollfd, 2>{{{fd_a, POLLIN, 0}, {fd_b, POLLIN, 0}}};
+    auto const result = poll(files.data(), files.size(), timeout_ms);
+
+    if (result == error) {
+        if (errno == EINTR)  // A signal interrupted poll.
+            return -1;
+        throw std::runtime_error{"timeout_wait_for_reads(): Poll Error"};
+    }
+    if (result == timeout)
+        return -1;
+    if (result > 0 && static_cast<bool>(files[0].revents & POLLIN))
+        return fd_a;
+    if (result > 0 && static_cast<bool>(files[1].revents & POLLIN))
+        return fd_b;
+    throw std::logic_error{"timeout_wait_for_reads(): logic_error."};
+}
+
+/// Blocks until a read is available for either file descriptor.
+/** Returns the file descriptor that is ready. */
+[[nodiscard]] auto blocking_wait_for_reads(int fd_a, int fd_b) -> int
+{
+    return timeout_wait_for_reads(fd_a, fd_b,
+                                  -1);  // -1 inf timeout
+}
+
+/// Read an event in alt mode, returns std::nullopt on non-event
+/// reads.
+/** non-event reads are Key_press events on stdin, and nullopt from
+ * tty. */
+[[nodiscard]] auto do_maybe_alt_blocking_read() -> std::optional<esc::Event>
+{
+    auto const file = blocking_wait_for_reads(
+        STDIN_FILENO, *esc::detail::tty_file_descriptor);
+    if (file == STDIN_FILENO) {
+        auto const event = do_blocking_read();
+        if (std::holds_alternative<esc::Key_press>(event))
+            return std::nullopt;
+        else
+            return event;
+    }
+    else if (file == *esc::detail::tty_file_descriptor)
+        return read_and_parse_scancode(*esc::detail::tty_file_descriptor);
+    assert(false);
+}
+
+/// Read an event in alt mode, throws out stdin key press events.
+/// reads from tty
+/** Waits until an actual event is ready, throwing out non-event
+ * reads. */
+[[nodiscard]] auto do_alt_blocking_read() -> esc::Event
+{
+    while (true) {
+        auto const file = blocking_wait_for_reads(
+            STDIN_FILENO, *esc::detail::tty_file_descriptor);
+        if (file == STDIN_FILENO) {
+            auto const event = do_blocking_read();
+            if (std::holds_alternative<esc::Key_press>(event))
+                continue;
+            else
+                return event;
+        }
+        else if (file == *esc::detail::tty_file_descriptor) {
+            auto const event =
+                read_and_parse_scancode(*esc::detail::tty_file_descriptor);
+            if (event.has_value())
+                return *event;
+            else
+                continue;
+        }
+    }
+}
+
+/// Read a single event from stdin with timeout returning
+/// std::nullopt.
+[[nodiscard]] auto do_timeout_read(int millisecond_timeout)
+    -> std::optional<esc::Event>
+{
+    if (window_resize_sig || !is_stdin_empty(millisecond_timeout))
+        return esc::read();
+    return std::nullopt;
+}
+
+/// Reads a single token from either STDIN_FILENO or
+/// detail::tty_file_descriptor
+/** Assumes the tty_file_descriptor is valid. Returns std::nullopt
+ * if nothing was read in the given timeout time. Can return earlier
+ * than timeout with std::nullopt. */
+[[nodiscard]] auto do_alt_timeout_read(int millisecond_timeout)
+    -> std::optional<esc::Event>
+{
+    auto const file = timeout_wait_for_reads(
+        STDIN_FILENO, *esc::detail::tty_file_descriptor, millisecond_timeout);
+    if (file == STDIN_FILENO) {
+        auto const result = do_blocking_read();
+        if (std::holds_alternative<esc::Key_press>(result))
+            return std::nullopt;
+        else
+            return result;
+    }
+    else if (file == *esc::detail::tty_file_descriptor)
+        return do_maybe_alt_blocking_read();
+    return std::nullopt;
 }
 
 }  // namespace
@@ -449,56 +859,20 @@ void write(std::u32string_view sv)
 
 void flush() { std::fflush(::stdout); }
 
-// you want to read from console and stdin, which will have duplicates and stdin
-// will throw out keyboard events, but how do you separate this out and read as
-// many times as needed? just always check console first and if there is nothing
-// move onto stdin and if there are events in both, you will read from console
-// and return and from stdin and return, but this returns an Event, not an
-// optional, and that second read is going to be thrown out.. maybe you can do a
-// duplicate check somehow.. like if you are reading from ... console is going
-// to have two events for every single key event from stdin. so you can't just
-// ignore stdin for each event. maybe take a step back and think about the
-// higher level. Read from two inputs, some will be thrown out, and you want to
-// timeout so you can check if there is an event ready, that won't be thrown
-// out.
-
-// you should have two separate sections, you have to handle this from a higher
-// level, but you have the functions you need to work with.
-
-// you have a timeout function that checks if there is input, one function for
-// each fd.
-// then you have a read function for both, so that when there is input, you let
-// it read an event from that particular fd read_stdin() read_tty() and these
-// both return events.
-
-// then at the callsite of read you determine if you want to use the mouse
-// events from stdin or not, and if you event want to call to the tty() version.
-
-// so where is read() called from? might be in in termox.
-
-// so the user of read() has to now call read_stdin() and read_tty() ?
-
-// so you have these is something ready and read functions, and you can use them
-// at the proper call site, you will have to enable it in escape, initialize it,
-// and you will have to also know at termox level to throw own and to not call
-// tty
-
-// auto read_stdin() -> Event;
-
-// auto read_tty() -> Event;
-
 auto read() -> Event
 {
-    auto const token = read_single_token();
-    return std::visit([](auto t) { return parse(t); }, token);
+    if (detail::tty_file_descriptor.has_value())
+        return do_alt_blocking_read();
+    else
+        return do_blocking_read();
 }
 
 auto read(int millisecond_timeout) -> std::optional<Event>
 {
-    // TODO if special up/down mode is on, check if console fd is not empty too
-    if (window_resize_sig || !is_stdin_empty(millisecond_timeout))
-        return esc::read();
-    return std::nullopt;
+    if (detail::tty_file_descriptor.has_value())
+        return do_alt_timeout_read(millisecond_timeout);
+    else
+        return do_timeout_read(millisecond_timeout);
 }
 
 }  // namespace esc

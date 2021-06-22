@@ -38,6 +38,12 @@ struct Key_press {
     Key key;
 };
 
+/// Key Release Event
+/** Only used with Key_mode::Alternate set. */
+struct Key_release {
+    Key key;
+};
+
 /// Terminal Window Resized
 struct Window_resize {
     Area new_dimensions;
@@ -49,6 +55,7 @@ using Event = std::variant<Mouse_press,
                            Scroll_wheel,
                            Mouse_move,
                            Key_press,
+                           Key_release,
                            Window_resize>;
 
 }  // namespace esc
