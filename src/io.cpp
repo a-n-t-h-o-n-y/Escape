@@ -631,13 +631,15 @@ auto read_single_token() -> Token
 [[nodiscard]] auto read_and_parse_scancode(int fd) -> std::optional<esc::Event>
 {
     // TODO Cleanup and insert and delete don't quite work.
+    // use `sudo showkey -c` to find scancodes.
     // TODO Test on other keyboards.
     auto const byte = read_byte(fd);
     switch (byte) {
         using namespace esc;
         case 0xE0: {
+            auto const byte2 = read_byte(fd);
             // Print Screen Press: e0 2a e0 37
-            if (auto const byte2 = read_byte(fd); byte2 == 0x2A) {
+            if (byte2 == 0x2A) {
                 if (auto const byte3 = read_byte(fd); byte3 == 0xE0) {
                     if (auto const byte4 = read_byte(fd); byte4 == 0x37)
                         return Key_press{Key::Print_screen};
@@ -666,6 +668,18 @@ auto read_single_token() -> Token
                         return Key_press{Key::Pause_ctrl};
                     }
                 }
+            }
+
+            switch (byte2) {
+                case 0x48: return Key_press{Key::Arrow_up};
+                case 0x48 + 0x80: return Key_release{Key::Arrow_up};
+                case 0x50: return Key_press{Key::Arrow_down};
+                case 0x50 + 0x80: return Key_release{Key::Arrow_down};
+                case 0x4D: return Key_press{Key::Arrow_right};
+                case 0x4D + 0x80: return Key_release{Key::Arrow_right};
+                case 0x4B: return Key_press{Key::Arrow_left};
+                case 0x4B + 0x80: return Key_release{Key::Arrow_left};
+                default: return std::nullopt;
             }
         }
         case 0xE1: {

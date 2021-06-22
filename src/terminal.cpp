@@ -108,9 +108,18 @@ void set(Screen_buffer sb)
 
 void set(Key_mode km)
 {
-    constexpr auto k_raw = 0x00;  // linux/kd.h
+    // TODO implementation is messy, depends on call order.
+
+    // from linux/kd.h
+    constexpr auto k_xlate = 0x01;
+    constexpr auto k_raw   = 0x00;
     switch (km) {
-        case Key_mode::Normal: break;
+        case Key_mode::Normal:
+            if (detail::tty_file_descriptor.has_value()) {
+                detail::set_keyboard_mode(*detail::tty_file_descriptor,
+                                          k_xlate);
+            }
+            break;
         case Key_mode::Raw:
             detail::tty_file_descriptor = detail::open_console_file();
             detail::set_keyboard_mode(*detail::tty_file_descriptor, k_raw);
@@ -214,7 +223,7 @@ void uninitialize_terminal()
     // TODO take settings parameter and use that to reset the terminal to
     // settings before.
     write(turn_on_auto_wrap());
-    set(Screen_buffer::Normal, Mouse_mode::Off, Cursor::Show);
+    set(Screen_buffer::Normal, Mouse_mode::Off, Cursor::Show, Key_mode::Normal);
     flush();
     if (std::setlocale(LC_ALL, original_clocale.c_str()) == nullptr)
         throw std::runtime_error{"uninitialize_terminal: set_locale() failed."};
