@@ -202,8 +202,8 @@ void initialize_normal_terminal()
 }
 
 void initialize_interactive_terminal(Mouse_mode mouse_mode,
-                                     Signals signals,
-                                     Key_mode key_mode)
+                                     Key_mode key_mode,
+                                     Signals signals)
 {
     initialize_terminal(Screen_buffer::Alternate, mouse_mode, Cursor::Hide,
                         Echo::Off, Input_buffer::Immediate, signals, key_mode);

@@ -159,8 +159,8 @@ void initialize_normal_terminal();
 /** This is for typical console full-screen applications, the alternate screen
  *  buffer is set, key press echo is off, and the input buffer is immediate. */
 void initialize_interactive_terminal(Mouse_mode mouse_mode = Mouse_mode::Basic,
-                                     Signals signals       = Signals::On,
-                                     Key_mode key_mode     = Key_mode::Normal);
+                                     Key_mode key_mode     = Key_mode::Normal,
+                                     Signals signals       = Signals::On);
 
 // UNINITIALIZE ----------------------------------------------------------------
 
