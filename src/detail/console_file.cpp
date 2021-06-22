@@ -1,7 +1,6 @@
 #include <esc/detail/console_file.hpp>
 
 #include <fcntl.h>
-#include <linux/kd.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
@@ -9,6 +8,13 @@
 #include <stdexcept>
 
 namespace {
+
+// from linux/kd.h
+constexpr auto get_kb_type = 0x4B33;
+constexpr auto get_kb_mode = 0x4B44;
+constexpr auto set_kb_mode = 0x4B45;
+constexpr auto kb_84       = 0x01;
+constexpr auto kb_101      = 0x02;
 
 constexpr auto console_paths = std::array<char const*, 6>{
     "/proc/self/fd/0", "/dev/tty",    "/dev/tty0",
@@ -19,8 +25,8 @@ constexpr auto console_paths = std::array<char const*, 6>{
 {
     auto kb_type = '\0';
     return (::isatty(file_descriptor) &&
-            ::ioctl(file_descriptor, KDGKBTYPE, &kb_type) == 0) &&
-           ((kb_type == KB_101) || (kb_type == KB_84));
+            ::ioctl(file_descriptor, get_kb_type, &kb_type) == 0) &&
+           ((kb_type == kb_101) || (kb_type == kb_84));
 }
 
 /// Attempt to open a console \p filename.
@@ -64,14 +70,14 @@ auto open_console_file() noexcept(false) -> int
 auto current_keyboard_mode(int file_descriptor) noexcept(false) -> long
 {
     auto mode = long{0};
-    if (::ioctl(file_descriptor, KDGKBMODE, &mode) == -1)
+    if (::ioctl(file_descriptor, get_kb_mode, &mode) == -1)
         throw std::runtime_error("current_keyboard_mode(): Failed.");
     return mode;
 }
 
 void set_keyboard_mode(int file_descriptor, long mode) noexcept(false)
 {
-    if (::ioctl(file_descriptor, KDSKBMODE, mode) == -1)
+    if (::ioctl(file_descriptor, set_kb_mode, mode) == -1)
         throw std::runtime_error{"set_keyboard_mode(): Failed."};
 }
 
