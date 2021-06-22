@@ -418,8 +418,7 @@ auto process(Window_resize ws, Termcaps_app& app) -> bool
 
 int main()
 {
-    initialize_interactive_terminal(Mouse_mode::Basic, Signals::Off,
-                                    Key_mode::Raw);
+    initialize_interactive_terminal(Mouse_mode::Basic, Signals::Off);
 
     auto app = Termcaps_app{};
     flush();
