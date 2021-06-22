@@ -7,7 +7,6 @@
 #include <string>
 #include <utility>
 
-#include <linux/kd.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
@@ -109,11 +108,12 @@ void set(Screen_buffer sb)
 
 void set(Key_mode km)
 {
+    constexpr auto k_raw = 0x00;  // linux/kd.h
     switch (km) {
         case Key_mode::Normal: break;
         case Key_mode::Raw:
             detail::tty_file_descriptor = detail::open_console_file();
-            detail::set_keyboard_mode(*detail::tty_file_descriptor, K_RAW);
+            detail::set_keyboard_mode(*detail::tty_file_descriptor, k_raw);
             break;
     }
 }
