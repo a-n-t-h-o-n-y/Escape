@@ -13,8 +13,6 @@
 #include <string>
 #include <variant>
 
-#include <iostream>  //temp
-
 #include <poll.h>
 #include <sys/ioctl.h>
 #include <termios.h>
@@ -714,10 +712,8 @@ auto read_single_token() -> Token
     }
 }
 
-/// Blocks until timeout for a read available for either file
-/// descriptor.
-/** Returns the file descriptor that is ready, or -1 if timeout or
- * error. */
+/// Blocks until timeout for a read available for either file descriptor.
+/** Returns the file descriptor that is ready, or -1 if timeout or error. */
 [[nodiscard]] auto timeout_wait_for_reads(int fd_a, int fd_b, int timeout_ms)
     -> int
 {
@@ -749,10 +745,8 @@ auto read_single_token() -> Token
                                   -1);  // -1 inf timeout
 }
 
-/// Read an event in alt mode, returns std::nullopt on non-event
-/// reads.
-/** non-event reads are Key_press events on stdin, and nullopt from
- * tty. */
+/// Read an event in alt mode, returns std::nullopt on non-event reads.
+/** non-event reads are Key_press events on stdin, and nullopt from tty. */
 [[nodiscard]] auto do_maybe_alt_blocking_read() -> std::optional<esc::Event>
 {
     auto const file = blocking_wait_for_reads(
@@ -769,16 +763,14 @@ auto read_single_token() -> Token
     assert(false);
 }
 
-/// Read an event in alt mode, throws out stdin key press events.
-/// reads from tty
-/** Waits until an actual event is ready, throwing out non-event
- * reads. */
+/// Read an event in alt mode, throws out stdin key press events. Reads from tty
+/** Waits until an actual event is ready, throwing out non-event reads. */
 [[nodiscard]] auto do_alt_blocking_read() -> esc::Event
 {
     while (true) {
         auto const file = blocking_wait_for_reads(
             STDIN_FILENO, *esc::detail::tty_file_descriptor);
-        if (file == STDIN_FILENO) {
+        if (window_resize_sig || file == STDIN_FILENO) {
             auto const event = do_blocking_read();
             if (std::holds_alternative<esc::Key_press>(event))
                 continue;
@@ -806,11 +798,10 @@ auto read_single_token() -> Token
     return std::nullopt;
 }
 
-/// Reads a single token from either STDIN_FILENO or
-/// detail::tty_file_descriptor
-/** Assumes the tty_file_descriptor is valid. Returns std::nullopt
- * if nothing was read in the given timeout time. Can return earlier
- * than timeout with std::nullopt. */
+/// Reads a single token from either STDIN_FILENO or detail::tty_file_descriptor
+/** Assumes the tty_file_descriptor is valid. Returns std::nullopt if nothing
+ *  was read in the given timeout time. Can return earlier than timeout with
+ *  std::nullopt. */
 [[nodiscard]] auto do_alt_timeout_read(int millisecond_timeout)
     -> std::optional<esc::Event>
 {
