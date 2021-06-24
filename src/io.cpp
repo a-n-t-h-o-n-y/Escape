@@ -774,7 +774,8 @@ auto read_single_token() -> Token
     }
     else if (file == *esc::detail::tty_file_descriptor)
         return read_and_parse_scancode(*esc::detail::tty_file_descriptor);
-    assert(false);
+    else
+        throw std::logic_error{"do_maybe_alt_blocking_read(): signal int."};
 }
 
 /// Read an event in alt mode, throws out stdin key press events. Reads from tty
