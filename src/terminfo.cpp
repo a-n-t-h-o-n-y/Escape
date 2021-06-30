@@ -178,7 +178,7 @@ auto get_env(char const* name) -> std::string
 {
     char const* const v = std::getenv(name);
     return v == nullptr ? "" : v;
-};
+}
 
 auto const TERM = get_env("TERM");
 
