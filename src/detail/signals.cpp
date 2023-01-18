@@ -11,7 +11,7 @@ namespace {
 extern "C" auto sigint_handler(int sig) -> void
 {
     if (sig == SIGINT)
-        std::quick_exit(EXIT_SUCCESS);
+        std::exit(EXIT_SUCCESS);
 }
 
 /// Set the window_resize_sig flag to true on SIGWINCH signals.
@@ -29,7 +29,7 @@ bool window_resize_sig = false;
 
 void register_signals(bool sigint)
 {
-    std::at_quick_exit(esc::uninitialize_terminal);
+    std::atexit(esc::uninitialize_terminal);
 
     if (std::signal(SIGWINCH, &resize_handler) == SIG_ERR)
         throw std::runtime_error{"register_SIGWINCH(): std::signal call"};
