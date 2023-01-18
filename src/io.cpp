@@ -21,6 +21,7 @@
 #include <esc/area.hpp>
 #include <esc/detail/mb_to_u32.hpp>
 #include <esc/detail/u32_to_mb.hpp>
+#include <esc/detail/signals.hpp>
 #include <esc/event.hpp>
 #include <esc/key.hpp>
 #include <esc/terminal.hpp>
@@ -276,18 +277,6 @@ auto read_byte(int fd, int millisecond_timeout) -> std::optional<char>
 
 auto previous_mouse_btn = esc::Mouse::Button{};
 
-// SIGWINCH --------------------------------------------------------------------
-
-/// Notifies read() and next_state(Initial) that the window has been resized.
-bool window_resize_sig = false;
-
-/// Set the window_resize_sig flag to true on SIGWINCH signals.
-extern "C" void resize_handler(int sig)
-{
-    if (sig == SIGWINCH)
-        window_resize_sig = true;
-}
-
 // Token -----------------------------------------------------------------------
 
 class Control_sequence {
@@ -516,6 +505,8 @@ using Lexer =
 // -----------------------------------------------------------------------------
 
 auto constexpr escape = '\033';
+
+using esc::detail::window_resize_sig;
 
 auto next_state(Initial) -> Lexer
 {
@@ -882,13 +873,3 @@ auto read(int millisecond_timeout) -> std::optional<Event>
 }
 
 }  // namespace esc
-
-namespace esc::detail {
-
-void register_SIGWINCH()
-{
-    if (std::signal(SIGWINCH, &resize_handler) == SIG_ERR)
-        throw std::runtime_error{"register_SIGWINCH(): std::signal call"};
-}
-
-}  // namespace esc::detail

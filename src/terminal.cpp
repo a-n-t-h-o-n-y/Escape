@@ -17,6 +17,7 @@
 #include <esc/mouse.hpp>
 
 #include "detail/tty_file.hpp"
+#include "esc/detail/signals.hpp"
 
 namespace {
 
@@ -174,7 +175,8 @@ void initialize_terminal(Screen_buffer screen_buffer,
                          Echo echo,
                          Input_buffer input_buffer,
                          Signals signals,
-                         Key_mode key_mode)
+                         Key_mode key_mode,
+                         bool sigint_uninit)
 {
     auto constexpr stdout_buf_size = 4'096;
     // TODO record current settings before calling set, this is ioctl things and
@@ -186,7 +188,7 @@ void initialize_terminal(Screen_buffer screen_buffer,
     if (std::setlocale(LC_ALL, "en_US.UTF-8") == nullptr)
         throw std::runtime_error{"initialize_terminal(): setlocale() failed."};
     std::setvbuf(stdout, nullptr, _IOFBF, stdout_buf_size);
-    detail::register_SIGWINCH();
+    detail::register_signals(sigint_uninit);
 
     fix_ctrl_m();
     write(turn_off_auto_wrap());

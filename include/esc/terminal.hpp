@@ -100,7 +100,8 @@ void set(Args... args)
 
 /// Prepare the terminal for input/output and display with the given settings.
 /** Call this function before performing any calls to write(), and call
- *  uninitialize_terminal() on application exit.
+ *  uninitialize_terminal() on application exit. Installs sigterm handler to
+ *  uninitialize the terminal, if sigint_uninit is true.
  *
  *  Screen_buffer - Alternate: Provides a blank terminal screen.
  *                  Normal:    Provides the existing terminal display.
@@ -148,7 +149,8 @@ void initialize_terminal(Screen_buffer,
                          Echo,
                          Input_buffer,
                          Signals,
-                         Key_mode);
+                         Key_mode,
+                         bool sigint_uninit = true);
 
 /// Initialize the terminal with 'normal' settings.
 /** The terminal should mimic normal terminal input/output activity, leaving the

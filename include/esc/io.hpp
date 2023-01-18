@@ -74,11 +74,4 @@ auto read() -> Event;
 auto read(int millisecond_timeout) -> std::optional<Event>;
 
 }  // namespace esc
-
-namespace esc::detail {
-
-/// register handler for terminal window resize event signals.
-void register_SIGWINCH();
-
-}  // namespace esc::detail
 #endif  // ESC_IO_HPP
