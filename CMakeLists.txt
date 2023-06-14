@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.16)
 project(escape LANGUAGES CXX)
 
 # Escape Library
@@ -80,4 +80,3 @@ target_compile_options(termcaps
         -Wextra
         -Wpedantic
 )
-
