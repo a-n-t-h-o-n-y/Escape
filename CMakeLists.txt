@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 project(escape LANGUAGES CXX)
 
 # Escape Library
-add_library(escape STATIC
+add_library(${PROJECT_NAME}
     src/io.cpp
     src/terminfo.cpp
     src/terminal.cpp
@@ -20,24 +20,27 @@ add_library(escape STATIC
     src/detail/signals.cpp
 )
 
-target_include_directories(escape
+target_include_directories(${PROJECT_NAME}
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_compile_features(escape
+target_compile_features(${PROJECT_NAME}
     PUBLIC
         cxx_std_17
 )
 
-target_compile_options(escape
+target_compile_options(${PROJECT_NAME}
     PRIVATE
         -Wall
         -Wextra
         -Wpedantic
 )
 
+set_target_properties(${PROJECT_NAME} PROPERTIES PUBLIC_HEADER "${ESCAPE_HEADERS}"  WINDOWS_EXPORT_ALL_SYMBOLS true)
+
 option(LTO "Turn Link Time Optimization ON/OFF" ON)
+option(ENABLE_TERMCAPS "Build termcaps executable" ON)
 
 # Link-Time Optimization
 include(CheckIPOSupported)
@@ -52,10 +55,10 @@ else()
 endif()
 
 include(GNUInstallDirs)
-install(TARGETS escape
-        ARCHIVE
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        CONFIGURATIONS Release
+install(TARGETS ${PROJECT_NAME}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 install(
     DIRECTORY
@@ -64,19 +67,21 @@ install(
         ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-# TermCaps Executable
-add_executable(termcaps EXCLUDE_FROM_ALL
-    tools/termcaps.cpp
-)
+if (ENABLE_TERMCAPS)
+    # TermCaps Executable
+    add_executable(termcaps EXCLUDE_FROM_ALL
+        tools/termcaps.cpp
+    )
 
-target_link_libraries(termcaps
-    PRIVATE
-        escape
-)
+    target_link_libraries(termcaps
+        PRIVATE
+            ${PROJECT_NAME}
+    )
 
-target_compile_options(termcaps
-    PRIVATE
-        -Wall
-        -Wextra
-        -Wpedantic
-)
+    target_compile_options(termcaps
+        PRIVATE
+            -Wall
+            -Wextra
+            -Wpedantic
+    )
+endif()
