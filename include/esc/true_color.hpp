@@ -132,6 +132,20 @@ class True_color {
     constexpr True_color(HSL x) : True_color{hsl_to_rgb(x)} {}
 };
 
+/// Returns true if the two True_colors are the same.
+[[nodiscard]] inline auto operator==(True_color const& lhs,
+                                     True_color const& rhs) -> bool
+{
+    return lhs.red == rhs.red && lhs.green == rhs.green && lhs.blue == rhs.blue;
+}
+
+/// Returns true if the two True_colors are not the same.
+[[nodiscard]] inline auto operator!=(True_color const& lhs,
+                                     True_color const& rhs) -> bool
+{
+    return !(lhs == rhs);
+}
+
 /// Tag type for True_color that is used as a background.
 struct BG_True_color {
     True_color value;

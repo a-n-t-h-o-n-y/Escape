@@ -5,6 +5,18 @@ namespace esc {
 /// Default Color of the terminal.
 struct Default_color {};
 
+/// Checks for equality, always returns true.
+[[nodiscard]] constexpr auto operator==(Default_color, Default_color) -> bool
+{
+    return true;
+}
+
+/// Checks for inequality, always returns false.
+[[nodiscard]] constexpr auto operator!=(Default_color, Default_color) -> bool
+{
+    return false;
+}
+
 /// Tag type for terminal default color background.
 struct BG_Default_color {};
 

@@ -14,5 +14,20 @@ struct Brush {
     Traits traits    = Traits{Trait::None};
 };
 
+/// Returns true if the two Brushes have the same background, foreground, and
+/// traits.
+[[nodiscard]] inline auto operator==(Brush const& lhs, Brush const& rhs) -> bool
+{
+    return lhs.background == rhs.background &&
+           lhs.foreground == rhs.foreground && lhs.traits == rhs.traits;
+}
+
+/// Returns true if the two Brushes do not have the same background, foreground,
+/// and traits.
+[[nodiscard]] inline auto operator!=(Brush const& lhs, Brush const& rhs) -> bool
+{
+    return !(lhs == rhs);
+}
+
 }  // namespace esc
 #endif  // ESC_BRUSH_HPP
