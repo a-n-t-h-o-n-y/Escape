@@ -42,18 +42,6 @@ jobs:
               run: |
                   mkdir build && cd build
                   cmake .. && make termcaps
-    build-ubuntu22-gcc9:
-        runs-on: ubuntu-22.04
-        steps:
-            - uses: actions/checkout@v3
-              with:
-                  submodules: recursive
-            - env:
-                  CC: gcc-9
-                  CXX: g++-9
-              run: |
-                  mkdir build && cd build
-                  cmake .. && make termcaps
 
     # Ubuntu-22 Clang
     build-ubuntu22-clang14:
@@ -91,18 +79,6 @@ jobs:
             - env:
                   CC: gcc-10
                   CXX: g++-10
-              run: |
-                  mkdir build && cd build
-                  cmake .. && make termcaps
-    build-ubuntu20-gcc9:
-        runs-on: ubuntu-20.04
-        steps:
-            - uses: actions/checkout@v3
-              with:
-                  submodules: recursive
-            - env:
-                  CC: gcc-9
-                  CXX: g++-9
               run: |
                   mkdir build && cd build
                   cmake .. && make termcaps
