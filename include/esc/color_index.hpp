@@ -24,9 +24,12 @@ struct ColorIndex {
     static ColorIndex const BrightMagenta;
     static ColorIndex const BrightCyan;
     static ColorIndex const BrightWhite;
+
+    [[nodiscard]] constexpr bool operator==(ColorIndex const&) const = default;
+    [[nodiscard]] constexpr bool operator!=(ColorIndex const&) const = default;
 };
 
-// Yes, defining constexpr vs const declaration is legal here.
+// Yes, defining constexpr with const declaration is legal here.
 constexpr ColorIndex ColorIndex::Black         = ColorIndex{0};
 constexpr ColorIndex ColorIndex::Red           = ColorIndex{1};
 constexpr ColorIndex ColorIndex::Green         = ColorIndex{2};
@@ -43,45 +46,5 @@ constexpr ColorIndex ColorIndex::BrightBlue    = ColorIndex{12};
 constexpr ColorIndex ColorIndex::BrightMagenta = ColorIndex{13};
 constexpr ColorIndex ColorIndex::BrightCyan    = ColorIndex{14};
 constexpr ColorIndex ColorIndex::BrightWhite   = ColorIndex{15};
-
-/// Return true if \p a and \p b contain the same index value.
-constexpr auto operator==(ColorIndex a, ColorIndex b) -> bool
-{
-    return a.value == b.value;
-}
-
-/// Return false if \p a and \p b contain the same index value.
-constexpr auto operator!=(ColorIndex a, ColorIndex b) -> bool
-{
-    return a.value != b.value;
-}
-
-/// Tag type for ColorIndex that is used as a background.
-struct ColorIndexBG {
-    ColorIndex value;
-};
-
-/// Tag type for ColorIndex that is used as a foreground.
-struct ColorIndexFG {
-    ColorIndex value;
-};
-
-/// Return a background tag type to use with escape(...) function.
-[[nodiscard]] constexpr auto background(ColorIndex x) -> ColorIndexBG
-{
-    return {x};
-}
-
-/// Return a background tag type to use with escape(...) function.
-[[nodiscard]] constexpr auto bg(ColorIndex x) -> ColorIndexBG { return {x}; }
-
-/// Return a foreground tag type to use with escape(...) function.
-[[nodiscard]] constexpr auto foreground(ColorIndex x) -> ColorIndexFG
-{
-    return {x};
-}
-
-/// Return a foreground tag type to use with escape(...) function.
-[[nodiscard]] constexpr auto fg(ColorIndex x) -> ColorIndexFG { return {x}; }
 
 }  // namespace esc

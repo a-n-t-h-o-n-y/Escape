@@ -130,49 +130,9 @@ class TrueColor {
 
     /// Construct a true color with HSL values.
     constexpr TrueColor(HSL x) : TrueColor{hsl_to_rgb(x)} {}
+
+    [[nodiscard]] constexpr bool operator==(TrueColor const&) const = default;
+    [[nodiscard]] constexpr bool operator!=(TrueColor const&) const = default;
 };
-
-/// Returns true if the two `TrueColor`s are the same.
-
-[[nodiscard]] inline auto operator==(TrueColor const& lhs, TrueColor const& rhs)
-    -> bool
-{
-    return lhs.red == rhs.red && lhs.green == rhs.green && lhs.blue == rhs.blue;
-}
-
-/// Returns true if the two TrueColor are not the same.
-[[nodiscard]] inline auto operator!=(TrueColor const& lhs, TrueColor const& rhs)
-    -> bool
-{
-    return !(lhs == rhs);
-}
-
-/// Tag type for TrueColor that is used as a background.
-struct TrueColorBG {
-    TrueColor value;
-};
-
-/// Tag type for TrueColor that is used as a foreground.
-struct TrueColorFG {
-    TrueColor value;
-};
-
-/// Return a background tag type to use with escape(...) function.
-[[nodiscard]] constexpr auto background(TrueColor x) -> TrueColorBG
-{
-    return {x};
-}
-
-/// Return a background tag type to use with escape(...) function.
-[[nodiscard]] constexpr auto bg(TrueColor x) -> TrueColorBG { return {x}; }
-
-/// Return a foreground tag type to use with escape(...) function.
-[[nodiscard]] constexpr auto foreground(TrueColor x) -> TrueColorFG
-{
-    return {x};
-}
-
-/// Return a foreground tag type to use with escape(...) function.
-[[nodiscard]] constexpr auto fg(TrueColor x) -> TrueColorFG { return {x}; }
 
 }  // namespace esc

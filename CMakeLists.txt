@@ -27,7 +27,7 @@ target_include_directories(escape
 
 target_compile_features(escape
     PUBLIC
-        cxx_std_17
+        cxx_std_20
 )
 
 target_compile_options(escape

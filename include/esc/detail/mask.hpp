@@ -77,9 +77,16 @@ class Mask {
 
 /// Return true if data() members are equal.
 template <typename E>
-auto constexpr operator==(Mask<E> a, Mask<E> b) -> bool
+[[nodiscard]] auto constexpr operator==(Mask<E> a, Mask<E> b) -> bool
 {
     return a.data() == b.data();
+}
+
+/// Return true if data() members are not equal.
+template <typename E>
+[[nodiscard]] auto constexpr operator!=(Mask<E> a, Mask<E> b) -> bool
+{
+    return a.data() != b.data();
 }
 
 }  // namespace esc::detail

@@ -61,52 +61,62 @@ auto clear_traits() -> std::string
 
 auto traits() -> Traits { return ::current_traits; }
 
-auto escape(ColorIndexBG x) -> std::string
+auto escape(ColorBG c) -> std::string
 {
-    ::current_background = x.value;
+    return std::visit([](auto c) { return escape_bg(c); }, c.value);
+}
+
+auto escape_bg(ColorIndex c) -> std::string
+{
+    ::current_background = c;
     return "\033["
            "48;5;" +
-           std::to_string(x.value.value) + 'm';
+           std::to_string(c.value) + 'm';
 }
 
-auto escape(TrueColorBG x) -> std::string
+auto escape_bg(TrueColor c) -> std::string
 {
-    ::current_background = x.value;
+    ::current_background = c;
     return "\033["
            "48;2;" +
-           std::to_string(x.value.red) + ';' + std::to_string(x.value.green) +
-           ';' + std::to_string(x.value.blue) + 'm';
+           std::to_string(c.red) + ';' + std::to_string(c.green) + ';' +
+           std::to_string(c.blue) + 'm';
 }
 
-auto escape(DefaultColorBG) -> std::string
+auto escape_bg(DefaultColor c) -> std::string
 {
-    ::current_background = DefaultColor{};
+    ::current_background = c;
     return "\033["
            "49m";
 }
 
 auto background_color() -> Color { return ::current_background; }
 
-auto escape(ColorIndexFG x) -> std::string
+auto escape(ColorFG c) -> std::string
 {
-    ::current_foreground = x.value;
+    return std::visit([](auto c) { return escape_fg(c); }, c.value);
+}
+
+auto escape_fg(ColorIndex c) -> std::string
+{
+    ::current_foreground = c;
     return "\033["
            "38;5;" +
-           std::to_string(x.value.value) + 'm';
+           std::to_string(c.value) + 'm';
 }
 
-auto escape(TrueColorFG x) -> std::string
+auto escape_fg(TrueColor c) -> std::string
 {
-    ::current_foreground = x.value;
+    ::current_foreground = c;
     return "\033["
            "38;2;" +
-           std::to_string(x.value.red) + ';' + std::to_string(x.value.green) +
-           ';' + std::to_string(x.value.blue) + 'm';
+           std::to_string(c.red) + ';' + std::to_string(c.green) + ';' +
+           std::to_string(c.blue) + 'm';
 }
 
-auto escape(DefaultColorFG) -> std::string
+auto escape_fg(DefaultColor c) -> std::string
 {
-    ::current_foreground = DefaultColor{};
+    ::current_foreground = c;
     return "\033["
            "39m";
 }
@@ -115,11 +125,8 @@ auto foreground_color() -> Color { return ::current_foreground; }
 
 auto escape(Brush b) -> std::string
 {
-    auto const bg =
-        std::visit([](auto c) { return escape(background(c)); }, b.background);
-    auto const fg =
-        std::visit([](auto c) { return escape(foreground(c)); }, b.foreground);
-    return bg + fg + escape(b.traits);
+    return escape(background(b.background)) + escape(foreground(b.foreground)) +
+           escape(b.traits);
 }
 
 }  // namespace esc
