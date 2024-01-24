@@ -107,7 +107,7 @@ void set(Screen_buffer sb)
     }
 }
 
-void set(Key_mode km)
+void set(KeyMode km)
 {
     // TODO implementation is messy, depends on call order.
 
@@ -115,13 +115,13 @@ void set(Key_mode km)
     constexpr auto k_xlate = 0x01;
     constexpr auto k_raw   = 0x00;
     switch (km) {
-        case Key_mode::Normal:
+        case KeyMode::Normal:
             if (detail::tty_file_descriptor.has_value()) {
                 detail::set_keyboard_mode(*detail::tty_file_descriptor,
                                           k_xlate);
             }
             break;
-        case Key_mode::Raw:
+        case KeyMode::Raw:
             detail::tty_file_descriptor = detail::open_console_file();
             detail::set_keyboard_mode(*detail::tty_file_descriptor, k_raw);
             break;
@@ -144,24 +144,24 @@ void set(Cursor c)
     }
 }
 
-void set(Mouse_mode mm)
+void set(MouseMode mm)
 {
     auto const ext_mode = detail::is_urxvt(TERM_var()) ? "1015" : "1006";
 
     auto result = std::string{};
     switch (mm) {
-        case Mouse_mode::Off:
+        case MouseMode::Off:
             result.append("\033[?1000;1002;1003;").append(ext_mode).append("l");
             break;
-        case Mouse_mode::Basic:
+        case MouseMode::Basic:
             result.append("\033[?1002;1003l");  // Off
             result.append("\033[?1000;").append(ext_mode).append("h");
             break;
-        case Mouse_mode::Drag:
+        case MouseMode::Drag:
             result.append("\033[?1000;1003l");  // Off
             result.append("\033[?1002;").append(ext_mode).append("h");
             break;
-        case Mouse_mode::Move:
+        case MouseMode::Move:
             result.append("\033[?1000;1002l");  // Off
             result.append("\033[?1003;").append(ext_mode).append("h");
             break;
@@ -170,12 +170,12 @@ void set(Mouse_mode mm)
 }
 
 void initialize_terminal(Screen_buffer screen_buffer,
-                         Mouse_mode mouse_mode,
+                         MouseMode mouse_mode,
                          Cursor cursor,
                          Echo echo,
                          Input_buffer input_buffer,
                          Signals signals,
-                         Key_mode key_mode,
+                         KeyMode key_mode,
                          bool sigint_uninit)
 {
     auto constexpr stdout_buf_size = 4'096;
@@ -207,13 +207,13 @@ void initialize_terminal(Screen_buffer screen_buffer,
 
 void initialize_normal_terminal()
 {
-    initialize_terminal(Screen_buffer::Normal, Mouse_mode::Off, Cursor::Show,
+    initialize_terminal(Screen_buffer::Normal, MouseMode::Off, Cursor::Show,
                         Echo::On, Input_buffer::Canonical, Signals::On,
-                        Key_mode::Normal);
+                        KeyMode::Normal);
 }
 
-void initialize_interactive_terminal(Mouse_mode mouse_mode,
-                                     Key_mode key_mode,
+void initialize_interactive_terminal(MouseMode mouse_mode,
+                                     KeyMode key_mode,
                                      Signals signals)
 {
     initialize_terminal(Screen_buffer::Alternate, mouse_mode, Cursor::Hide,
@@ -225,7 +225,7 @@ void uninitialize_terminal()
     // TODO take settings parameter and use that to reset the terminal to
     // settings before.
     write(turn_on_auto_wrap());
-    set(Screen_buffer::Normal, Mouse_mode::Off, Cursor::Show, Key_mode::Normal);
+    set(Screen_buffer::Normal, MouseMode::Off, Cursor::Show, KeyMode::Normal);
     flush();
     if (std::setlocale(LC_ALL, original_clocale.c_str()) == nullptr)
         throw std::runtime_error{"uninitialize_terminal: set_locale() failed."};

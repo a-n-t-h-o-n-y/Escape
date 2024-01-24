@@ -52,11 +52,11 @@ void set(Screen_buffer);
 /** Raw mode makes the read() call more complex, only enable if needed. All keys
  *  returned in Raw mode are lower-case. Has only been tested on a single laptop
  *  keyboard. */
-enum class Key_mode : bool { Normal, Raw };
+enum class KeyMode : bool { Normal, Raw };
 
-/// Enable the given Key_mode value.
+/// Enable the given KeyMode value.
 /** Calls on ioctl internally. */
-void set(Key_mode);
+void set(KeyMode);
 
 // CURSOR ----------------------------------------------------------------------
 
@@ -71,7 +71,7 @@ void set(Cursor);
 
 /// Set the mouse input mode; determines which Events are generated for mouse.
 /** Calls on write internally, but does not call flush(). */
-void set(Mouse_mode);
+void set(MouseMode);
 
 // CONVENIENCE -----------------------------------------------------------------
 
@@ -82,8 +82,8 @@ bool constexpr is_setable = detail::is_any_of<T,
                                               Signals,
                                               Screen_buffer,
                                               Cursor,
-                                              Mouse_mode,
-                                              Key_mode>;
+                                              MouseMode,
+                                              KeyMode>;
 
 /// Convenience function to set multiple properties at once.
 template <typename... Args>
@@ -109,7 +109,7 @@ void set(Args... args)
  *                  Alternate buffer in order to restore the terminal screen to
  *                  how it was before the application started.
  *
- *  Mouse_mode  - - Off:   Generates no Mouse Events.
+ *  MouseMode - - - Off:   Generates no Mouse Events.
  *                  Basic: Generate Mouse Press and Release Events for all
  *                         buttons and the scroll wheel.
  *                  Drag:  Basic, plus Mouse Move Events while a button is
@@ -133,7 +133,7 @@ void set(Args... args)
  *                  Off: Signals will not be generated on ctrl-[key] presses,
  *                       sending the byte value of the ctrl character instead.
  *
- *  Key_mode  - - - Normal: KeyPress Events generated and auto-repeated if key
+ *  KeyMode - - - - Normal: KeyPress Events generated and auto-repeated if key
  *                          is held down.
  *                  Raw:    KeyPress and KeyRelease Events are generated, the
  *                          shift key is not applied with other keys, each key
@@ -144,12 +144,12 @@ void set(Args... args)
  *                          keyboard.
  */
 void initialize_terminal(Screen_buffer,
-                         Mouse_mode,
+                         MouseMode,
                          Cursor,
                          Echo,
                          Input_buffer,
                          Signals,
-                         Key_mode,
+                         KeyMode,
                          bool sigint_uninit = true);
 
 /// Initialize the terminal with 'normal' settings.
@@ -160,9 +160,9 @@ void initialize_normal_terminal();
 /// Initialize the terminal with 'interactive' settings.
 /** This is for typical console full-screen applications, the alternate screen
  *  buffer is set, key press echo is off, and the input buffer is immediate. */
-void initialize_interactive_terminal(Mouse_mode mouse_mode = Mouse_mode::Basic,
-                                     Key_mode key_mode     = Key_mode::Normal,
-                                     Signals signals       = Signals::On);
+void initialize_interactive_terminal(MouseMode mouse_mode = MouseMode::Basic,
+                                     KeyMode key_mode     = KeyMode::Normal,
+                                     Signals signals      = Signals::On);
 
 // UNINITIALIZE ----------------------------------------------------------------
 

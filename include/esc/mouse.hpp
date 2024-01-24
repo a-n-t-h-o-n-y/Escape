@@ -1,5 +1,5 @@
-#ifndef ESC_MOUSE_HPP
-#define ESC_MOUSE_HPP
+#pragma once
+
 #include <cstdint>
 #include <string>
 
@@ -43,15 +43,14 @@ struct Mouse {
 [[nodiscard]] auto to_string(Mouse::Button b) -> std::string;
 
 /// Defines all input modes for the Mouse.
-enum class Mouse_mode {
+enum class MouseMode {
     Off,    // No Mouse Events are generated, this is the default.
     Basic,  // Mouse Press & Release Events for all Buttons and Scroll Wheel.
     Drag,   // Basic, plus Move Events while a Button is pressed.
     Move    // Basic, plus Move Events sent with or without a Button pressed.
 };
 
-/// Return a string display of the given Mouse_mode enum.
-[[nodiscard]] auto to_string(Mouse_mode mm) -> std::string;
+/// Return a string display of the given MouseMode enum.
+[[nodiscard]] auto to_string(MouseMode mm) -> std::string;
 
 }  // namespace esc
-#endif  // ESC_MOUSE_HPP

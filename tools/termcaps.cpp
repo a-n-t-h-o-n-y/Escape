@@ -236,16 +236,16 @@ class Change_mouse_mode {
    public:
     Change_mouse_mode(Point offset) : offset_{offset}
     {
-        set(Mouse_mode::Basic);
-        this->update(Mouse_mode::Basic);
+        set(MouseMode::Basic);
+        this->update(MouseMode::Basic);
     }
 
    public:
     auto row() const -> int { return offset_.y; }
 
-    auto current_mode() const -> Mouse_mode { return current_; }
+    auto current_mode() const -> MouseMode { return current_; }
 
-    void update(Mouse_mode mm)
+    void update(MouseMode mm)
     {
         set(mm);
         current_ = mm;
@@ -258,7 +258,7 @@ class Change_mouse_mode {
 
    private:
     Point offset_;
-    Mouse_mode current_;
+    MouseMode current_;
 };
 
 auto constexpr column_two = 44;
@@ -356,14 +356,14 @@ struct Termcaps_app {
     Color_palette_display color_palette_display{{column_two, 5}};
 };
 
-/// Returns the next mouse mode, skipping Mouse_mode::Off
-auto next_mouse_mode(Mouse_mode mm) -> Mouse_mode
+/// Returns the next mouse mode, skipping MouseMode::Off
+auto next_mouse_mode(MouseMode mm) -> MouseMode
 {
     switch (mm) {
-        case Mouse_mode::Move:
-        case Mouse_mode::Off: return Mouse_mode::Basic;
-        case Mouse_mode::Basic: return Mouse_mode::Drag;
-        case Mouse_mode::Drag: return Mouse_mode::Move;
+        case MouseMode::Move:
+        case MouseMode::Off: return MouseMode::Basic;
+        case MouseMode::Basic: return MouseMode::Drag;
+        case MouseMode::Drag: return MouseMode::Move;
     }
     throw std::logic_error{"next_mouse_mode(): Bad enum value for mm."};
 }

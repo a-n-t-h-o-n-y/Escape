@@ -179,7 +179,7 @@ enum class Key : char32_t {
     utf8 = 160,
 
     // Unicode planes 4-13 are unassigned
-    // Below are only used in Key_mode::Raw
+    // Below are only used in KeyMode::Raw
     LCtrl = 0x40000,
     RCtrl,
     LShift,

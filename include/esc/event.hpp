@@ -34,7 +34,7 @@ struct KeyPress {
 };
 
 /// Key Release Event
-/** Only used with Key_mode::Alternate set. */
+/** Only used with KeyMode::Alternate set. */
 struct KeyRelease {
     Key key;
 };

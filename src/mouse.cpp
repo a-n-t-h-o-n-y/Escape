@@ -27,15 +27,15 @@ auto to_string(Mouse::Button b) -> std::string
                              std::to_string(static_cast<std::uint16_t>(b))};
 }
 
-auto to_string(Mouse_mode mm) -> std::string
+auto to_string(MouseMode mm) -> std::string
 {
     switch (mm) {
-        case Mouse_mode::Off: return "Mouse_mode::Off";
-        case Mouse_mode::Basic: return "Mouse_mode::Basic";
-        case Mouse_mode::Drag: return "Mouse_mode::Drag";
-        case Mouse_mode::Move: return "Mouse_mode::Move";
+        case MouseMode::Off: return "MouseMode::Off";
+        case MouseMode::Basic: return "MouseMode::Basic";
+        case MouseMode::Drag: return "MouseMode::Drag";
+        case MouseMode::Move: return "MouseMode::Move";
     }
-    throw std::logic_error{"to_string(Mouse_mode): Bad Enum Value."};
+    throw std::logic_error{"to_string(MouseMode): Bad Enum Value."};
 }
 
 }  // namespace esc

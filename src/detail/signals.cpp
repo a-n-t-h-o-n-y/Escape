@@ -1,5 +1,6 @@
 #include <esc/detail/signals.hpp>
 
+#include <atomic>
 #include <csignal>
 #include <cstdlib>
 #include <stdexcept>
@@ -10,32 +11,48 @@ namespace {
 
 extern "C" auto sigint_handler(int sig) -> void
 {
-    if (sig == SIGINT)
-        std::exit(EXIT_SUCCESS);
+    if (sig == SIGINT) {
+        if (esc::sigint_flag) {
+            // If this is second time ctrl + c is pressed, force exit.
+            std::quick_exit(1);
+        }
+        else {
+            esc::sigint_flag = true;
+        }
+    }
 }
 
 /// Set the window_resize_sig flag to true on SIGWINCH signals.
 extern "C" void resize_handler(int sig)
 {
-    if (sig == SIGWINCH)
+    if (sig == SIGWINCH) {
         esc::detail::window_resize_sig = true;
+    }
 }
 
 }  // namespace
 
+namespace esc {
+
+std::atomic<bool> sigint_flag = false;
+
+}  // namespace esc
+
 namespace esc::detail {
 
-bool window_resize_sig = false;
+std::atomic<bool> window_resize_sig = false;
 
 void register_signals(bool sigint)
 {
-    std::atexit(esc::uninitialize_terminal);
+    std::at_quick_exit(::esc::uninitialize_terminal);
 
-    if (std::signal(SIGWINCH, &resize_handler) == SIG_ERR)
+    if (std::signal(SIGWINCH, &resize_handler) == SIG_ERR) {
         throw std::runtime_error{"register_SIGWINCH(): std::signal call"};
+    }
 
-    if (sigint && std::signal(SIGINT, &sigint_handler) == SIG_ERR)
+    if (sigint && std::signal(SIGINT, &sigint_handler) == SIG_ERR) {
         throw std::runtime_error{"register_SIGINT(): std::signal call"};
+    }
 }
 
 }  // namespace esc::detail
