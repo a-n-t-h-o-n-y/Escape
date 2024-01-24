@@ -1,5 +1,5 @@
-#ifndef ESC_COLOR_HPP
-#define ESC_COLOR_HPP
+#pragma once
+
 #include <variant>
 
 #include <esc/color_index.hpp>
@@ -9,7 +9,6 @@
 namespace esc {
 
 /// Variant for any of the color types that can be used.
-using Color = std::variant<Color_index, True_color, Default_color>;
+using Color = std::variant<ColorIndex, TrueColor, DefaultColor>;
 
 }  // namespace esc
-#endif  // ESC_COLOR_HPP

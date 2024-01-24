@@ -1,62 +1,56 @@
-#ifndef ESC_EVENT_HPP
-#define ESC_EVENT_HPP
-#include <cstddef>
-#include <cstdint>
-#include <functional>
-#include <type_traits>
+#pragma once
+
 #include <variant>
 
 #include <esc/area.hpp>
 #include <esc/key.hpp>
 #include <esc/mouse.hpp>
-#include <esc/point.hpp>
 
 namespace esc {
 
 /// Mouse Button Pressed
-struct Mouse_press {
-    Mouse state;
+struct MousePress {
+    Mouse mouse;
 };
 
 /// Mouse Button Released
-struct Mouse_release {
-    Mouse state;
+struct MouseRelease {
+    Mouse mouse;
 };
 
 /// Mouse Wheel Scrolled
-struct Scroll_wheel {
-    Mouse state;
+struct MouseWheel {
+    Mouse mouse;
 };
 
 /// Mouse Pointer Moved
-struct Mouse_move {
-    Mouse state;
+struct MouseMove {
+    Mouse mouse;
 };
 
 /// Key Press Event
-struct Key_press {
+struct KeyPress {
     Key key;
 };
 
 /// Key Release Event
 /** Only used with Key_mode::Alternate set. */
-struct Key_release {
+struct KeyRelease {
     Key key;
 };
 
 /// Terminal Window Resized
-struct Window_resize {
-    Area new_dimensions;
+struct Resize {
+    Area area;
 };
 
 /// Any input event type that can be returned from esc::read().
-using Event = std::variant<Mouse_press,
-                           Mouse_release,
-                           Scroll_wheel,
-                           Mouse_move,
-                           Key_press,
-                           Key_release,
-                           Window_resize>;
+using Event = std::variant<MousePress,
+                           MouseRelease,
+                           MouseWheel,
+                           MouseMove,
+                           KeyPress,
+                           KeyRelease,
+                           Resize>;
 
 }  // namespace esc
-#endif  // ESC_EVENT_HPP

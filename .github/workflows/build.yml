@@ -80,18 +80,6 @@ jobs:
               run: |
                   mkdir build && cd build
                   cmake .. && make termcaps
-    build-ubuntu22-clang12:
-        runs-on: ubuntu-22.04
-        steps:
-            - uses: actions/checkout@v3
-              with:
-                  submodules: recursive
-            - env:
-                  CC: clang-12
-                  CXX: clang++-12
-              run: |
-                  mkdir build && cd build
-                  cmake .. && make termcaps
 
     # Ubuntu-20 GCC
     build-ubuntu20-gcc10:

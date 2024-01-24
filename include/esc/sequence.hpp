@@ -71,13 +71,13 @@ struct Blank_screen {};
 // BACKGROUND COLOR ------------------------------------------------------------
 
 /// Return control sequence to set background to given xterm palette index.
-[[nodiscard]] auto escape(BG_Color_index x) -> std::string;
+[[nodiscard]] auto escape(ColorIndexBG x) -> std::string;
 
 /// Return control sequence to set background to given terminal true color.
-[[nodiscard]] auto escape(BG_True_color x) -> std::string;
+[[nodiscard]] auto escape(TrueColorBG x) -> std::string;
 
 /// Return control sequence to reset the background to the terminal default
-[[nodiscard]] auto escape(BG_Default_color) -> std::string;
+[[nodiscard]] auto escape(DefaultColorBG) -> std::string;
 
 /// Returns the last color that was created with set_background().
 /** May not represent what is on the screen if the last call to set_background()
@@ -87,13 +87,13 @@ struct Blank_screen {};
 // FOREGROUND COLOR ------------------------------------------------------------
 
 /// Return control sequence to set foreground to given xterm palette index.
-[[nodiscard]] auto escape(FG_Color_index x) -> std::string;
+[[nodiscard]] auto escape(ColorIndexFG x) -> std::string;
 
 /// Return control sequence to set foreground to given terminal true color.
-[[nodiscard]] auto escape(FG_True_color x) -> std::string;
+[[nodiscard]] auto escape(TrueColorFG x) -> std::string;
 
 /// Return control sequence to reset the foreground to the terminal default
-[[nodiscard]] auto escape(FG_Default_color) -> std::string;
+[[nodiscard]] auto escape(DefaultColorFG) -> std::string;
 
 /// Returns the last color that was created with set_foreground().
 /** May not represent what is on the screen if the last call to set_foreground()
@@ -114,12 +114,12 @@ bool constexpr is_escapable = detail::is_any_of<T,
                                                 Blank_screen,
                                                 Trait,
                                                 Traits,
-                                                BG_Color_index,
-                                                FG_Color_index,
-                                                BG_True_color,
-                                                FG_True_color,
-                                                BG_Default_color,
-                                                FG_Default_color,
+                                                ColorIndexBG,
+                                                ColorIndexFG,
+                                                TrueColorBG,
+                                                TrueColorFG,
+                                                DefaultColorBG,
+                                                DefaultColorFG,
                                                 Brush>;
 
 /// Convenience function to concatenate multiple escapable objects at once.

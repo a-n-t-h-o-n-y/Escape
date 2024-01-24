@@ -9,8 +9,8 @@ namespace {
 
 // Modifiable currently set Traits & Colors, yes, they are global to this TU.
 auto current_traits     = esc::Traits{esc::Trait::None};
-auto current_background = esc::Color{esc::Default_color{}};
-auto current_foreground = esc::Color{esc::Default_color{}};
+auto current_background = esc::Color{esc::DefaultColor{}};
+auto current_foreground = esc::Color{esc::DefaultColor{}};
 
 }  // namespace
 
@@ -61,7 +61,7 @@ auto clear_traits() -> std::string
 
 auto traits() -> Traits { return ::current_traits; }
 
-auto escape(BG_Color_index x) -> std::string
+auto escape(ColorIndexBG x) -> std::string
 {
     ::current_background = x.value;
     return "\033["
@@ -69,7 +69,7 @@ auto escape(BG_Color_index x) -> std::string
            std::to_string(x.value.value) + 'm';
 }
 
-auto escape(BG_True_color x) -> std::string
+auto escape(TrueColorBG x) -> std::string
 {
     ::current_background = x.value;
     return "\033["
@@ -78,16 +78,16 @@ auto escape(BG_True_color x) -> std::string
            ';' + std::to_string(x.value.blue) + 'm';
 }
 
-auto escape(BG_Default_color) -> std::string
+auto escape(DefaultColorBG) -> std::string
 {
-    ::current_background = Default_color{};
+    ::current_background = DefaultColor{};
     return "\033["
            "49m";
 }
 
 auto background_color() -> Color { return ::current_background; }
 
-auto escape(FG_Color_index x) -> std::string
+auto escape(ColorIndexFG x) -> std::string
 {
     ::current_foreground = x.value;
     return "\033["
@@ -95,7 +95,7 @@ auto escape(FG_Color_index x) -> std::string
            std::to_string(x.value.value) + 'm';
 }
 
-auto escape(FG_True_color x) -> std::string
+auto escape(TrueColorFG x) -> std::string
 {
     ::current_foreground = x.value;
     return "\033["
@@ -104,9 +104,9 @@ auto escape(FG_True_color x) -> std::string
            ';' + std::to_string(x.value.blue) + 'm';
 }
 
-auto escape(FG_Default_color) -> std::string
+auto escape(DefaultColorFG) -> std::string
 {
-    ::current_foreground = Default_color{};
+    ::current_foreground = DefaultColor{};
     return "\033["
            "39m";
 }

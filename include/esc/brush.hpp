@@ -9,8 +9,8 @@ namespace esc {
 /// Convenience type to hold visual aspects of the terminal display.
 /** use set_brush() */
 struct Brush {
-    Color background = Default_color{};
-    Color foreground = Default_color{};
+    Color background = DefaultColor{};
+    Color foreground = DefaultColor{};
     Traits traits    = Traits{Trait::None};
 };
 

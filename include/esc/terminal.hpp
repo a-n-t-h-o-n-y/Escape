@@ -48,7 +48,7 @@ void set(Screen_buffer);
 
 // KEY RELEASE ---------------------------------------------------------------
 
-/// Raw key mode enables Key_release Events and does not combine shift with key.
+/// Raw key mode enables KeyRelease Events and does not combine shift with key.
 /** Raw mode makes the read() call more complex, only enable if needed. All keys
  *  returned in Raw mode are lower-case. Has only been tested on a single laptop
  *  keyboard. */
@@ -133,9 +133,9 @@ void set(Args... args)
  *                  Off: Signals will not be generated on ctrl-[key] presses,
  *                       sending the byte value of the ctrl character instead.
  *
- *  Key_mode  - - - Normal: Key_press Events generated and auto-repeated if key
+ *  Key_mode  - - - Normal: KeyPress Events generated and auto-repeated if key
  *                          is held down.
- *                  Raw:    Key_press and Key_release Events are generated, the
+ *                  Raw:    KeyPress and KeyRelease Events are generated, the
  *                          shift key is not applied with other keys, each key
  *                          press and release is its own event. Useful for games
  *                          and where you need to keep track of multiple keys

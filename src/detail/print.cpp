@@ -34,7 +34,7 @@ namespace {
 
 namespace esc::detail {
 
-auto print(esc::Key_press k, std::ostream& os) -> std::ostream&
+auto print(esc::KeyPress k, std::ostream& os) -> std::ostream&
 {
     os << "Key::" << static_cast<std::uint32_t>(k.key) << '\n'
        << std::boolalpha << "shift: " << is_set(k.key, esc::Mod::Shift) << '\n'
@@ -44,35 +44,35 @@ auto print(esc::Key_press k, std::ostream& os) -> std::ostream&
     return os;
 }
 
-auto print(esc::Mouse_press m, std::ostream& os) -> std::ostream&
+auto print(esc::MousePress m, std::ostream& os) -> std::ostream&
 {
-    os << "struct Mouse_press {\n" << ::to_string(m.state, "\t") << "\n};\n";
+    os << "struct MousePress {\n" << ::to_string(m.mouse, "\t") << "\n};\n";
     return os;
 }
 
-auto print(esc::Mouse_release m, std::ostream& os) -> std::ostream&
+auto print(esc::MouseRelease m, std::ostream& os) -> std::ostream&
 {
-    os << "struct Mouse_release {\n" << ::to_string(m.state, "\t") << "\n};\n";
+    os << "struct MouseRelease {\n" << ::to_string(m.mouse, "\t") << "\n};\n";
     return os;
 }
 
-auto print(esc::Scroll_wheel m, std::ostream& os) -> std::ostream&
+auto print(esc::MouseWheel m, std::ostream& os) -> std::ostream&
 {
-    os << "struct Scroll_wheel {\n" << ::to_string(m.state, "\t") << "\n};\n";
+    os << "struct MouseWheel {\n" << ::to_string(m.mouse, "\t") << "\n};\n";
     return os;
 }
 
-auto print(esc::Mouse_move m, std::ostream& os) -> std::ostream&
+auto print(esc::MouseMove m, std::ostream& os) -> std::ostream&
 {
-    os << "struct Mouse_move {\n" << ::to_string(m.state, "\t") << "\n};\n";
+    os << "struct MouseMove {\n" << ::to_string(m.mouse, "\t") << "\n};\n";
     return os;
 }
 
-auto print(esc::Window_resize w, std::ostream& os) -> std::ostream&
+auto print(esc::Resize r, std::ostream& os) -> std::ostream&
 {
-    os << "struct Window_resize {\n"
-       << "    Area{width: " << w.new_dimensions.width
-       << " height: " << w.new_dimensions.height << "}\n"
+    os << "struct Resize {\n"
+       << "    Area{width: " << r.area.width << " height: " << r.area.height
+       << "}\n"
        << "};\n";
     return os;
 }

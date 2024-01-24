@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -110,11 +111,11 @@ class Key_press_display {
    public:
     Key_press_display(Point offset) : offset_{offset}
     {
-        this->update(Key_press{Key::Null});
+        this->update(KeyPress{Key::Null});
     }
 
    public:
-    void update(Key_release kr) const
+    void update(KeyRelease kr) const
     {
         auto mods_to_string = [](auto k) {
             auto result = std::string{};
@@ -147,7 +148,7 @@ class Key_press_display {
         flush();
     }
 
-    void update(Key_press kp) const
+    void update(KeyPress kp) const
     {
         auto mods_to_string = [](auto k) {
             auto result = std::string{};
@@ -267,16 +268,16 @@ class Color_palette_display {
     Color_palette_display(Point offset) : offset_{offset}
     {
         write(escape(Cursor_position{offset_}, Trait::Bold,
-                     background(Default_color{})),
+                     background(DefaultColor{})),
               "Color Palette", escape(Trait::None));
         auto const color_count = color_palette_size();
         for (auto i = 0; i < color_count; ++i) {
             write(escape(Cursor_position{offset_.x + (i % width),
                                          offset_.y + (i / width) + 1},
-                         background(Color_index{static_cast<std::uint8_t>(i)})),
+                         background(ColorIndex{static_cast<std::uint8_t>(i)})),
                   ' ');
         }
-        write(escape(background(Default_color{})));
+        write(escape(background(DefaultColor{})));
     }
 
    private:
@@ -311,7 +312,7 @@ class True_color_display {
         auto result = std::string{};
         for (auto i = 0; i < width; ++i) {
             start.hue += 1;
-            result.append(escape(background(True_color{start})));
+            result.append(escape(background(TrueColor{start})));
             result.push_back(' ');
         }
         return result;
@@ -322,7 +323,7 @@ class True_color_display {
         auto result = std::string{};
         for (auto i = 0; i < width; ++i) {
             start.saturation += 1;
-            result.append(escape(background(True_color{start})));
+            result.append(escape(background(TrueColor{start})));
             result.push_back(' ');
         }
         return result;
@@ -333,7 +334,7 @@ class True_color_display {
         auto result = std::string{};
         for (auto i = 0; i < width; ++i) {
             start.lightness += 1;
-            result.append(escape(background(True_color{start})));
+            result.append(escape(background(TrueColor{start})));
             result.push_back(' ');
         }
         return result;
@@ -368,35 +369,35 @@ auto next_mouse_mode(Mouse_mode mm) -> Mouse_mode
 }
 
 // return false if should exit.
-auto process(Mouse_press mp, Termcaps_app& app) -> bool
+auto process(MousePress m, Termcaps_app& app) -> bool
 {
-    if (app.change_mouse_mode.row() == mp.state.at.y) {
+    if (app.change_mouse_mode.row() == m.mouse.at.y) {
         auto& cmm = app.change_mouse_mode;
         cmm.update(next_mouse_mode(cmm.current_mode()));
     }
-    app.mouse_display.update("Mouse_press", mp.state);
+    app.mouse_display.update("MousePress", m.mouse);
     return true;
 }
 
-auto process(Mouse_release mp, Termcaps_app& app) -> bool
+auto process(MouseRelease m, Termcaps_app& app) -> bool
 {
-    app.mouse_display.update("Mouse_release", mp.state);
+    app.mouse_display.update("MouseRelease", m.mouse);
     return true;
 }
 
-auto process(Scroll_wheel mp, Termcaps_app& app) -> bool
+auto process(MouseWheel m, Termcaps_app& app) -> bool
 {
-    app.mouse_display.update("Scroll_wheel", mp.state);
+    app.mouse_display.update("MouseWheel", m.mouse);
     return true;
 }
 
-auto process(Mouse_move mp, Termcaps_app& app) -> bool
+auto process(MouseMove m, Termcaps_app& app) -> bool
 {
-    app.mouse_display.update("Mouse_move", mp.state);
+    app.mouse_display.update("MouseMove", m.mouse);
     return true;
 }
 
-auto process(Key_press k, Termcaps_app& app) -> bool
+auto process(KeyPress k, Termcaps_app& app) -> bool
 {
     if (k.key == Key::q)
         return false;
@@ -404,28 +405,36 @@ auto process(Key_press k, Termcaps_app& app) -> bool
     return true;
 }
 
-auto process(Key_release kr, Termcaps_app& app) -> bool
+auto process(KeyRelease kr, Termcaps_app& app) -> bool
 {
     app.key_press_display.update(kr);
     return true;
 }
 
-auto process(Window_resize ws, Termcaps_app& app) -> bool
+auto process(Resize r, Termcaps_app& app) -> bool
 {
-    app.term_size.update(ws.new_dimensions);
+    app.term_size.update(r.area);
     return true;
 }
 
 int main()
 {
-    initialize_interactive_terminal(Mouse_mode::Basic, Key_mode::Raw,
-                                    Signals::Off);
+    try {
+        initialize_interactive_terminal();
 
-    auto app = Termcaps_app{};
-    flush();
+        auto app = Termcaps_app{};
+        flush();
 
-    while (std::visit([&app](auto event) { return process(event, app); },
-                      read())) {}
-
-    uninitialize_terminal();
+        while (std::visit([&app](auto event) { return process(event, app); },
+                          read())) {}
+        uninitialize_terminal();
+    }
+    catch (std::exception const& e) {
+        uninitialize_terminal();
+        std::cerr << "Exception: " << e.what() << '\n';
+    }
+    catch (...) {
+        uninitialize_terminal();
+        std::cerr << "Unknown Exception\n";
+    }
 }

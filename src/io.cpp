@@ -20,8 +20,8 @@
 
 #include <esc/area.hpp>
 #include <esc/detail/mb_to_u32.hpp>
-#include <esc/detail/u32_to_mb.hpp>
 #include <esc/detail/signals.hpp>
+#include <esc/detail/u32_to_mb.hpp>
 #include <esc/event.hpp>
 #include <esc/key.hpp>
 #include <esc/terminal.hpp>
@@ -362,28 +362,28 @@ auto parse_mouse(Control_sequence cs) -> esc::Event
     // Move Event
     auto constexpr move_event = 0b00100000;
     if (btn & move_event)
-        return esc::Mouse_move{mouse};
+        return esc::MouseMove{mouse};
 
     // Scroll Event
     if (mouse.button == Mouse::Button::ScrollUp ||
         mouse.button == Mouse::Button::ScrollDown) {
-        return esc::Scroll_wheel{mouse};
+        return esc::MouseWheel{mouse};
     }
 
     // Release Event
     if (cs.final_byte == 'm')
-        return esc::Mouse_release{mouse};
+        return esc::MouseRelease{mouse};
 
     // urxvt btn release does not mention the button that was released.
     if (!is_sgr && mouse.button == Mouse::Button::None) {
         mouse.button = previous_mouse_btn;
-        return esc::Mouse_release{mouse};
+        return esc::MouseRelease{mouse};
     }
 
     // Press Event
     previous_mouse_btn = mouse.button;
     if (cs.final_byte == 'M')
-        return esc::Mouse_press{mouse};
+        return esc::MousePress{mouse};
 
     throw std::runtime_error{"io.cpp::parse_mouse(): Bad Mouse Event Parse"};
 }
@@ -460,24 +460,21 @@ auto parse(Control_sequence const& cs) -> esc::Event
 {
     if (cs.final_byte == 'M' || cs.final_byte == 'm')
         return parse_mouse(cs);
-    return esc::Key_press{parse_key(cs) |
-                          parse_key_modifiers(cs.parameter_bytes)};
+    return esc::KeyPress{parse_key(cs) |
+                         parse_key_modifiers(cs.parameter_bytes)};
 }
 
 auto parse(Escaped e) -> esc::Event
 {
-    return esc::Key_press{static_cast<esc::Key>(e.character)};
+    return esc::KeyPress{static_cast<esc::Key>(e.character)};
 }
 
 auto parse(UTF8 x) -> esc::Event
 {
-    return esc::Key_press{esc::char32_to_key(esc::detail::mb_to_u32(x.bytes))};
+    return esc::KeyPress{esc::char32_to_key(esc::detail::mb_to_u32(x.bytes))};
 }
 
-auto parse(Window) -> esc::Event
-{
-    return esc::Window_resize{esc::terminal_area()};
-}
+auto parse(Window) -> esc::Event { return esc::Resize{esc::terminal_area()}; }
 
 // Lexer -----------------------------------------------------------------------
 
@@ -617,7 +614,7 @@ auto read_single_token() -> Token
     return byte & 0x80;
 }
 
-/// Read and parse a keyboard scancode into a Key_press or a Key_release event.
+/// Read and parse a keyboard scancode into a KeyPress or a KeyRelease event.
 /** Throws std::runtime_error if read fails. */
 [[nodiscard]] auto read_and_parse_scancode(int fd) -> std::optional<esc::Event>
 {
@@ -633,43 +630,43 @@ auto read_single_token() -> Token
             if (byte2 == 0x2A) {
                 if (auto const byte3 = read_byte(fd); byte3 == 0xE0) {
                     if (auto const byte4 = read_byte(fd); byte4 == 0x37)
-                        return Key_press{Key::Print_screen};
+                        return KeyPress{Key::Print_screen};
                 }
             }
             // Print Screen Release: e0 2a+0x80 e0 37+0x80
             else if ((byte2 - 0x80) == 0x2A) {
                 if (auto const byte3 = read_byte(fd); byte3 == 0xE0) {
                     if (auto const byte4 = read_byte(fd) - 0x80; byte4 == 0x37)
-                        return Key_release{Key::Print_screen};
+                        return KeyRelease{Key::Print_screen};
                 }
             }
 
             // Print Screen w/Shift: e0 37
             else if (byte2 == 0x37)
-                return Key_press{Key::Print_screen_shift};
+                return KeyPress{Key::Print_screen_shift};
 
             // Print Screen w/Shift: e0 37+0x80
             else if ((byte2 & 0x7F) == 0x37)
-                return Key_release{Key::Print_screen_shift};
+                return KeyRelease{Key::Print_screen_shift};
 
             // Pause w/left or right ctrl: e0 46 e0 c6
             else if (byte2 == 0x46) {
                 if (auto const byte3 = read_byte(fd); byte3 == 0xE0) {
                     if (auto const byte4 = read_byte(fd); byte4 == 0xC6) {
-                        return Key_press{Key::Pause_ctrl};
+                        return KeyPress{Key::Pause_ctrl};
                     }
                 }
             }
 
             switch (byte2) {
-                case 0x48: return Key_press{Key::Arrow_up};
-                case 0x48 + 0x80: return Key_release{Key::Arrow_up};
-                case 0x50: return Key_press{Key::Arrow_down};
-                case 0x50 + 0x80: return Key_release{Key::Arrow_down};
-                case 0x4D: return Key_press{Key::Arrow_right};
-                case 0x4D + 0x80: return Key_release{Key::Arrow_right};
-                case 0x4B: return Key_press{Key::Arrow_left};
-                case 0x4B + 0x80: return Key_release{Key::Arrow_left};
+                case 0x48: return KeyPress{Key::Arrow_up};
+                case 0x48 + 0x80: return KeyRelease{Key::Arrow_up};
+                case 0x50: return KeyPress{Key::Arrow_down};
+                case 0x50 + 0x80: return KeyRelease{Key::Arrow_down};
+                case 0x4D: return KeyPress{Key::Arrow_right};
+                case 0x4D + 0x80: return KeyRelease{Key::Arrow_right};
+                case 0x4B: return KeyPress{Key::Arrow_left};
+                case 0x4B + 0x80: return KeyRelease{Key::Arrow_left};
                 default: return std::nullopt;
             }
         }
@@ -684,7 +681,7 @@ auto read_single_token() -> Token
                         if (auto const byte5 = read_byte(fd); byte5 == 0x9D) {
                             if (auto const byte6 = read_byte(fd);
                                 byte6 == 0xC5) {
-                                return Key_press{Key::Pause};
+                                return KeyPress{Key::Pause};
                             }
                         }
                     }
@@ -693,12 +690,12 @@ auto read_single_token() -> Token
             if (key_byte > 0x53)
                 return std::nullopt;
             return is_release(byte2)
-                       ? Event{Key_release{escape_keymap[key_byte - 0x1C]}}
-                       : Event{Key_press{escape_keymap[key_byte - 0x1C]}};
+                       ? Event{KeyRelease{escape_keymap[key_byte - 0x1C]}}
+                       : Event{KeyPress{escape_keymap[key_byte - 0x1C]}};
         }
 
-        case 0x54: return Key_press{Key::Print_screen_alt};
-        case 0x54 + 0x80: return Key_release{Key::Print_screen_alt};
+        case 0x54: return KeyPress{Key::Print_screen_alt};
+        case 0x54 + 0x80: return KeyRelease{Key::Print_screen_alt};
 
         case 0x00:  // Keyboard Error
         case 0xAA:  // Basic Assurance Test OK
@@ -712,8 +709,8 @@ auto read_single_token() -> Token
             return std::nullopt;
 
         default:
-            return is_release(byte) ? Event{Key_release{keymap[byte & 0x7F]}}
-                                    : Event{Key_press{keymap[byte]}};
+            return is_release(byte) ? Event{KeyRelease{keymap[byte & 0x7F]}}
+                                    : Event{KeyPress{keymap[byte]}};
     }
 }
 
@@ -751,14 +748,14 @@ auto read_single_token() -> Token
 }
 
 /// Read an event in alt mode, returns std::nullopt on non-event reads.
-/** non-event reads are Key_press events on stdin, and nullopt from tty. */
+/** non-event reads are KeyPress events on stdin, and nullopt from tty. */
 [[nodiscard]] auto do_maybe_alt_blocking_read() -> std::optional<esc::Event>
 {
     auto const file = blocking_wait_for_reads(
         STDIN_FILENO, *esc::detail::tty_file_descriptor);
     if (file == STDIN_FILENO) {
         auto const event = do_blocking_read();
-        if (std::holds_alternative<esc::Key_press>(event))
+        if (std::holds_alternative<esc::KeyPress>(event))
             return std::nullopt;
         else
             return event;
@@ -778,7 +775,7 @@ auto read_single_token() -> Token
             STDIN_FILENO, *esc::detail::tty_file_descriptor);
         if (window_resize_sig || file == STDIN_FILENO) {
             auto const event = do_blocking_read();
-            if (std::holds_alternative<esc::Key_press>(event))
+            if (std::holds_alternative<esc::KeyPress>(event))
                 continue;
             else
                 return event;
@@ -815,7 +812,7 @@ auto read_single_token() -> Token
         STDIN_FILENO, *esc::detail::tty_file_descriptor, millisecond_timeout);
     if (file == STDIN_FILENO) {
         auto const result = do_blocking_read();
-        if (std::holds_alternative<esc::Key_press>(result))
+        if (std::holds_alternative<esc::KeyPress>(result))
             return std::nullopt;
         else
             return result;

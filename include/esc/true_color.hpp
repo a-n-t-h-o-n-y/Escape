@@ -1,5 +1,5 @@
-#ifndef ESC_TRUE_COLOR_HPP
-#define ESC_TRUE_COLOR_HPP
+#pragma once
+
 #include <algorithm>
 #include <cstdint>
 
@@ -117,7 +117,7 @@ auto constexpr rgb_to_hsl(RGB x) -> HSL
 
 /// Holds data for a terminal 'true color'.
 /** True colors can be used to set an exact color to the terminal screen. */
-class True_color {
+class TrueColor {
    public:
     std::uint8_t red;
     std::uint8_t green;
@@ -126,47 +126,53 @@ class True_color {
    public:
     /// Construct a true color with RGB values.
     /** Use this to construct with hex values. */
-    constexpr True_color(RGB x) : red{x.red}, green{x.green}, blue{x.blue} {}
+    constexpr TrueColor(RGB x) : red{x.red}, green{x.green}, blue{x.blue} {}
 
     /// Construct a true color with HSL values.
-    constexpr True_color(HSL x) : True_color{hsl_to_rgb(x)} {}
+    constexpr TrueColor(HSL x) : TrueColor{hsl_to_rgb(x)} {}
 };
 
-/// Returns true if the two True_colors are the same.
-[[nodiscard]] inline auto operator==(True_color const& lhs,
-                                     True_color const& rhs) -> bool
+/// Returns true if the two `TrueColor`s are the same.
+
+[[nodiscard]] inline auto operator==(TrueColor const& lhs, TrueColor const& rhs)
+    -> bool
 {
     return lhs.red == rhs.red && lhs.green == rhs.green && lhs.blue == rhs.blue;
 }
 
-/// Returns true if the two True_colors are not the same.
-[[nodiscard]] inline auto operator!=(True_color const& lhs,
-                                     True_color const& rhs) -> bool
+/// Returns true if the two TrueColor are not the same.
+[[nodiscard]] inline auto operator!=(TrueColor const& lhs, TrueColor const& rhs)
+    -> bool
 {
     return !(lhs == rhs);
 }
 
-/// Tag type for True_color that is used as a background.
-struct BG_True_color {
-    True_color value;
+/// Tag type for TrueColor that is used as a background.
+struct TrueColorBG {
+    TrueColor value;
 };
 
-/// Tag type for True_color that is used as a foreground.
-struct FG_True_color {
-    True_color value;
+/// Tag type for TrueColor that is used as a foreground.
+struct TrueColorFG {
+    TrueColor value;
 };
 
 /// Return a background tag type to use with escape(...) function.
-[[nodiscard]] inline auto background(True_color x) -> BG_True_color
+[[nodiscard]] constexpr auto background(TrueColor x) -> TrueColorBG
+{
+    return {x};
+}
+
+/// Return a background tag type to use with escape(...) function.
+[[nodiscard]] constexpr auto bg(TrueColor x) -> TrueColorBG { return {x}; }
+
+/// Return a foreground tag type to use with escape(...) function.
+[[nodiscard]] constexpr auto foreground(TrueColor x) -> TrueColorFG
 {
     return {x};
 }
 
 /// Return a foreground tag type to use with escape(...) function.
-[[nodiscard]] inline auto foreground(True_color x) -> FG_True_color
-{
-    return {x};
-}
+[[nodiscard]] constexpr auto fg(TrueColor x) -> TrueColorFG { return {x}; }
 
 }  // namespace esc
-#endif  // ESC_TRUE_COLOR_HPP
