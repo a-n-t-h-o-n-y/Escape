@@ -2,7 +2,7 @@ name: build
 
 on:
     push:
-        branches: [main]
+        branches: [main, v2-develop]
 
 jobs:
     # Ubuntu-22 GCC
