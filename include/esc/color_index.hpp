@@ -27,31 +27,31 @@ struct ColorIndex {
 };
 
 // Yes, defining constexpr vs const declaration is legal here.
-constexpr auto ColorIndex::Black         = ColorIndex{0};
-constexpr auto ColorIndex::Red           = ColorIndex{1};
-constexpr auto ColorIndex::Green         = ColorIndex{2};
-constexpr auto ColorIndex::Yellow        = ColorIndex{3};
-constexpr auto ColorIndex::Blue          = ColorIndex{4};
-constexpr auto ColorIndex::Magenta       = ColorIndex{5};
-constexpr auto ColorIndex::Cyan          = ColorIndex{6};
-constexpr auto ColorIndex::White         = ColorIndex{7};
-constexpr auto ColorIndex::BrightBlack   = ColorIndex{8};
-constexpr auto ColorIndex::BrightRed     = ColorIndex{9};
-constexpr auto ColorIndex::BrightGreen   = ColorIndex{10};
-constexpr auto ColorIndex::BrightYellow  = ColorIndex{11};
-constexpr auto ColorIndex::BrightBlue    = ColorIndex{12};
-constexpr auto ColorIndex::BrightMagenta = ColorIndex{13};
-constexpr auto ColorIndex::BrightCyan    = ColorIndex{14};
-constexpr auto ColorIndex::BrightWhite   = ColorIndex{15};
+constexpr ColorIndex ColorIndex::Black         = ColorIndex{0};
+constexpr ColorIndex ColorIndex::Red           = ColorIndex{1};
+constexpr ColorIndex ColorIndex::Green         = ColorIndex{2};
+constexpr ColorIndex ColorIndex::Yellow        = ColorIndex{3};
+constexpr ColorIndex ColorIndex::Blue          = ColorIndex{4};
+constexpr ColorIndex ColorIndex::Magenta       = ColorIndex{5};
+constexpr ColorIndex ColorIndex::Cyan          = ColorIndex{6};
+constexpr ColorIndex ColorIndex::White         = ColorIndex{7};
+constexpr ColorIndex ColorIndex::BrightBlack   = ColorIndex{8};
+constexpr ColorIndex ColorIndex::BrightRed     = ColorIndex{9};
+constexpr ColorIndex ColorIndex::BrightGreen   = ColorIndex{10};
+constexpr ColorIndex ColorIndex::BrightYellow  = ColorIndex{11};
+constexpr ColorIndex ColorIndex::BrightBlue    = ColorIndex{12};
+constexpr ColorIndex ColorIndex::BrightMagenta = ColorIndex{13};
+constexpr ColorIndex ColorIndex::BrightCyan    = ColorIndex{14};
+constexpr ColorIndex ColorIndex::BrightWhite   = ColorIndex{15};
 
 /// Return true if \p a and \p b contain the same index value.
-auto constexpr operator==(ColorIndex a, ColorIndex b) -> bool
+constexpr auto operator==(ColorIndex a, ColorIndex b) -> bool
 {
     return a.value == b.value;
 }
 
 /// Return false if \p a and \p b contain the same index value.
-auto constexpr operator!=(ColorIndex a, ColorIndex b) -> bool
+constexpr auto operator!=(ColorIndex a, ColorIndex b) -> bool
 {
     return a.value != b.value;
 }
