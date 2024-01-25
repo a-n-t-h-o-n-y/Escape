@@ -509,8 +509,8 @@ auto next_state(Initial) -> Lexer
 {
     auto constexpr timeout = 30;  // milliseconds
     while (true) {
-        if (window_resize_sig) {
-            window_resize_sig = false;
+        if (window_resize_sig == 1) {
+            window_resize_sig = 0;
             return Final{Window{}};
         }
         if (auto const b = read_byte(STDIN_FILENO, timeout); b.has_value()) {
@@ -773,7 +773,7 @@ auto read_single_token() -> Token
     while (true) {
         auto const file = blocking_wait_for_reads(
             STDIN_FILENO, *esc::detail::tty_file_descriptor);
-        if (window_resize_sig || file == STDIN_FILENO) {
+        if (window_resize_sig == 1 || file == STDIN_FILENO) {
             auto const event = do_blocking_read();
             if (std::holds_alternative<esc::KeyPress>(event))
                 continue;
@@ -796,7 +796,7 @@ auto read_single_token() -> Token
 [[nodiscard]] auto do_timeout_read(int millisecond_timeout)
     -> std::optional<esc::Event>
 {
-    if (window_resize_sig || !is_stdin_empty(millisecond_timeout))
+    if (window_resize_sig == 1 || !is_stdin_empty(millisecond_timeout))
         return esc::read();
     return std::nullopt;
 }

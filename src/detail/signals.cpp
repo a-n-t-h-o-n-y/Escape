@@ -1,6 +1,5 @@
 #include <esc/detail/signals.hpp>
 
-#include <atomic>
 #include <csignal>
 #include <cstdlib>
 #include <stdexcept>
@@ -12,7 +11,7 @@ namespace {
 extern "C" auto sigint_handler(int sig) -> void
 {
     if (sig == SIGINT) {
-        if (esc::sigint_flag) {
+        if (esc::sigint_flag == 1) {
             // If this is second time ctrl + c is pressed, force exit.
 #if defined(__APPLE__) && defined(__MACH__)
             std::_Exit(1);
@@ -21,7 +20,7 @@ extern "C" auto sigint_handler(int sig) -> void
 #endif
         }
         else {
-            esc::sigint_flag = true;
+            esc::sigint_flag = 1;
         }
     }
 }
@@ -30,7 +29,7 @@ extern "C" auto sigint_handler(int sig) -> void
 extern "C" void resize_handler(int sig)
 {
     if (sig == SIGWINCH) {
-        esc::detail::window_resize_sig = true;
+        esc::detail::window_resize_sig = 1;
     }
 }
 
@@ -38,13 +37,13 @@ extern "C" void resize_handler(int sig)
 
 namespace esc {
 
-std::atomic<bool> sigint_flag = false;
+std::sig_atomic_t sigint_flag = 0;
 
 }  // namespace esc
 
 namespace esc::detail {
 
-std::atomic<bool> window_resize_sig = false;
+std::sig_atomic_t window_resize_sig = 0;
 
 void register_signals(bool sigint)
 {
