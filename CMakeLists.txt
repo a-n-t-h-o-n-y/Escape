@@ -3,6 +3,8 @@ project(escape LANGUAGES CXX)
 
 # Escape Library
 add_library(escape STATIC
+    include/esc/glyph.hpp
+
     src/io.cpp
     src/terminfo.cpp
     src/terminal.cpp
@@ -51,19 +53,6 @@ else()
     message("LTO Not Enabled")
 endif()
 
-include(GNUInstallDirs)
-install(TARGETS escape
-        ARCHIVE
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        CONFIGURATIONS Release
-)
-install(
-    DIRECTORY
-        ${PROJECT_SOURCE_DIR}/include/esc
-    DESTINATION
-        ${CMAKE_INSTALL_INCLUDEDIR}
-)
-
 # TermCaps Executable
 add_executable(termcaps EXCLUDE_FROM_ALL
     tools/termcaps.cpp
@@ -80,3 +69,9 @@ target_compile_options(termcaps
         -Wextra
         -Wpedantic
 )
+
+if (NOT TARGET Catch2)
+    add_subdirectory(external/Catch2)
+endif()
+
+add_subdirectory(tests)
