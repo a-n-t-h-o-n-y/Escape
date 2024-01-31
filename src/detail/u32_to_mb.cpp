@@ -1,34 +1,25 @@
 #include <esc/detail/u32_to_mb.hpp>
 
-#include <array>
-#include <cstddef>
 #include <stdexcept>
-#include <utility>
+#include <string>
 
-#ifdef __APPLE__
-#    include <cwchar>
-#else
-#    include <cuchar>
-#endif
+#include <unicode/ucnv.h>
+#include <unicode/unistr.h>
+#include <unicode/utypes.h>
 
 namespace esc::detail {
 
-auto u32_to_mb(char32_t c) -> std::pair<std::size_t, std::array<char, 4>>
+auto u32_to_mb(char32_t c) -> std::string
 {
-    auto result = std::array<char, 4>{};
-    auto state  = std::mbstate_t{};
+    auto status = U_ZERO_ERROR;
+    auto u_str  = icu::UnicodeString(static_cast<UChar32>(c));
+    auto result = std::string{};
+    u_str.toUTF8String(result);
 
-#ifdef __APPLE__
-    static_assert(sizeof(wchar_t) == sizeof(char32_t));
-    static_assert(alignof(wchar_t) == alignof(char32_t));
-    auto const count =
-        std::wcrtomb(result.data(), static_cast<wchar_t>(c), &state);
-#else
-    auto const count = std::c32rtomb(result.data(), c, &state);
-#endif
-    if (count == std::size_t(-1))
-        throw std::runtime_error{"u32_to_mb(char32_t): Error in Conversion."};
-    return {count, result};
+    if (U_FAILURE(status)) {
+        throw std::runtime_error{"Unicode conversion failed"};
+    }
+    return result;
 }
 
 }  // namespace esc::detail

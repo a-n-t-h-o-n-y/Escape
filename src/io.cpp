@@ -830,9 +830,10 @@ void write(char c) { std::putchar(c); }
 
 void write(char32_t c) noexcept(false)
 {
-    auto const [count, chars] = esc::detail::u32_to_mb(c);
-    for (auto i = std::size_t{0}; i < count; ++i)
-        write(chars[i]);
+    write(esc::detail::u32_to_mb(c));
+    // auto const [count, chars] = esc::detail::u32_to_mb(c);
+    // for (auto i = std::size_t{0}; i < count; ++i)
+    //     write(chars[i]);
 }
 
 void write(std::string_view sv)

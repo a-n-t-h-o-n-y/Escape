@@ -1,15 +1,13 @@
-#ifndef ESC_DETAIL_U32_TO_MB_HPP
-#define ESC_DETAIL_U32_TO_MB_HPP
-#include <array>
-#include <cstddef>
-#include <utility>
+#pragma once
+
+#include <string>
 
 namespace esc::detail {
 
-/// Convert the given char32_t into a multi-byte array of chars.
-/** Depends on the currently set clocale to transform the char32_t. */
-[[nodiscard]] auto u32_to_mb(char32_t c)
-    -> std::pair<std::size_t, std::array<char, 4>>;
+/// Convert the given char32_t into a multi-byte reprensentation as a string.
+/// @param c The char32_t to convert.
+/// @return The multi-byte representation of the given char32_t.
+/// @throws std::runtime_error if the conversion fails.
+[[nodiscard]] auto u32_to_mb(char32_t c) -> std::string;
 
 }  // namespace esc::detail
-#endif  // ESC_DETAIL_U32_TO_MB_HPP

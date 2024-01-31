@@ -377,19 +377,15 @@ TEST_CASE("Operator|(StringType ...)", "[GlyphString]")
 
     SECTION("std::u32string") { test_string_pipe_ops(std::u32string{U"abc"}); }
 
-    // SECTION("char16_t const*") { test_string_pipe_ops(u"abc"); }
+    SECTION("char16_t const*") { test_string_pipe_ops(u"abc"); }
 
-    // SECTION("std::u16string") { test_string_pipe_ops(std::u16string{u"abc"});
-    // }
+    SECTION("std::u16string") { test_string_pipe_ops(std::u16string{u"abc"}); }
 
-    // SECTION("char8_t const*") { test_string_pipe_ops(u8"abc"); }
+    SECTION("char8_t const*") { test_string_pipe_ops(u8"abc"); }
 
-    // SECTION("std::u8string") { test_string_pipe_ops(std::u8string{u8"abc"});
-    // }
+    SECTION("std::u8string") { test_string_pipe_ops(std::u8string{u8"abc"}); }
 
-    // SECTION("wchar_t const*") { test_string_pipe_ops(L"abc"); }
+    SECTION("char const*") { test_string_pipe_ops("abc"); }
 
-    // SECTION("char const*") { test_string_pipe_ops("abc"); }
-
-    // SECTION("std::string") { test_string_pipe_ops(std::string{"abc"}); }
+    SECTION("std::string") { test_string_pipe_ops(std::string{"abc"}); }
 }

@@ -22,6 +22,12 @@ add_library(escape STATIC
     src/detail/signals.cpp
 )
 
+# UTF Support
+find_package(ICU REQUIRED COMPONENTS dt uc i18n)
+if(ICU_FOUND)
+    target_link_libraries(escape ICU::dt ICU::uc ICU::i18n)
+endif()
+
 target_include_directories(escape
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -38,20 +44,6 @@ target_compile_options(escape
         -Wextra
         -Wpedantic
 )
-
-option(LTO "Turn Link Time Optimization ON/OFF" ON)
-
-# Link-Time Optimization
-include(CheckIPOSupported)
-check_ipo_supported(RESULT has_lto OUTPUT error)
-if(has_lto AND LTO)
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
-    message("LTO Enabled Globally")
-elseif(NOT has_lto)
-    message(WARNING "LTO is not supported: ${error}")
-else()
-    message("LTO Not Enabled")
-endif()
 
 # TermCaps Executable
 add_executable(termcaps EXCLUDE_FROM_ALL
