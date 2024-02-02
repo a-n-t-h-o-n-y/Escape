@@ -56,12 +56,6 @@ TEST_CASE(
         REQUIRE(glyph.symbol == U'C');
     }
 
-    SECTION("wchar_t")
-    {
-        auto const glyph = L'D' | bg(ColorIndex::Red);
-        REQUIRE(glyph.symbol == U'D');
-    }
-
     SECTION("char8_t")
     {
         auto const glyph = u8'E' | bg(ColorIndex::Red);
@@ -104,12 +98,6 @@ TEST_CASE(
         REQUIRE(glyph.symbol == U'C');
     }
 
-    SECTION("wchar_t")
-    {
-        auto const glyph = L'D' | fg(ColorIndex::Red);
-        REQUIRE(glyph.symbol == U'D');
-    }
-
     SECTION("char8_t")
     {
         auto const glyph = u8'E' | fg(ColorIndex::Red);
@@ -148,12 +136,6 @@ TEST_CASE("Operator|(Character, Trait) works with all character literal types",
     {
         auto const glyph = static_cast<unsigned char>('C') | Trait::Bold;
         REQUIRE(glyph.symbol == U'C');
-    }
-
-    SECTION("wchar_t")
-    {
-        auto const glyph = L'D' | Trait::Bold;
-        REQUIRE(glyph.symbol == U'D');
     }
 
     SECTION("char8_t")
@@ -377,15 +359,67 @@ TEST_CASE("Operator|(StringType ...)", "[GlyphString]")
 
     SECTION("std::u32string") { test_string_pipe_ops(std::u32string{U"abc"}); }
 
-    SECTION("char16_t const*") { test_string_pipe_ops(u"abc"); }
-
-    SECTION("std::u16string") { test_string_pipe_ops(std::u16string{u"abc"}); }
-
-    SECTION("char8_t const*") { test_string_pipe_ops(u8"abc"); }
-
-    SECTION("std::u8string") { test_string_pipe_ops(std::u8string{u8"abc"}); }
-
     SECTION("char const*") { test_string_pipe_ops("abc"); }
 
     SECTION("std::string") { test_string_pipe_ops(std::string{"abc"}); }
+}
+
+TEST_CASE("Operator|(StringType) with multibyte symbols", "[GlyphString]")
+{
+    SECTION("char32_t const*")
+    {
+        auto const gs = U"🚦" | bg(ColorIndex::Green);
+        REQUIRE(gs.size() == 1);
+        REQUIRE(gs[0] == Glyph{U'🚦', {.background = ColorIndex::Green}});
+    }
+
+    SECTION("Empty char32_t const*")
+    {
+        auto const gs = U"" | bg(ColorIndex::Green);
+        REQUIRE(gs.empty());
+    }
+
+    SECTION("std::u32string_view")
+    {
+        auto const gs =
+            std::u32string_view{U"A¢€😀 世界𐍈"} | bg(ColorIndex::Green);
+
+        REQUIRE(gs.size() == 8);
+
+        REQUIRE(gs[1] == Glyph{U'¢', {.background = ColorIndex::Green}});
+        REQUIRE(gs[2] == Glyph{U'€', {.background = ColorIndex::Green}});
+        REQUIRE(gs[3] == Glyph{U'😀', {.background = ColorIndex::Green}});
+        REQUIRE(gs[4] == Glyph{U' ', {.background = ColorIndex::Green}});
+        REQUIRE(gs[5] == Glyph{U'世', {.background = ColorIndex::Green}});
+        REQUIRE(gs[6] == Glyph{U'界', {.background = ColorIndex::Green}});
+        REQUIRE(gs[7] == Glyph{U'𐍈', {.background = ColorIndex::Green}});
+    }
+
+    SECTION("char const*")
+    {
+        auto const gs = "🚦" | bg(ColorIndex::Green);
+        REQUIRE(gs.size() == 1);
+        REQUIRE(gs[0] == Glyph{U'🚦', {.background = ColorIndex::Green}});
+    }
+
+    SECTION("Empty char const*")
+    {
+        auto const gs = "" | bg(ColorIndex::Green);
+        REQUIRE(gs.empty());
+    }
+
+    SECTION("std::string_view")
+    {
+        auto const gs = std::string_view{"A¢€😀 世界𐍈"} | bg(ColorIndex::Green);
+
+        REQUIRE(gs.size() == 8);
+
+        REQUIRE(gs[1] == Glyph{U'¢', {.background = ColorIndex::Green}});
+        REQUIRE(gs[2] == Glyph{U'€', {.background = ColorIndex::Green}});
+        REQUIRE(gs[3] == Glyph{U'😀', {.background = ColorIndex::Green}});
+        REQUIRE(gs[4] == Glyph{U' ', {.background = ColorIndex::Green}});
+        REQUIRE(gs[5] == Glyph{U'世', {.background = ColorIndex::Green}});
+        REQUIRE(gs[6] == Glyph{U'界', {.background = ColorIndex::Green}});
+        REQUIRE(gs[7] == Glyph{U'𐍈', {.background = ColorIndex::Green}});
+    }
 }

@@ -46,7 +46,7 @@ class Mask {
     /** Returns a reference to the container. */
     auto constexpr remove(E e) -> Mask&
     {
-        flags_ &= ~(ut_cast(e));
+        flags_ &= static_cast<std::underlying_type_t<E>>(~(ut_cast(e)));
         return *this;
     }
 

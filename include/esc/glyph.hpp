@@ -3,11 +3,11 @@
 #include <concepts>
 #include <cstdint>
 #include <ranges>
+#include <stdexcept>
 #include <string_view>
 #include <vector>
 
-#include <unicode/ucnv.h>
-#include <unicode/unistr.h>
+#include <unicode/uchar.h>
 
 #include <esc/brush.hpp>
 #include <esc/color.hpp>
@@ -15,9 +15,12 @@
 
 namespace esc {
 
-/// A single terminal cell display unit.
-/// @details Contains a symbol and a Brush to describe how the symbol should be
-/// displayed.
+/**
+ * A single terminal cell display unit.
+ *
+ * @details Contains a symbol and a Brush to describe how the symbol should be
+ * displayed.
+ */
 struct Glyph {
     char32_t symbol = U'\0';
     Brush brush     = {};
@@ -28,20 +31,26 @@ struct Glyph {
 
 // ------------------------------ CONCEPTS -------------------------------------
 
-/// True if T is a Character type.
+/**
+ * Defines the requirements for a type to be considered a Character.
+ */
 template <typename T>
-concept Character = std::same_as<T, char> || std::same_as<T, signed char> ||
-                    std::same_as<T, unsigned char> ||
-                    std::same_as<T, wchar_t> || std::same_as<T, char8_t> ||
-                    std::same_as<T, char16_t> || std::same_as<T, char32_t>;
+concept Character =
+    std::same_as<T, char> || std::same_as<T, signed char> ||
+    std::same_as<T, unsigned char> || std::same_as<T, char8_t> ||
+    std::same_as<T, char16_t> || std::same_as<T, char32_t>;
 
-/// True if T is a valid Attribute type.
+/**
+ * Defines the requirements for a type to be considered an Attribute.
+ */
 template <typename T>
 concept Attribute =
     std::same_as<T, esc::ColorBG> || std::same_as<T, esc::ColorFG> ||
     std::same_as<T, Trait> || std::same_as<T, esc::RemoveTrait>;
 
-/// True if T is a Forward iterable range of Glyphs.
+/**
+ * Defines the requirements for a type to be considered a GlyphString.
+ */
 template <typename T>
 concept GlyphString = std::ranges::forward_range<T> &&
                       std::same_as<std::ranges::range_value_t<T>, Glyph>;
@@ -49,32 +58,41 @@ concept GlyphString = std::ranges::forward_range<T> &&
 // ------------------------------ PIPE OPS -------------------------------------
 // ------------------------------ COLORBG --------------------------------------
 
-/// Creates a Glyph with the given symbol and background Color.
-/// @param symbol The symbol to display.
-/// @param c The ColorBG to apply to the return Glyph's brush.
-/// @return A Glyph with the given symbol and Color background.
+/**
+ * Creates a Glyph with the given symbol and background Color.
+ *
+ * @param symbol The symbol to display.
+ * @param c The ColorBG to apply to the return Glyph's brush.
+ * @return A Glyph with the given symbol and Color background.
+ */
 [[nodiscard]] constexpr auto operator|(Character auto symbol, esc::ColorBG c)
     -> Glyph
 {
     return {static_cast<char32_t>(symbol), {.background = c.value}};
 }
 
-/// Copy the Glyph and modify its background Color.
-/// @param g The Glyph to work from.
-/// @param c The ColorBG to apply to the return Glyph's brush.
-/// @return The passed in Glyph with the given Color background.
+/**
+ * Copy the Glyph and modify its background Color.
+ *
+ * @param g The Glyph to work from.
+ * @param c The ColorBG to apply to the return Glyph's brush.
+ * @return The passed in Glyph with the given Color background.
+ */
 [[nodiscard]] constexpr auto operator|(Glyph g, esc::ColorBG c) -> Glyph
 {
     g.brush.background = c.value;
     return g;
 }
 
-/// Modify the Glyphs in the GlyphString to have the given background Color.
-/// @param gs The GlyphString to work from.
-/// @param c The ColorBG to apply to each Glyph's brush.
-/// @return The passed in GlyphString with the given Color background.
+/**
+ * Modify the Glyphs in the GlyphString to have the given background Color.
+ *
+ * @param gs The GlyphString to work from.
+ * @param c The ColorBG to apply to each Glyph's brush.
+ * @return The passed in GlyphString with the given Color background.
+ */
 template <GlyphString T>
-constexpr auto operator|(T&& gs, esc::ColorBG c) -> decltype(auto)
+auto operator|(T&& gs, esc::ColorBG c) -> decltype(auto)
 {
     for (auto& glyph : gs) {
         glyph.brush.background = c.value;
@@ -85,7 +103,7 @@ constexpr auto operator|(T&& gs, esc::ColorBG c) -> decltype(auto)
 // ------------------------------ COLORFG --------------------------------------
 
 /**
- * @brief Creates a Glyph with the given symbol and foreground Color.
+ * Creates a Glyph with the given symbol and foreground Color.
  *
  * @param symbol The symbol to display.
  * @param c The ColorFG to apply to the return Glyph's brush.
@@ -98,7 +116,7 @@ constexpr auto operator|(T&& gs, esc::ColorBG c) -> decltype(auto)
 }
 
 /**
- * @brief Copy the Glyph and modify its foreground Color.
+ * Copy the Glyph and modify its foreground Color.
  *
  * @param g The Glyph to work from.
  * @param c The ColorFG to apply to the return Glyph's brush.
@@ -111,15 +129,14 @@ constexpr auto operator|(T&& gs, esc::ColorBG c) -> decltype(auto)
 }
 
 /**
- * @brief Modify the Glyphs in the GlyphString to have the given foreground
- * Color.
+ * Modify the Glyphs in the GlyphString to have the given foreground Color.
  *
  * @param gs The GlyphString to work from.
  * @param c The ColorFG to apply to each Glyph's brush.
  * @return The passed in GlyphString with the given Color foreground.
  */
 template <GlyphString T>
-constexpr auto operator|(T&& gs, esc::ColorFG c) -> decltype(auto)
+auto operator|(T&& gs, esc::ColorFG c) -> decltype(auto)
 {
     for (auto& glyph : gs) {
         glyph.brush.foreground = c.value;
@@ -130,7 +147,7 @@ constexpr auto operator|(T&& gs, esc::ColorFG c) -> decltype(auto)
 // ------------------------------- TRAIT ---------------------------------------
 
 /**
- * @brief Creates a Glyph with the given symbol and Trait.
+ * Creates a Glyph with the given symbol and Trait.
  *
  * @param symbol The symbol to display.
  * @param t The Trait to apply to the return Glyph's brush.
@@ -142,7 +159,7 @@ constexpr auto operator|(T&& gs, esc::ColorFG c) -> decltype(auto)
 }
 
 /**
- * @brief Copy the Glyph and add a Trait.
+ * Copy the Glyph and add a Trait.
  *
  * @param g The Glyph to work from.
  * @param t The Trait to apply to the return Glyph's brush.
@@ -154,12 +171,15 @@ constexpr auto operator|(T&& gs, esc::ColorFG c) -> decltype(auto)
     return g;
 }
 
-/// Modify the Glyphs in the GlyphString to have the given Trait.
-/// @param gs The GlyphString to work from.
-/// @param c The Trait to apply to each Glyph's brush.
-/// @return The passed in GlyphString with the given Trait.
+/**
+ * Modify the Glyphs in the GlyphString to have the given Trait.
+ *
+ * @param gs The GlyphString to work from.
+ * @param t The Trait to apply to each Glyph's brush.
+ * @return The passed in GlyphString with the given Trait.
+ */
 template <GlyphString T>
-constexpr auto operator|(T&& gs, Trait t) -> decltype(auto)
+auto operator|(T&& gs, Trait t) -> decltype(auto)
 {
     for (auto& glyph : gs) {
         glyph.brush.traits = glyph.brush.traits | t;
@@ -170,9 +190,10 @@ constexpr auto operator|(T&& gs, Trait t) -> decltype(auto)
 // ---------------------------- REMOVE TRAIT -----------------------------------
 
 /**
- * @brief Removes a Trait from a Glyph's brush.
+ * Removes a Trait from a Glyph's brush.
  *
- * Use the esc::remove_trait(Trait) function to create the RemoveTrait object.
+ * @details Use the esc::remove_trait(Trait) function to create the RemoveTrait
+ * object.
  *
  * @param g The Glyph to remove the Trait from.
  * @param t The Trait to remove from the Glyph's brush.
@@ -185,14 +206,14 @@ constexpr auto operator|(T&& gs, Trait t) -> decltype(auto)
 }
 
 /**
- * @brief Modify the Glyphs in the GlyphString to remove the given Trait.
+ * Modify the Glyphs in the GlyphString to remove the given Trait.
  *
  * @param gs The GlyphString to work from.
  * @param c The Trait to remove from each Glyph's brush.
  * @return The passed in GlyphString with the given Trait removed.
  */
 template <GlyphString T>
-constexpr auto operator|(T&& gs, esc::RemoveTrait t) -> decltype(auto)
+auto operator|(T&& gs, esc::RemoveTrait t) -> decltype(auto)
 {
     for (auto& glyph : gs) {
         glyph.brush.traits = glyph.brush.traits | t;
@@ -203,15 +224,14 @@ constexpr auto operator|(T&& gs, esc::RemoveTrait t) -> decltype(auto)
 // ------------------------------- STRINGS -------------------------------------
 
 /**
- * @brief Creates a std::vector<Glyph> from the given u32string_view and
- * Attribute.
+ * Creates a std::vector<Glyph> from the given u32string_view and Attribute.
  *
  * @param sv The string_view to create Glyphs from.
  * @param attr The Attribute to apply to each Glyph's brush.
  * @return A std::vector<Glyph> with the given Attribute applied to each Glyph.
  */
 template <Attribute T>
-[[nodiscard]] constexpr auto operator|(std::u32string_view sv, T attr)
+[[nodiscard]] auto operator|(std::u32string_view sv, T attr)
     -> std::vector<Glyph>
 {
     auto glyphs = std::vector<Glyph>{
@@ -222,89 +242,31 @@ template <Attribute T>
 }
 
 /**
- * @brief Creates a std::vector<Glyph> from the given u16string_view and
- * Attribute.
+ * Creates a std::vector<Glyph> from the given string_view and Attribute.
  *
- * @param sv The string_view to create Glyphs from.
- * @param attr The Attribute to apply to each Glyph's brush.
- * @return A std::vector<Glyph> with the given Attribute applied to each Glyph.
- */
-template <Attribute T>
-[[nodiscard]] constexpr auto operator|(std::u16string_view sv, T attr)
-    -> std::vector<Glyph>
-{
-    auto const u_str = icu::UnicodeString{
-        sv.data(),
-        (std::int32_t)sv.size(),
-    };
-
-    auto glyphs = std::vector<Glyph>{};
-    glyphs.reserve(u_str.length());
-
-    for (int32_t i = 0; i < u_str.length(); ++i) {
-        glyphs.push_back({
-            .symbol = static_cast<char32_t>(u_str.char32At(i)),
-        });
-    }
-
-    return glyphs | attr;
-}
-
-/**
- * @brief Creates a std::vector<Glyph> from the given u8string_view and
- * Attribute.
+ * @details UTF-8 encoding of the input string is assumed.
  *
  * @param sv The string_view to create Glyphs from.
  * @param attr The Attribute to apply to each Glyph's brush.
  * @return A std::vector<Glyph> with the given Attribute applied to each
  * Glyph.
+ * @throws std::runtime_error If the input string is not valid UTF-8.
  */
 template <Attribute T>
-[[nodiscard]] constexpr auto operator|(std::u8string_view sv, T attr)
-    -> std::vector<Glyph>
+[[nodiscard]] auto operator|(std::string_view sv, T attr) -> std::vector<Glyph>
 {
-    auto const u_str = icu::UnicodeString::fromUTF8(icu::StringPiece{
-        sv.data(),
-        (std::int32_t)sv.size(),
-    });
-
     auto glyphs = std::vector<Glyph>{};
-    glyphs.reserve(u_str.length());
 
-    for (int32_t i = 0; i < u_str.length(); ++i) {
-        glyphs.push_back({
-            .symbol = static_cast<char32_t>(u_str.char32At(i)),
-        });
-    }
+    auto i            = std::int32_t{0};  // Index in the UTF-8 string
+    auto const length = static_cast<std::int32_t>(sv.length());
 
-    return glyphs | attr;
-}
-
-/**
- * @brief Creates a std::vector<Glyph> from the given string_view and
- * Attribute.
- *
- * @param sv The string_view to create Glyphs from.
- * @param attr The Attribute to apply to each Glyph's brush.
- * @return A std::vector<Glyph> with the given Attribute applied to each
- * Glyph.
- */
-template <Attribute T>
-[[nodiscard]] constexpr auto operator|(std::string_view sv, T attr)
-    -> std::vector<Glyph>
-{
-    auto const u_str = icu::UnicodeString::fromUTF8(icu::StringPiece{
-        sv.data(),
-        (std::int32_t)sv.size(),
-    });
-
-    auto glyphs = std::vector<Glyph>{};
-    glyphs.reserve(u_str.length());
-
-    for (int32_t i = 0; i < u_str.length(); ++i) {
-        glyphs.push_back({
-            .symbol = static_cast<char32_t>(u_str.char32At(i)),
-        });
+    while (i < length) {
+        UChar32 ch;
+        U8_NEXT(sv.data(), i, length, ch);
+        if (ch < 0) {
+            throw std::runtime_error{"Invalid UTF-8 sequence"};
+        }
+        glyphs.push_back({static_cast<char32_t>(ch)});
     }
 
     return glyphs | attr;

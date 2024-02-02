@@ -16,6 +16,10 @@ Please open an issue if you find any bugs.
 
 Note that not all terminals implement these features in the same way.
 
+## Dependencies
+
+- [ICU Library](https://icu.unicode.org/)
+
 ## Future Features
 
 - Add `Terminal_focus_in` and `Terminal_focus_out` Events that are triggered on
