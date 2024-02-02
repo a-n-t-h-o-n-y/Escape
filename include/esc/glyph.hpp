@@ -234,10 +234,11 @@ template <Attribute T>
 [[nodiscard]] auto operator|(std::u32string_view sv, T attr)
     -> std::vector<Glyph>
 {
-    auto glyphs = std::vector<Glyph>{
-        std::begin(sv),
-        std::end(sv),
-    };
+    auto glyphs = std::vector<Glyph>{};
+    glyphs.reserve(sv.length());
+    for (auto const symbol : sv) {
+        glyphs.push_back({symbol});
+    }
     return glyphs | attr;
 }
 
