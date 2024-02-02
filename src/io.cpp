@@ -19,9 +19,8 @@
 #include <unistd.h>
 
 #include <esc/area.hpp>
-#include <esc/detail/mb_to_u32.hpp>
 #include <esc/detail/signals.hpp>
-#include <esc/detail/u32_to_mb.hpp>
+#include <esc/detail/transcode.hpp>
 #include <esc/event.hpp>
 #include <esc/key.hpp>
 #include <esc/terminal.hpp>
@@ -471,7 +470,7 @@ auto parse(Escaped e) -> esc::Event
 
 auto parse(UTF8 x) -> esc::Event
 {
-    return esc::KeyPress{esc::char32_to_key(esc::detail::mb_to_u32(x.bytes))};
+    return esc::KeyPress{esc::char32_to_key(esc::detail::u8_to_u32(x.bytes))};
 }
 
 auto parse(Window) -> esc::Event { return esc::Resize{esc::terminal_area()}; }
@@ -828,28 +827,24 @@ namespace esc {
 
 void write(char c) { std::putchar(c); }
 
-void write(char32_t c) noexcept(false)
-{
-    write(esc::detail::u32_to_mb(c));
-    // auto const [count, chars] = esc::detail::u32_to_mb(c);
-    // for (auto i = std::size_t{0}; i < count; ++i)
-    //     write(chars[i]);
-}
+void write(char32_t c) noexcept(false) { write(esc::detail::u32_to_u8(c)); }
 
 void write(std::string_view sv)
 {
-    for (auto c : sv)
+    for (auto c : sv) {
         write(c);
+    }
 }
 
-void write(std::string const& s) { std::fputs(s.c_str(), stdout); }
+void write(std::string const& s) { write(s.c_str()); }
 
 void write(char const* s) { std::fputs(s, stdout); }
 
 void write(std::u32string_view sv)
 {
-    for (auto c : sv)
+    for (auto c : sv) {
         write(c);
+    }
 }
 
 void flush() { std::fflush(::stdout); }

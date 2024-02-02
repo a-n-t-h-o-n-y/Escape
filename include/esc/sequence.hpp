@@ -1,5 +1,6 @@
-#ifndef ESC_SEQUENCE_HPP
-#define ESC_SEQUENCE_HPP
+#pragma once
+
+#include <concepts>
 #include <string>
 #include <variant>
 
@@ -7,7 +8,8 @@
 #include <esc/color.hpp>
 #include <esc/color_index.hpp>
 #include <esc/default_color.hpp>
-#include <esc/detail/is_any_of.hpp>
+#include <esc/detail/any_of.hpp>
+#include <esc/glyph.hpp>
 #include <esc/point.hpp>
 #include <esc/trait.hpp>
 #include <esc/true_color.hpp>
@@ -111,30 +113,43 @@ struct Blank_screen {};
 /// Return control sequence to set Brush Colors and Traits.
 [[nodiscard]] auto escape(Brush b) -> std::string;
 
+// GLYPH -----------------------------------------------------------------------
+
+/// Return control sequence to set Glyph Brush and Symbol.
+[[nodiscard]] auto escape(Glyph const& g) -> std::string;
+
 // CONVENIENCE -----------------------------------------------------------------
 
+/**
+ * Types that can have a control sequence generated for them.
+ */
 template <typename T>
-bool constexpr is_escapable = detail::is_any_of<T,
-                                                Cursor_position,
-                                                Blank_row,
-                                                Blank_screen,
-                                                Trait,
-                                                Traits,
-                                                ColorBG,
-                                                ColorFG,
-                                                Brush>;
+concept Escapable = detail::AnyOf<T,
+                                  Cursor_position,
+                                  Blank_row,
+                                  Blank_screen,
+                                  Trait,
+                                  Traits,
+                                  ColorBG,
+                                  ColorFG,
+                                  Brush,
+                                  Glyph>;
 
-/// Convenience function to concatenate multiple escapable objects at once.
-/** Returns a single string containing the escape sequences for all args... */
-template <typename... Args>
-[[nodiscard]] auto escape(Args... args) -> std::string
+/**
+ * Convenience function to concatenate multiple escapable objects at once.
+ *
+ * @details Returns a single string containing the escape sequences for all
+ * args...
+ * @tparam Args... A list of escapable types.
+ * @param args... A list of escapable objects.
+ * @return A single string containing the escape sequences for all args...
+ */
+template <Escapable... Args>
+[[nodiscard]] auto escape(Args&&... args) -> std::string
 {
     static_assert(sizeof...(Args) > 0,
                   "escape(...): Must have at least one argument.");
-    static_assert((is_escapable<Args> && ...),
-                  "escape(...): All Args... must be escapable types.");
-    return (escape(args) + ...);
+    return (escape(std::forward<Args>(args)) + ...);
 }
 
 }  // namespace esc
-#endif  // ESC_SEQUENCE_HPP

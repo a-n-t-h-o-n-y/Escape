@@ -4,6 +4,7 @@
 #include <variant>
 
 #include <esc/detail/traits_to_int_sequence.hpp>
+#include <esc/detail/transcode.hpp>
 
 namespace {
 
@@ -127,6 +128,11 @@ auto escape(Brush b) -> std::string
 {
     return escape(background(b.background)) + escape(foreground(b.foreground)) +
            escape(b.traits);
+}
+
+auto escape(Glyph const& g) -> std::string
+{
+    return escape(g.brush) + detail::u32_to_u8(g.symbol);
 }
 
 }  // namespace esc

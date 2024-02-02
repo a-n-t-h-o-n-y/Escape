@@ -4,6 +4,8 @@ project(escape LANGUAGES CXX)
 # Escape Library
 add_library(escape STATIC
     include/esc/glyph.hpp
+    include/esc/detail/any_of.hpp
+    include/esc/detail/transcode.hpp
 
     src/io.cpp
     src/terminfo.cpp
@@ -14,10 +16,9 @@ add_library(escape STATIC
     src/mouse.cpp
     src/detail/display.cpp
     src/detail/is_urxvt.cpp
-    src/detail/mb_to_u32.cpp
     src/detail/print.cpp
+    src/detail/transcode.cpp
     src/detail/traits_to_int_sequence.cpp
-    src/detail/u32_to_mb.cpp
     src/detail/console_file.cpp
     src/detail/signals.cpp
 )

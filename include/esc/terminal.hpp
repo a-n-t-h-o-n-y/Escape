@@ -1,11 +1,14 @@
-#ifndef ESC_TERMINAL_HPP
-#define ESC_TERMINAL_HPP
+#pragma once
+
+#include <concepts>
+
 #include <esc/area.hpp>
-#include <esc/detail/is_any_of.hpp>
+#include <esc/detail/any_of.hpp>
 #include <esc/mouse.hpp>
 
 /** \file
- *  Terminal Specific Settings. */
+ *  Terminal Specific Settings.
+ */
 
 namespace esc {
 
@@ -75,25 +78,30 @@ void set(MouseMode);
 
 // CONVENIENCE -----------------------------------------------------------------
 
+/**
+ * Types that represent a setting on the terminal.
+ */
 template <typename T>
-bool constexpr is_setable = detail::is_any_of<T,
-                                              Echo,
-                                              Input_buffer,
-                                              Signals,
-                                              Screen_buffer,
-                                              Cursor,
-                                              MouseMode,
-                                              KeyMode>;
+concept Setable = detail::AnyOf<T,
+                                Echo,
+                                Input_buffer,
+                                Signals,
+                                Screen_buffer,
+                                Cursor,
+                                MouseMode,
+                                KeyMode>;
 
-/// Convenience function to set multiple properties at once.
-template <typename... Args>
-void set(Args... args)
+/**
+ * Convenience function to set multiple properties at once.
+ * @tparam Args The types of the properties to set.
+ * @param args The properties to set.
+ */
+template <Setable... Args>
+auto set(Args&&... args) -> void
 {
     static_assert(sizeof...(Args) > 0,
                   "set(...): Must have at least one argument.");
-    static_assert((is_setable<Args> && ...),
-                  "set(...): All Args... must be setable types.");
-    (set(args), ...);
+    (set(std::forward<Args>(args)), ...);
 }
 
 // INITIALIZE ------------------------------------------------------------------
@@ -183,4 +191,3 @@ auto terminal_height() -> int;
 [[nodiscard]] auto terminal_area() -> Area;
 
 }  // namespace esc
-#endif  // ESC_TERMINAL_HPP

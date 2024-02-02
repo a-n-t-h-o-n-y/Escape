@@ -21,9 +21,6 @@ namespace esc {
 void write(char c);
 
 /// Writes a 4 byte char to the console via stdout.
-/** Converts the character to a multi-byte array via std::c32rtomb() and sends
- *  each resulting char to write(). The conversion uses the current C locale.
- *  Throws std::runtime_error if there is an error during conversion. */
 void write(char32_t c) noexcept(false);
 
 /// Writes each char of \p sv to the console via stdout.
