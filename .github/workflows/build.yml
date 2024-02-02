@@ -121,22 +121,6 @@ jobs:
                   mkdir build && cd build
                   cmake .. && make termcaps
 
-    # MacOS-12 Clang
-    build-MacOS12-clang14:
-        runs-on: macos-12
-        steps:
-            - uses: actions/checkout@v3
-              with:
-                  submodules: recursive
-            - name: Install ICU
-              run: brew install icu4c
-            - env:
-                  CC: clang
-                  CXX: clang++
-              run: |
-                  mkdir build && cd build
-                  cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps
-
     # MacOS-12 GCC
     build-MacOS12-gcc12:
         runs-on: macos-12
