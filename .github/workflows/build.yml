@@ -9,7 +9,7 @@ jobs:
     build-ubuntu22-gcc12:
         runs-on: ubuntu-22.04
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
                   submodules: recursive
             - env:
@@ -21,7 +21,7 @@ jobs:
     build-ubuntu22-gcc11:
         runs-on: ubuntu-22.04
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
                   submodules: recursive
             - env:
@@ -33,7 +33,7 @@ jobs:
     build-ubuntu22-gcc10:
         runs-on: ubuntu-22.04
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
                   submodules: recursive
             - env:
@@ -47,7 +47,7 @@ jobs:
     build-ubuntu22-clang14:
         runs-on: ubuntu-22.04
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
                   submodules: recursive
             - env:
@@ -59,7 +59,7 @@ jobs:
     build-ubuntu22-clang13:
         runs-on: ubuntu-22.04
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
                   submodules: recursive
             - env:
@@ -73,7 +73,7 @@ jobs:
     build-ubuntu20-gcc10:
         runs-on: ubuntu-20.04
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
                   submodules: recursive
             - env:
@@ -87,7 +87,7 @@ jobs:
     build-ubuntu20-clang12:
         runs-on: ubuntu-20.04
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
                   submodules: recursive
             - env:
@@ -99,7 +99,7 @@ jobs:
     build-ubuntu20-clang11:
         runs-on: ubuntu-20.04
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
                   submodules: recursive
             - env:
@@ -111,7 +111,7 @@ jobs:
     build-ubuntu20-clang10:
         runs-on: ubuntu-20.04
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
                   submodules: recursive
             - env:
@@ -125,7 +125,7 @@ jobs:
     build-MacOS12-gcc12:
         runs-on: macos-12
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
                   submodules: recursive
             - name: Install ICU
@@ -139,7 +139,7 @@ jobs:
     build-MacOS12-gcc11:
         runs-on: macos-12
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
                   submodules: recursive
             - name: Install ICU
