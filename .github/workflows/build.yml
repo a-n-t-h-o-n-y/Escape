@@ -17,7 +17,7 @@ jobs:
                   CXX: g++-12
               run: |
                   mkdir build && cd build
-                  cmake .. && make termcaps
+                  cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
     build-ubuntu22-gcc11:
         runs-on: ubuntu-22.04
         steps:
@@ -29,7 +29,7 @@ jobs:
                   CXX: g++-11
               run: |
                   mkdir build && cd build
-                  cmake .. && make termcaps
+                  cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
     build-ubuntu22-gcc10:
         runs-on: ubuntu-22.04
         steps:
@@ -41,7 +41,7 @@ jobs:
                   CXX: g++-10
               run: |
                   mkdir build && cd build
-                  cmake .. && make termcaps
+                  cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
 
     # Ubuntu-22 Clang
     build-ubuntu22-clang14:
@@ -55,7 +55,7 @@ jobs:
                   CXX: clang++-14
               run: |
                   mkdir build && cd build
-                  cmake .. && make termcaps
+                  cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
     build-ubuntu22-clang13:
         runs-on: ubuntu-22.04
         steps:
@@ -67,7 +67,7 @@ jobs:
                   CXX: clang++-13
               run: |
                   mkdir build && cd build
-                  cmake .. && make termcaps
+                  cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
 
     # Ubuntu-20 GCC
     build-ubuntu20-gcc10:
@@ -81,7 +81,7 @@ jobs:
                   CXX: g++-10
               run: |
                   mkdir build && cd build
-                  cmake .. && make termcaps
+                  cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
 
     # Ubuntu-20 Clang
     build-ubuntu20-clang12:
@@ -95,7 +95,7 @@ jobs:
                   CXX: clang++-12
               run: |
                   mkdir build && cd build
-                  cmake .. && make termcaps
+                  cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
     build-ubuntu20-clang11:
         runs-on: ubuntu-20.04
         steps:
@@ -107,7 +107,7 @@ jobs:
                   CXX: clang++-11
               run: |
                   mkdir build && cd build
-                  cmake .. && make termcaps
+                  cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
     build-ubuntu20-clang10:
         runs-on: ubuntu-20.04
         steps:
@@ -119,7 +119,7 @@ jobs:
                   CXX: clang++-10
               run: |
                   mkdir build && cd build
-                  cmake .. && make termcaps
+                  cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
 
     # MacOS-12 GCC
     build-MacOS12-gcc12:
@@ -135,7 +135,7 @@ jobs:
                   CXX: g++-12
               run: |
                   mkdir build && cd build
-                  cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps
+                  cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
     build-MacOS12-gcc11:
         runs-on: macos-12
         steps:
@@ -149,4 +149,4 @@ jobs:
                   CXX: g++-11
               run: |
                   mkdir build && cd build
-                  cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps
+                  cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
