@@ -168,8 +168,9 @@ inline auto const terminfo_db = std::array<Terminfo, 140>{
     auto at = std::find_if(
         std::cbegin(terminfo_db), std::cend(terminfo_db),
         [&term_name](auto const& ti) { return ti.TERM_name == term_name; });
-    if (at == std::cend(terminfo_db))
+    if (at == std::cend(terminfo_db)) {
         throw std::runtime_error{"find_terminfo(): term_name not found."};
+    }
     return *at;
 }
 
@@ -184,8 +185,6 @@ auto const TERM = get_env("TERM");
 
 auto const COLORTERM = get_env("COLORTERM");
 
-auto const terminfo = find_terminfo(TERM);
-
 }  // namespace
 
 namespace esc {
@@ -194,6 +193,7 @@ auto TERM_var() -> std::string_view { return TERM; }
 
 auto color_palette_size() -> std::uint16_t
 {
+    static auto const terminfo = find_terminfo(TERM);
     return terminfo.color_palette_size;
 }
 
