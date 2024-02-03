@@ -423,3 +423,403 @@ TEST_CASE("Operator|(StringType) with multibyte symbols", "[GlyphString]")
         REQUIRE(gs[7] == Glyph{U'𐍈', {.background = ColorIndex::Green}});
     }
 }
+
+TEST_CASE("Chained pipe ops")
+{
+    SECTION("Glyph")
+    {
+        auto const g = Glyph{U'a'} | bg(ColorIndex::Green) |
+                       fg(ColorIndex::Red) | Trait::Bold | Trait::Italic |
+                       remove_trait(Trait::Bold);
+        REQUIRE(g == Glyph{.symbol = U'a',
+                           .brush  = {.background = ColorIndex::Green,
+                                      .foreground = ColorIndex::Red,
+                                      .traits     = Trait::Italic}});
+    }
+
+    SECTION("GlyphString")
+    {
+        auto const gs = "abc" | bg(ColorIndex::Green) | fg(ColorIndex::Red) |
+                        Trait::Bold | Trait::Italic | remove_trait(Trait::Bold);
+
+        REQUIRE(gs.size() == 3);
+        REQUIRE(gs[0] == Glyph{.symbol = U'a',
+                               .brush  = {.background = ColorIndex::Green,
+                                          .foreground = ColorIndex::Red,
+                                          .traits     = Trait::Italic}});
+        REQUIRE(gs[1] == Glyph{.symbol = U'b',
+                               .brush  = {.background = ColorIndex::Green,
+                                          .foreground = ColorIndex::Red,
+                                          .traits     = Trait::Italic}});
+        REQUIRE(gs[2] == Glyph{.symbol = U'c',
+                               .brush  = {.background = ColorIndex::Green,
+                                          .foreground = ColorIndex::Red,
+                                          .traits     = Trait::Italic}});
+    }
+}
+
+TEST_CASE("operator+=(GlyphString, ...)", "[Glyph]")
+{
+    SECTION("GS += GS")
+    {
+        auto gs = "abc" | bg(ColorIndex::Green);
+        gs += "def" | bg(ColorIndex::Red);
+
+        REQUIRE(gs.size() == 6);
+        REQUIRE(gs[0] == Glyph{U'a', {.background = ColorIndex::Green}});
+        REQUIRE(gs[1] == Glyph{U'b', {.background = ColorIndex::Green}});
+        REQUIRE(gs[2] == Glyph{U'c', {.background = ColorIndex::Green}});
+        REQUIRE(gs[3] == Glyph{U'd', {.background = ColorIndex::Red}});
+        REQUIRE(gs[4] == Glyph{U'e', {.background = ColorIndex::Red}});
+        REQUIRE(gs[5] == Glyph{U'f', {.background = ColorIndex::Red}});
+    }
+
+    SECTION("GS += std::u32string_view")
+    {
+        auto gs = "abc" | bg(ColorIndex::Green);
+        gs += U"d😀f";
+
+        REQUIRE(gs.size() == 6);
+        REQUIRE(gs[0] == Glyph{U'a', {.background = ColorIndex::Green}});
+        REQUIRE(gs[1] == Glyph{U'b', {.background = ColorIndex::Green}});
+        REQUIRE(gs[2] == Glyph{U'c', {.background = ColorIndex::Green}});
+        REQUIRE(gs[3] == Glyph{U'd'});
+        REQUIRE(gs[4] == Glyph{U'😀'});
+        REQUIRE(gs[5] == Glyph{U'f'});
+    }
+
+    SECTION("GS += std::string_view")
+    {
+        auto gs = "abc" | bg(ColorIndex::Green);
+        gs += "d😀f";
+
+        REQUIRE(gs.size() == 6);
+        REQUIRE(gs[0] == Glyph{U'a', {.background = ColorIndex::Green}});
+        REQUIRE(gs[1] == Glyph{U'b', {.background = ColorIndex::Green}});
+        REQUIRE(gs[2] == Glyph{U'c', {.background = ColorIndex::Green}});
+        REQUIRE(gs[3] == Glyph{U'd'});
+        REQUIRE(gs[4] == Glyph{U'😀'});
+        REQUIRE(gs[5] == Glyph{U'f'});
+    }
+
+    SECTION("GS += Glyph")
+    {
+        auto gs = "abc" | bg(ColorIndex::Green);
+        gs += Glyph{U'd', {.background = ColorIndex::Red}};
+
+        REQUIRE(gs.size() == 4);
+        REQUIRE(gs[0] == Glyph{U'a', {.background = ColorIndex::Green}});
+        REQUIRE(gs[1] == Glyph{U'b', {.background = ColorIndex::Green}});
+        REQUIRE(gs[2] == Glyph{U'c', {.background = ColorIndex::Green}});
+        REQUIRE(gs[3] == Glyph{U'd', {.background = ColorIndex::Red}});
+    }
+
+    SECTION("GS += Character")
+    {
+        SECTION("char")
+        {
+            auto gs = "abc" | bg(ColorIndex::Green);
+            gs += 'd';
+
+            REQUIRE(gs.size() == 4);
+            REQUIRE(gs[0] == Glyph{U'a', {.background = ColorIndex::Green}});
+            REQUIRE(gs[1] == Glyph{U'b', {.background = ColorIndex::Green}});
+            REQUIRE(gs[2] == Glyph{U'c', {.background = ColorIndex::Green}});
+            REQUIRE(gs[3] == Glyph{U'd'});
+        }
+
+        SECTION("char8_t")
+        {
+            auto gs = "abc" | bg(ColorIndex::Green);
+            gs += u8'd';
+
+            REQUIRE(gs.size() == 4);
+            REQUIRE(gs[0] == Glyph{U'a', {.background = ColorIndex::Green}});
+            REQUIRE(gs[1] == Glyph{U'b', {.background = ColorIndex::Green}});
+            REQUIRE(gs[2] == Glyph{U'c', {.background = ColorIndex::Green}});
+            REQUIRE(gs[3] == Glyph{U'd'});
+        }
+
+        SECTION("char16_t")
+        {
+            auto gs = "abc" | bg(ColorIndex::Green);
+            gs += u'd';
+
+            REQUIRE(gs.size() == 4);
+            REQUIRE(gs[0] == Glyph{U'a', {.background = ColorIndex::Green}});
+            REQUIRE(gs[1] == Glyph{U'b', {.background = ColorIndex::Green}});
+            REQUIRE(gs[2] == Glyph{U'c', {.background = ColorIndex::Green}});
+            REQUIRE(gs[3] == Glyph{U'd'});
+        }
+
+        SECTION("char32_t")
+        {
+            auto gs = "abc" | bg(ColorIndex::Green);
+            gs += U'd';
+
+            REQUIRE(gs.size() == 4);
+            REQUIRE(gs[0] == Glyph{U'a', {.background = ColorIndex::Green}});
+            REQUIRE(gs[1] == Glyph{U'b', {.background = ColorIndex::Green}});
+            REQUIRE(gs[2] == Glyph{U'c', {.background = ColorIndex::Green}});
+            REQUIRE(gs[3] == Glyph{U'd'});
+        }
+
+        SECTION("signed char")
+        {
+            auto gs = "abc" | bg(ColorIndex::Green);
+            gs += static_cast<signed char>('d');
+
+            REQUIRE(gs.size() == 4);
+            REQUIRE(gs[0] == Glyph{U'a', {.background = ColorIndex::Green}});
+            REQUIRE(gs[1] == Glyph{U'b', {.background = ColorIndex::Green}});
+            REQUIRE(gs[2] == Glyph{U'c', {.background = ColorIndex::Green}});
+            REQUIRE(gs[3] == Glyph{U'd'});
+        }
+
+        SECTION("unsigned char")
+        {
+            auto gs = "abc" | bg(ColorIndex::Green);
+            gs += static_cast<unsigned char>('d');
+
+            REQUIRE(gs.size() == 4);
+            REQUIRE(gs[0] == Glyph{U'a', {.background = ColorIndex::Green}});
+            REQUIRE(gs[1] == Glyph{U'b', {.background = ColorIndex::Green}});
+            REQUIRE(gs[2] == Glyph{U'c', {.background = ColorIndex::Green}});
+            REQUIRE(gs[3] == Glyph{U'd'});
+        }
+    }
+}
+
+TEST_CASE("operator+(..., ...)", "[Glyph]")
+{
+    SECTION("Glyph + Glyph")
+    {
+        auto const gs = Glyph{U'a'} + Glyph{U'b'};
+        REQUIRE(gs.size() == 2);
+        REQUIRE(gs[0] == Glyph{U'a'});
+        REQUIRE(gs[1] == Glyph{U'b'});
+    }
+
+    SECTION("Glyph + Character", "[Glyph]")
+    {
+        SECTION("char")
+        {
+            auto const gs = Glyph{U'a'} + 'b';
+            REQUIRE(gs.size() == 2);
+            REQUIRE(gs[0] == Glyph{U'a'});
+            REQUIRE(gs[1] == Glyph{U'b'});
+        }
+
+        SECTION("char8_t")
+        {
+            auto const gs = Glyph{U'a'} + u8'b';
+            REQUIRE(gs.size() == 2);
+            REQUIRE(gs[0] == Glyph{U'a'});
+            REQUIRE(gs[1] == Glyph{U'b'});
+        }
+
+        SECTION("char16_t")
+        {
+            auto const gs = Glyph{U'a'} + u'b';
+            REQUIRE(gs.size() == 2);
+            REQUIRE(gs[0] == Glyph{U'a'});
+            REQUIRE(gs[1] == Glyph{U'b'});
+        }
+
+        SECTION("char32_t")
+        {
+            auto const gs = Glyph{U'a'} + U'b';
+            REQUIRE(gs.size() == 2);
+            REQUIRE(gs[0] == Glyph{U'a'});
+            REQUIRE(gs[1] == Glyph{U'b'});
+        }
+
+        SECTION("signed char")
+        {
+            auto const gs = Glyph{U'a'} + static_cast<signed char>('b');
+            REQUIRE(gs.size() == 2);
+            REQUIRE(gs[0] == Glyph{U'a'});
+            REQUIRE(gs[1] == Glyph{U'b'});
+        }
+
+        SECTION("unsigned char")
+        {
+            auto const gs = Glyph{U'a'} + static_cast<unsigned char>('b');
+            REQUIRE(gs.size() == 2);
+            REQUIRE(gs[0] == Glyph{U'a'});
+            REQUIRE(gs[1] == Glyph{U'b'});
+        }
+    }
+
+    SECTION("Character + Glyph", "[Glyph]")
+    {
+        SECTION("char")
+        {
+            auto const gs = 'a' + Glyph{U'b'};
+            REQUIRE(gs.size() == 2);
+            REQUIRE(gs[0] == Glyph{U'a'});
+            REQUIRE(gs[1] == Glyph{U'b'});
+        }
+
+        SECTION("char8_t")
+        {
+            auto const gs = u8'a' + Glyph{U'b'};
+            REQUIRE(gs.size() == 2);
+            REQUIRE(gs[0] == Glyph{U'a'});
+            REQUIRE(gs[1] == Glyph{U'b'});
+        }
+
+        SECTION("char16_t")
+        {
+            auto const gs = u'a' + Glyph{U'b'};
+            REQUIRE(gs.size() == 2);
+            REQUIRE(gs[0] == Glyph{U'a'});
+            REQUIRE(gs[1] == Glyph{U'b'});
+        }
+
+        SECTION("char32_t")
+        {
+            auto const gs = U'a' + Glyph{U'b'};
+            REQUIRE(gs.size() == 2);
+            REQUIRE(gs[0] == Glyph{U'a'});
+            REQUIRE(gs[1] == Glyph{U'b'});
+        }
+
+        SECTION("signed char")
+        {
+            auto const gs = static_cast<signed char>('a') + Glyph{U'b'};
+            REQUIRE(gs.size() == 2);
+            REQUIRE(gs[0] == Glyph{U'a'});
+            REQUIRE(gs[1] == Glyph{U'b'});
+        }
+
+        SECTION("unsigned char")
+        {
+            auto const gs = static_cast<unsigned char>('a') + Glyph{U'b'};
+            REQUIRE(gs.size() == 2);
+            REQUIRE(gs[0] == Glyph{U'a'});
+            REQUIRE(gs[1] == Glyph{U'b'});
+        }
+    }
+
+    SECTION("GlyphString + std::u32string_view")
+    {
+        auto const gs = ("abc" | bg(ColorIndex::Green)) + U"d😀f";
+        REQUIRE(gs.size() == 6);
+        REQUIRE(gs[0] == Glyph{U'a', {.background = ColorIndex::Green}});
+        REQUIRE(gs[1] == Glyph{U'b', {.background = ColorIndex::Green}});
+        REQUIRE(gs[2] == Glyph{U'c', {.background = ColorIndex::Green}});
+        REQUIRE(gs[3] == Glyph{U'd'});
+        REQUIRE(gs[4] == Glyph{U'😀'});
+        REQUIRE(gs[5] == Glyph{U'f'});
+    }
+
+    SECTION("std::u32string_view + GlyphString")
+    {
+        auto const gs = U"a😀c" + ("def" | bg(ColorIndex::Green));
+        REQUIRE(gs.size() == 6);
+        REQUIRE(gs[0] == Glyph{U'a'});
+        REQUIRE(gs[1] == Glyph{U'😀'});
+        REQUIRE(gs[2] == Glyph{U'c'});
+        REQUIRE(gs[3] == Glyph{U'd', {.background = ColorIndex::Green}});
+        REQUIRE(gs[4] == Glyph{U'e', {.background = ColorIndex::Green}});
+        REQUIRE(gs[5] == Glyph{U'f', {.background = ColorIndex::Green}});
+    }
+
+    SECTION("GlyphString + std::string_view")
+    {
+        auto const gs = ("abc" | bg(ColorIndex::Green)) + "d😀f";
+        REQUIRE(gs.size() == 6);
+        REQUIRE(gs[0] == Glyph{U'a', {.background = ColorIndex::Green}});
+        REQUIRE(gs[1] == Glyph{U'b', {.background = ColorIndex::Green}});
+        REQUIRE(gs[2] == Glyph{U'c', {.background = ColorIndex::Green}});
+        REQUIRE(gs[3] == Glyph{U'd'});
+        REQUIRE(gs[4] == Glyph{U'😀'});
+        REQUIRE(gs[5] == Glyph{U'f'});
+    }
+
+    SECTION("std::string_view + GlyphString")
+    {
+        auto const gs = "a😀c" + ("def" | bg(ColorIndex::Green));
+        REQUIRE(gs.size() == 6);
+        REQUIRE(gs[0] == Glyph{U'a'});
+        REQUIRE(gs[1] == Glyph{U'😀'});
+        REQUIRE(gs[2] == Glyph{U'c'});
+        REQUIRE(gs[3] == Glyph{U'd', {.background = ColorIndex::Green}});
+        REQUIRE(gs[4] == Glyph{U'e', {.background = ColorIndex::Green}});
+        REQUIRE(gs[5] == Glyph{U'f', {.background = ColorIndex::Green}});
+    }
+
+    SECTION("GlyphString + GlyphString")
+    {
+        auto const gs =
+            ("abc" | bg(ColorIndex::Green)) + ("d😀f" | bg(ColorIndex::Red));
+        REQUIRE(gs.size() == 6);
+        REQUIRE(gs[0] == Glyph{U'a', {.background = ColorIndex::Green}});
+        REQUIRE(gs[1] == Glyph{U'b', {.background = ColorIndex::Green}});
+        REQUIRE(gs[2] == Glyph{U'c', {.background = ColorIndex::Green}});
+        REQUIRE(gs[3] == Glyph{U'd', {.background = ColorIndex::Red}});
+        REQUIRE(gs[4] == Glyph{U'😀', {.background = ColorIndex::Red}});
+        REQUIRE(gs[5] == Glyph{U'f', {.background = ColorIndex::Red}});
+    }
+
+    SECTION("GlyphString + Glyph")
+    {
+        auto const gs = ("abc" | bg(ColorIndex::Green)) + Glyph{U'd'};
+        REQUIRE(gs.size() == 4);
+        REQUIRE(gs[0] == Glyph{U'a', {.background = ColorIndex::Green}});
+        REQUIRE(gs[1] == Glyph{U'b', {.background = ColorIndex::Green}});
+        REQUIRE(gs[2] == Glyph{U'c', {.background = ColorIndex::Green}});
+        REQUIRE(gs[3] == Glyph{U'd'});
+    }
+
+    SECTION("Glyph + GlyphString")
+    {
+        auto const gs = Glyph{U'a'} + ("def" | bg(ColorIndex::Green));
+        REQUIRE(gs.size() == 4);
+        REQUIRE(gs[0] == Glyph{U'a'});
+        REQUIRE(gs[1] == Glyph{U'd', {.background = ColorIndex::Green}});
+        REQUIRE(gs[2] == Glyph{U'e', {.background = ColorIndex::Green}});
+        REQUIRE(gs[3] == Glyph{U'f', {.background = ColorIndex::Green}});
+    }
+
+    SECTION("Glyph + std::string_view")
+    {
+        auto const gs = Glyph{U'a'} + "b😀d";
+        REQUIRE(gs.size() == 4);
+        REQUIRE(gs[0] == Glyph{U'a'});
+        REQUIRE(gs[1] == Glyph{U'b'});
+        REQUIRE(gs[2] == Glyph{U'😀'});
+        REQUIRE(gs[3] == Glyph{U'd'});
+    }
+
+    SECTION("Glyph + std::u32string_view")
+    {
+        auto const gs = Glyph{U'a'} + U"b😀d";
+        REQUIRE(gs.size() == 4);
+        REQUIRE(gs[0] == Glyph{U'a'});
+        REQUIRE(gs[1] == Glyph{U'b'});
+        REQUIRE(gs[2] == Glyph{U'😀'});
+        REQUIRE(gs[3] == Glyph{U'd'});
+    }
+
+    SECTION("std::string_view + Glyph")
+    {
+        auto const gs = "a😀b" + Glyph{U'c'};
+        REQUIRE(gs.size() == 4);
+        REQUIRE(gs[0] == Glyph{U'a'});
+        REQUIRE(gs[1] == Glyph{U'😀'});
+        REQUIRE(gs[2] == Glyph{U'b'});
+        REQUIRE(gs[3] == Glyph{U'c'});
+    }
+
+    SECTION("std::u32string_view + Glyph")
+    {
+        auto const gs = U"a😀b" + Glyph{U'c'};
+        REQUIRE(gs.size() == 4);
+        REQUIRE(gs[0] == Glyph{U'a'});
+        REQUIRE(gs[1] == Glyph{U'😀'});
+        REQUIRE(gs[2] == Glyph{U'b'});
+        REQUIRE(gs[3] == Glyph{U'c'});
+    }
+}
