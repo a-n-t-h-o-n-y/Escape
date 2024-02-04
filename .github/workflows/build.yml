@@ -47,15 +47,15 @@ jobs:
                   cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
 
     # Ubuntu-22 Clang
-    build-ubuntu22-clang16:
+    build-ubuntu22-clang15:
         runs-on: ubuntu-22.04
         steps:
             - uses: actions/checkout@v4
               with:
                   submodules: recursive
             - env:
-                  CC: clang-16
-                  CXX: clang++-16
+                  CC: clang-15
+                  CXX: clang++-15
               run: |
                   sudo apt-get update
                   mkdir build && cd build
