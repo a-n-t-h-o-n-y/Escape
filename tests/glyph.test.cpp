@@ -773,9 +773,29 @@ TEST_CASE("operator+(..., ...)", "[Glyph]")
         REQUIRE(gs[3] == Glyph{U'd'});
     }
 
+    SECTION("GlyphString + Character")
+    {
+        auto const gs = ("abc" | bg(ColorIndex::Green)) + 'd';
+        REQUIRE(gs.size() == 4);
+        REQUIRE(gs[0] == Glyph{U'a', {.background = ColorIndex::Green}});
+        REQUIRE(gs[1] == Glyph{U'b', {.background = ColorIndex::Green}});
+        REQUIRE(gs[2] == Glyph{U'c', {.background = ColorIndex::Green}});
+        REQUIRE(gs[3] == Glyph{U'd'});
+    }
+
     SECTION("Glyph + GlyphString")
     {
         auto const gs = Glyph{U'a'} + ("def" | bg(ColorIndex::Green));
+        REQUIRE(gs.size() == 4);
+        REQUIRE(gs[0] == Glyph{U'a'});
+        REQUIRE(gs[1] == Glyph{U'd', {.background = ColorIndex::Green}});
+        REQUIRE(gs[2] == Glyph{U'e', {.background = ColorIndex::Green}});
+        REQUIRE(gs[3] == Glyph{U'f', {.background = ColorIndex::Green}});
+    }
+
+    SECTION("Character + GlyphString")
+    {
+        auto const gs = U'a' + ("def" | bg(ColorIndex::Green));
         REQUIRE(gs.size() == 4);
         REQUIRE(gs[0] == Glyph{U'a'});
         REQUIRE(gs[1] == Glyph{U'd', {.background = ColorIndex::Green}});

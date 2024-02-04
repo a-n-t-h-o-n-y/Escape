@@ -440,10 +440,24 @@ template <InsertableGlyphString T>
     return lhs;
 }
 
+template <InsertableGlyphString T, Character U>
+[[nodiscard]] auto operator+(T lhs, U rhs) -> T
+{
+    lhs.insert(std::end(lhs), Glyph{.symbol = static_cast<char32_t>(rhs)});
+    return lhs;
+}
+
 template <InsertableGlyphString T>
 [[nodiscard]] auto operator+(Glyph const& lhs, T rhs) -> T
 {
     rhs.insert(std::begin(rhs), lhs);
+    return rhs;
+}
+
+template <InsertableGlyphString T, Character U>
+[[nodiscard]] auto operator+(U lhs, T rhs) -> T
+{
+    rhs.insert(std::begin(rhs), Glyph{.symbol = static_cast<char32_t>(lhs)});
     return rhs;
 }
 
