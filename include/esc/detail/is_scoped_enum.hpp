@@ -1,5 +1,5 @@
-#ifndef ESC_DETAIL_IS_SCOPED_ENUM_HPP
-#define ESC_DETAIL_IS_SCOPED_ENUM_HPP
+#pragma once
+
 #include <type_traits>
 
 namespace esc::detail {
@@ -10,4 +10,3 @@ constexpr bool is_scoped_enum =
     std::is_enum_v<E> && !std::is_convertible_v<E, int>;
 
 }  // namespace esc::detail
-#endif  // ESC_DETAIL_IS_SCOPED_ENUM_HPP

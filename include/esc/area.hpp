@@ -1,5 +1,4 @@
-#ifndef ESC_AREA_HPP
-#define ESC_AREA_HPP
+#pragma once
 
 namespace esc {
 
@@ -28,4 +27,3 @@ auto constexpr operator<(Area const& x, Area const& y) -> bool
 }
 
 }  // namespace esc
-#endif  // ESC_AREA_HPP

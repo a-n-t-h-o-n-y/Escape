@@ -1,5 +1,5 @@
-#ifndef ESC_DETAIL_TRAITS_TO_INT_SEQUENCE_HPP
-#define ESC_DETAIL_TRAITS_TO_INT_SEQUENCE_HPP
+#pragma once
+
 #include <string>
 
 #include <esc/trait.hpp>
@@ -13,4 +13,3 @@ namespace esc::detail {
 [[nodiscard]] auto traits_to_int_sequence(Traits traits) -> std::string;
 
 }  // namespace esc::detail
-#endif  // ESC_DETAIL_TRAITS_TO_INT_SEQUENCE_HPP

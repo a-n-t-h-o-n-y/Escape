@@ -1,5 +1,5 @@
-#ifndef ESC_DETAIL_CONSOLE_FILE_HPP
-#define ESC_DETAIL_CONSOLE_FILE_HPP
+#pragma once
+
 namespace esc::detail {
 
 /// Try to open the current console device as a file. Returns file descriptor.
@@ -18,4 +18,3 @@ namespace esc::detail {
 void set_keyboard_mode(int file_descriptor, long mode) noexcept(false);
 
 }  // namespace esc::detail
-#endif  // ESC_DETAIL_CONSOLE_FILE_HPP

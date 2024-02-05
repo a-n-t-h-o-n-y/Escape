@@ -1,5 +1,5 @@
-#ifndef ESC_DETAIL_PRINT_HPP
-#define ESC_DETAIL_PRINT_HPP
+#pragma once
+
 #include <ostream>
 
 #include <esc/event.hpp>
@@ -27,4 +27,3 @@ auto print(esc::MouseMove m, std::ostream& os) -> std::ostream&;
 auto print(esc::Resize w, std::ostream& os) -> std::ostream&;
 
 }  // namespace esc::detail
-#endif  // ESC_DETAIL_PRINT_HPP

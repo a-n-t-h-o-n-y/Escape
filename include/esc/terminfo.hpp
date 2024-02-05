@@ -1,5 +1,5 @@
-#ifndef ESC_TERMINFO_HPP
-#define ESC_TERMINFO_HPP
+#pragma once
+
 #include <cstdint>
 #include <string_view>
 
@@ -20,4 +20,3 @@ namespace esc {
 [[nodiscard]] auto has_true_color() -> bool;
 
 }  // namespace esc
-#endif  // ESC_TERMINFO_HPP

@@ -1,5 +1,5 @@
-#ifndef ESC_IO_HPP
-#define ESC_IO_HPP
+#pragma once
+
 #include <optional>
 #include <string>
 #include <string_view>
@@ -68,4 +68,3 @@ auto read() -> Event;
 auto read(int millisecond_timeout) -> std::optional<Event>;
 
 }  // namespace esc
-#endif  // ESC_IO_HPP

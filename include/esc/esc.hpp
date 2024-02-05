@@ -1,5 +1,4 @@
-#ifndef ESC_ESC_HPP
-#define ESC_ESC_HPP
+#pragma once
 
 #include <esc/area.hpp>
 #include <esc/brush.hpp>
@@ -16,5 +15,3 @@
 #include <esc/terminfo.hpp>
 #include <esc/trait.hpp>
 #include <esc/true_color.hpp>
-
-#endif  // ESC_ESC_HPP

@@ -1,5 +1,5 @@
-#ifndef ESC_DETAIL_DISPLAY_HPP
-#define ESC_DETAIL_DISPLAY_HPP
+#pragma once
+
 #include <string>
 
 namespace esc::detail {
@@ -13,4 +13,3 @@ namespace esc::detail {
 [[nodiscard]] auto display(std::string const& sequence) -> std::string;
 
 }  // namespace esc::detail
-#endif  // ESC_DETAIL_DISPLAY_HPP

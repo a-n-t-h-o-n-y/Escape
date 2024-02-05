@@ -1,5 +1,5 @@
-#ifndef ESC_KEY_HPP
-#define ESC_KEY_HPP
+#pragma once
+
 #include <cstddef>
 #include <functional>
 #include <tuple>
@@ -321,4 +321,3 @@ struct hash<esc::Key> {
 };
 
 }  // namespace std
-#endif  // ESC_KEY_HPP

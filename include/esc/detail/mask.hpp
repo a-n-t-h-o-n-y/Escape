@@ -1,5 +1,5 @@
-#ifndef ESC_DETAIL_MASK_HPP
-#define ESC_DETAIL_MASK_HPP
+#pragma once
+
 #include <type_traits>
 
 #include <esc/detail/is_scoped_enum.hpp>
@@ -90,4 +90,3 @@ template <typename E>
 }
 
 }  // namespace esc::detail
-#endif  // ESC_DETAIL_MASK_HPP

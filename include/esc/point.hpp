@@ -1,5 +1,5 @@
-#ifndef ESC_POINT_HPP
-#define ESC_POINT_HPP
+#pragma once
+
 #include <cstddef>
 #include <functional>
 
@@ -53,5 +53,5 @@ struct hash<esc::Point> {
     using result_type   = std::size_t;
     auto operator()(argument_type const& point) const noexcept -> result_type;
 };
+
 }  // namespace std
-#endif  // ESC_POINT_HPP
