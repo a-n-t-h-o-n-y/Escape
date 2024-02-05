@@ -1,13 +1,9 @@
 #ifndef ESC_IO_HPP
 #define ESC_IO_HPP
-#include <array>
-#include <climits>
-#include <clocale>
-#include <cstddef>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 #include <esc/detail/is_convertible_to_any_of.hpp>
 #include <esc/event.hpp>
@@ -38,6 +34,7 @@ void write(std::u32string_view sv);
 
 // CONVENIENCE -----------------------------------------------------------------
 
+// TODO make concept
 template <typename T>
 bool constexpr is_writable =
     detail::is_convertible_to_any_of<T,

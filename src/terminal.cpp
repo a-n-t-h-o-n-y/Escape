@@ -1,6 +1,5 @@
 #include <esc/terminal.hpp>
 
-#include <clocale>
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
@@ -40,7 +39,6 @@ void fix_ctrl_m()
 [[nodiscard]] auto turn_on_auto_wrap() -> std::string { return "\033[?7h"; }
 
 auto original_termios = ::termios{};
-auto original_clocale = std::string{};
 
 }  // namespace
 
@@ -180,13 +178,10 @@ void initialize_terminal(Screen_buffer screen_buffer,
 {
     auto constexpr stdout_buf_size = 4'096;
     // TODO record current settings before calling set, this is ioctl things and
-    // tcsetaddr things and locale. termios? probably from tcsetaddr
+    // tcsetaddr things. termios? probably from tcsetaddr
 
-    original_clocale = std::setlocale(LC_ALL, nullptr);
     original_termios = current_termios();
 
-    if (std::setlocale(LC_ALL, "en_US.UTF-8") == nullptr)
-        throw std::runtime_error{"initialize_terminal(): setlocale() failed."};
     std::setvbuf(stdout, nullptr, _IOFBF, stdout_buf_size);
     detail::register_signals(sigint_uninit);
 
@@ -227,8 +222,6 @@ void uninitialize_terminal()
     write(turn_on_auto_wrap());
     set(Screen_buffer::Normal, MouseMode::Off, Cursor::Show, KeyMode::Normal);
     flush();
-    if (std::setlocale(LC_ALL, original_clocale.c_str()) == nullptr)
-        throw std::runtime_error{"uninitialize_terminal: set_locale() failed."};
     ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &original_termios);
 }
 

@@ -175,8 +175,8 @@ void initialize_interactive_terminal(MouseMode mouse_mode = MouseMode::Basic,
 // UNINITIALIZE ----------------------------------------------------------------
 
 /// Restore terminal state to before any initialize...() functions were called.
-/** This is Input/Output settings and the C locale. This also sets the normal
- *  screen buffer, displays the cursor, and disables mouse input. */
+/** This is Input/Output settings. This also sets the normal screen buffer,
+ * displays the cursor, and disables mouse input. */
 void uninitialize_terminal();
 
 // QUERY -----------------------------------------------------------------------
