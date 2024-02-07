@@ -35,7 +35,7 @@ auto to_string(MouseMode mm) -> std::string
         case MouseMode::Drag: return "MouseMode::Drag";
         case MouseMode::Move: return "MouseMode::Move";
     }
-    throw std::logic_error{"to_string(MouseMode): Bad Enum Value."};
+    throw std::runtime_error{"to_string(MouseMode): Bad Enum Value."};
 }
 
 }  // namespace esc

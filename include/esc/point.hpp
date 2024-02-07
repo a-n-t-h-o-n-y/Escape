@@ -1,57 +1,21 @@
 #pragma once
 
-#include <cstddef>
-#include <functional>
-
 namespace esc {
 
-/// Represents a point on the Terminal in 2 dimensions.
-/** Top-left cell of the terminal is Point{x:0, y:0}. x is horizontal and y is
- *  vertical. */
+/**
+ * A point on the terminal screen.
+ *
+ * @details The top-left cell of the terminal is Point{x:0, y:0}. x is
+ *          horizontal and y is vertical.
+ * @note Provide your own comparison and/or hash operators at the point of use
+ *       for map like containers. Do not define those here.
+ */
 struct Point {
     int x;
     int y;
+
+    auto constexpr operator==(Point const& other) const -> bool = default;
+    auto constexpr operator!=(Point const& other) const -> bool = default;
 };
-
-/// Return true if lhs and rhs have the same values for x and y.
-[[nodiscard]] auto constexpr operator==(Point lhs, Point rhs) -> bool
-{
-    return lhs.x == rhs.x && lhs.y == rhs.y;
-}
-
-/// Return false if lhs and rhs have the same values for x and y.
-[[nodiscard]] auto constexpr operator!=(Point lhs, Point rhs) -> bool
-{
-    return !(lhs == rhs);
-}
-
-/// Only useful for total ordering, y is considered first, then x.
-[[nodiscard]] auto constexpr operator<(Point lhs, Point rhs) -> bool
-{
-    return (lhs.y < rhs.y) || (lhs.y == rhs.y && lhs.x < rhs.x);
-}
-
-/// Adds x coordinates and y coordinates together.
-[[nodiscard]] auto constexpr operator+(Point lhs, Point rhs) -> Point
-{
-    return {lhs.x + rhs.x, lhs.y + rhs.y};
-}
-
-/// Subtracts rhs coordinates from lhs coordinates.
-[[nodiscard]] auto constexpr operator-(Point lhs, Point rhs) -> Point
-{
-    return {lhs.x - rhs.x, lhs.y - rhs.y};
-}
 
 }  // namespace esc
-
-/// Custom specialization of std::hash for esc::Point.
-namespace std {
-template <>
-struct hash<esc::Point> {
-    using argument_type = esc::Point;
-    using result_type   = std::size_t;
-    auto operator()(argument_type const& point) const noexcept -> result_type;
-};
-
-}  // namespace std

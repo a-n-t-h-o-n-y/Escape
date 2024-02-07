@@ -1,5 +1,5 @@
-#ifndef ESC_SRC_DETAIL_TTY_FILE_HPP
-#define ESC_SRC_DETAIL_TTY_FILE_HPP
+#pragma once
+
 #include <optional>
 
 namespace esc::detail {
@@ -8,4 +8,3 @@ namespace esc::detail {
 inline auto tty_file_descriptor = std::optional<int>{std::nullopt};
 
 }  // namespace esc::detail
-#endif  // ESC_SRC_DETAIL_TTY_FILE_HPP

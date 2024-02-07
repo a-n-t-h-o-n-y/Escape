@@ -2,28 +2,15 @@
 
 namespace esc {
 
-/// Holds a width and height as `int`s.
+/**
+ * Represents a rectangular area with a width and height.
+ */
 struct Area {
     int width;
     int height;
+
+    auto constexpr operator==(Area const& other) const -> bool = default;
+    auto constexpr operator!=(Area const& other) const -> bool = default;
 };
-
-/// Compares the dimension values, not calculated areas.
-auto constexpr operator==(Area const& x, Area const& y) -> bool
-{
-    return x.width == y.width && x.height == y.height;
-}
-
-/// Compares the dimension values, not calculated areas.
-auto constexpr operator!=(Area const& x, Area const& y) -> bool
-{
-    return !(x == y);
-}
-
-/// Compares calculated area values, not the individual dimensions.
-auto constexpr operator<(Area const& x, Area const& y) -> bool
-{
-    return (x.width * x.height) < (y.width * y.height);
-}
 
 }  // namespace esc

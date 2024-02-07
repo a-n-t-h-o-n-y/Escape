@@ -12,7 +12,7 @@ using namespace esc;
 struct Title {
     explicit Title(Point offset)
     {
-        write(escape(Trait::Underline, Cursor_position{offset}),
+        write(escape(Trait::Underline, CursorPosition{offset}),
               "~Terminal Capabilities~ -- q to quit");
     }
 };
@@ -20,7 +20,7 @@ struct Title {
 struct TERM_display {
     TERM_display(Point offset)
     {
-        write(escape(Trait::Bold, Cursor_position{offset}),
+        write(escape(Trait::Bold, CursorPosition{offset}),
               "TERM env var:        ", escape(Trait::None), TERM_var());
     }
 };
@@ -28,7 +28,7 @@ struct TERM_display {
 struct Color_count {
     Color_count(Point offset)
     {
-        write(escape(Trait::Bold, Cursor_position{offset}),
+        write(escape(Trait::Bold, CursorPosition{offset}),
               "Palette Color Count: ", escape(Trait::None),
               std::to_string(color_palette_size()));
     }
@@ -37,7 +37,7 @@ struct Color_count {
 struct Has_true_color {
     Has_true_color(Point offset)
     {
-        write(escape(Trait::Bold, Cursor_position{offset}),
+        write(escape(Trait::Bold, CursorPosition{offset}),
               "Has True Color:      ", escape(Trait::None),
               has_true_color() ? "Yes" : "No");
     }
@@ -49,7 +49,7 @@ class Term_size {
 
     void update(Area a) const
     {
-        write(escape(Cursor_position{offset_}, Blank_row{}, Trait::Bold),
+        write(escape(CursorPosition{offset_}, BlankRow{}, Trait::Bold),
               "Terminal Size:       ", escape(Trait::None), area_to_string(a));
         flush();
     }
@@ -68,7 +68,7 @@ class Term_size {
 struct UTF8_text {
     UTF8_text(Point offset)
     {
-        write(escape(Trait::Bold, Cursor_position{offset}),
+        write(escape(Trait::Bold, CursorPosition{offset}),
               "UTF8 Text Examples:  ", escape(Trait::None),
               U"Ɣ ѝ ₪ ⌛ ▚ 😳 ㅎꂆ");
     }
@@ -79,27 +79,27 @@ struct Traits_display {
     {
         // clang-format off
         write(
-            escape(Trait::Bold, Cursor_position{offset}),
+            escape(Trait::Bold, CursorPosition{offset}),
             "Traits:              ",
             escape(Trait::Standout), "Standout ",
             escape(Trait::Bold), "Bold ",
             escape(Trait::Dim), "Dim",
-                escape(Cursor_position{offset.x, offset.y + 1}),
+                escape(CursorPosition{offset.x, offset.y + 1}),
             std::string(21, ' '),
             escape(Trait::Italic), "Italic ",
             escape(Trait::Underline), "Underline ",escape(Trait::None),
-                escape(Cursor_position{offset.x, offset.y + 2}),
+                escape(CursorPosition{offset.x, offset.y + 2}),
             std::string(21, ' '),
             escape(Trait::Blink), "Blink",
             escape(Trait::Inverse), "Inverse ", escape(Trait::None),
-                escape(Cursor_position{offset.x, offset.y + 3}),
+                escape(CursorPosition{offset.x, offset.y + 3}),
             std::string(21, ' '),
             escape(Trait::Invisible), "Invisible ", escape(Trait::None),
                 "<-- Invisible",
-                escape(Cursor_position{offset.x, offset.y + 4}),
+                escape(CursorPosition{offset.x, offset.y + 4}),
                 std::string(21, ' '),
             escape(Trait::Crossed_out), "Crossed_out ", escape(Trait::None),
-                escape(Cursor_position{offset.x, offset.y + 5}),
+                escape(CursorPosition{offset.x, offset.y + 5}),
                 std::string(21, ' '),
             escape(Trait::Double_underline), "Double_underline"
         );
@@ -132,15 +132,15 @@ class Key_press_display {
         }();
 
         // clang-format off
-        write(escape(Cursor_position{offset_}, Trait::Inverse),
+        write(escape(CursorPosition{offset_}, Trait::Inverse),
             "Last Key Release -----",
-            escape(Cursor_position{offset_.x, offset_.y + 1}, Trait::Bold),
+            escape(CursorPosition{offset_.x, offset_.y + 1}, Trait::Bold),
             "    Enum Value: ", escape(Trait::None), std::to_string(
                 static_cast<std::underlying_type_t<Key>>(kr.key)), "    ",
-            escape(Cursor_position{offset_.x, offset_.y + 2}, Trait::Bold),
+            escape(CursorPosition{offset_.x, offset_.y + 2}, Trait::Bold),
             "    Display:    ", escape(Trait::None), display,
-            escape(Cursor_position{offset_.x, offset_.y + 3}, Trait::Bold,
-                Blank_row{}),
+            escape(CursorPosition{offset_.x, offset_.y + 3}, Trait::Bold,
+                BlankRow{}),
             "    Modifiers:  ", escape(Trait::None),
                 mods_to_string(kr.key)
         );
@@ -165,15 +165,15 @@ class Key_press_display {
         }();
 
         // clang-format off
-        write(escape(Cursor_position{offset_}, Trait::Inverse),
+        write(escape(CursorPosition{offset_}, Trait::Inverse),
             "Last Key Press -----",
-            escape(Cursor_position{offset_.x, offset_.y + 1}, Trait::Bold),
+            escape(CursorPosition{offset_.x, offset_.y + 1}, Trait::Bold),
             "    Enum Value: ", escape(Trait::None), std::to_string(
                 static_cast<std::underlying_type_t<Key>>(kp.key)), "    ",
-            escape(Cursor_position{offset_.x, offset_.y + 2}, Trait::Bold),
+            escape(CursorPosition{offset_.x, offset_.y + 2}, Trait::Bold),
             "    Display:    ", escape(Trait::None), display,
-            escape(Cursor_position{offset_.x, offset_.y + 3}, Trait::Bold,
-                Blank_row{}),
+            escape(CursorPosition{offset_.x, offset_.y + 3}, Trait::Bold,
+                BlankRow{}),
             "    Modifiers:  ", escape(Trait::None),
                 mods_to_string(kp.key)
         );
@@ -209,18 +209,18 @@ class Mouse_display {
         };
 
         // clang-format off
-        write(escape(Cursor_position{offset_}, Trait::Inverse),
+        write(escape(CursorPosition{offset_}, Trait::Inverse),
             "Last Mouse Event ---",
-            escape(Cursor_position{offset_.x, offset_.y + 1}, Trait::Bold,
-                Blank_row{}),
+            escape(CursorPosition{offset_.x, offset_.y + 1}, Trait::Bold,
+                BlankRow{}),
             "    Event Type: ", escape(Trait::None), event_type,
-            escape(Cursor_position{offset_.x, offset_.y + 2}, Trait::Bold,
-                Blank_row{}),
+            escape(CursorPosition{offset_.x, offset_.y + 2}, Trait::Bold,
+                BlankRow{}),
             "    Button Name: ", escape(Trait::None), to_string(m.button),
-            escape(Cursor_position{offset_.x, offset_.y + 3}, Trait::Bold),
+            escape(CursorPosition{offset_.x, offset_.y + 3}, Trait::Bold),
             "    at:          ", escape(Trait::None), point_to_string(m.at),
-            escape(Cursor_position{offset_.x, offset_.y + 4}, Trait::Bold,
-                Blank_row{}),
+            escape(CursorPosition{offset_.x, offset_.y + 4}, Trait::Bold,
+                BlankRow{}),
             "    Modifiers:   ", escape(Trait::None),
                 mods_to_string(m.modifiers)
         );
@@ -249,7 +249,7 @@ class Change_mouse_mode {
     {
         set(mm);
         current_ = mm;
-        write(escape(Cursor_position{offset_}, Blank_row{},
+        write(escape(CursorPosition{offset_}, BlankRow{},
                      Trait::Bold | Trait::Underline),
               "Click to Change Mouse Mode:", escape(Trait::None), ' ',
               to_string(mm));
@@ -267,13 +267,13 @@ class Color_palette_display {
    public:
     Color_palette_display(Point offset) : offset_{offset}
     {
-        write(escape(Cursor_position{offset_}, Trait::Bold,
+        write(escape(CursorPosition{offset_}, Trait::Bold,
                      background(DefaultColor{})),
               "Color Palette", escape(Trait::None));
         auto const color_count = color_palette_size();
         for (auto i = 0; i < color_count; ++i) {
-            write(escape(Cursor_position{offset_.x + (i % width),
-                                         offset_.y + (i / width) + 1},
+            write(escape(CursorPosition{offset_.x + (i % width),
+                                        offset_.y + (i / width) + 1},
                          background(ColorIndex{static_cast<std::uint8_t>(i)})),
                   ' ');
         }
@@ -291,14 +291,14 @@ class True_color_display {
     {
         if (!has_true_color())
             return;
-        write(escape(Cursor_position{offset_}, Trait::Bold),
+        write(escape(CursorPosition{offset_}, Trait::Bold),
               "True Color Example",
-              escape(Cursor_position{offset_.x, offset_.y + 1}));
+              escape(CursorPosition{offset_.x, offset_.y + 1}));
         auto const init = HSL{100, 50, 50};
         write(hue_increment_row(width, init));
-        write(escape(Cursor_position{offset_.x, offset_.y + 2}));
+        write(escape(CursorPosition{offset_.x, offset_.y + 2}));
         write(saturation_increment_row(width, init));
-        write(escape(Cursor_position{offset_.x, offset_.y + 3}));
+        write(escape(CursorPosition{offset_.x, offset_.y + 3}));
         write(lightness_increment_row(width, init));
     }
 

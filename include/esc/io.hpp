@@ -1,70 +1,101 @@
 #pragma once
 
+#include <concepts>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <type_traits>
 
-#include <esc/detail/is_convertible_to_any_of.hpp>
 #include <esc/event.hpp>
-#include <esc/terminfo.hpp>
 
 namespace esc {
 
 // -------------------------- Write to Screen ----------------------------------
 
-/// Writes a single byte to the console via stdout.
-void write(char c);
+/**
+ * Write a single byte to the console via stdout.
+ * @param c The char to write.
+ */
+auto write(char c) -> void;
 
-/// Writes a 4 byte char to the console via stdout.
-void write(char32_t c) noexcept(false);
+/**
+ * Write a 4 byte char32_t to the console via stdout.
+ * @param c The char to write.
+ */
+auto write(char32_t c) -> void;
 
-/// Writes each char of \p sv to the console via stdout.
-void write(std::string_view sv);
+/**
+ * Write a string_view to the console via stdout.
+ * @param sv The string_view to write.
+ */
+auto write(std::string_view sv) -> void;
 
-/// Writes each char of \p s to the console via stdout.
+/**
+ * Write a string to the console via stdout.
+ * @details This is an optimization over the std::string_view overload since
+ *          null terminators are required in std::string but not in
+ *          std::string_view.
+ * @param s The string to write.
+ */
 auto write(std::string const& s) -> void;
 
-/// Writes each char of \p s to the console via stdout.
-void write(char const* s);
+/**
+ * Write a null-terminated string to the console via stdout.
+ * @param s The string to write.
+ */
+auto write(char const* s) -> void;
 
-/// Writes each char32_t of \p sv to the console via stdout.
-/** Calls write(char32_t) for each element of \p sv. */
-void write(std::u32string_view sv);
+/**
+ * Write a u32string_view to the console via stdout.
+ * @details Calls write(char32_t) for each element of \p sv.
+ * @param sv The u32string_view to write.
+ */
+auto write(std::u32string_view sv) -> void;
 
 // CONVENIENCE -----------------------------------------------------------------
 
-// TODO make concept
 template <typename T>
-bool constexpr is_writable =
-    detail::is_convertible_to_any_of<T,
-                                     char,
-                                     char32_t,
-                                     std::string,
-                                     std::string_view,
-                                     char const*,
-                                     std::u32string_view>;
+concept Writable = std::convertible_to<T, char32_t> ||
+                   std::convertible_to<T, std::string_view> ||
+                   std::convertible_to<T, std::u32string_view>;
 
-/// Writes any number of writable objects, in paramter order.
-template <typename... Args,
+/**
+ * Write any number of writable objects to the console, in parameter order.
+ *
+ * @tparam Args The types of the objects to write.
+ * @param args The objects to write.
+ */
+template <Writable... Args,
           typename = std::enable_if_t<(sizeof...(Args) > 1), void>>
-void write(Args&&... args)
+auto write(Args&&... args) -> void
 {
-    static_assert((is_writable<Args> && ...),
-                  "write(...): All Args... must be writable types.");
     (write(args), ...);
 }
 
 /// Send all buffered bytes from calls to write(...) to the console device.
-void flush();
+
+/**
+ * Flush the stdout buffer.
+ * @details Sends all buffered bytes from calls to write(...) to the console.
+ */
+auto flush() -> void;
 
 // ----------------------------- Reading --------------------------------------
 
-/// Blocking read of a single input Event from stdin.
+/**
+ * Blocks until a single input Event is read from stdin.
+ * @return The Event read from stdin.
+ */
 auto read() -> Event;
 
 /// Read a single input Event from stdin, with timeout.
 /** Returns std::nullopt if timeout passes without an Event. */
+
+/**
+ * Timeout version of read().
+ * @param millisecond_timeout The maximum time to wait for input.
+ * @return The Event read from stdin, or std::nullopt if the timeout is reached.
+ */
 auto read(int millisecond_timeout) -> std::optional<Event>;
 
 }  // namespace esc

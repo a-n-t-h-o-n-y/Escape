@@ -6,116 +6,215 @@
 
 #include <esc/brush.hpp>
 #include <esc/color.hpp>
-#include <esc/color_index.hpp>
-#include <esc/default_color.hpp>
 #include <esc/detail/any_of.hpp>
 #include <esc/glyph.hpp>
 #include <esc/point.hpp>
 #include <esc/trait.hpp>
-#include <esc/true_color.hpp>
 
 namespace esc {
 
 // MOVE CURSOR -----------------------------------------------------------------
 
-/// Tag type to move the cursor to a Point.
-struct Cursor_position {
+/**
+ * Tag type to move the cursor to a Point.
+ */
+struct CursorPosition {
    public:
-    constexpr Cursor_position(int x, int y) : at{x, y} {}
+    constexpr CursorPosition(int x, int y) : at{.x = x, .y = y} {}
 
-    constexpr Cursor_position(Point p) : at{p} {}
+    constexpr CursorPosition(Point p) : at{p} {}
 
    public:
     Point at;
 };
 
-/// Return control sequence to move the cursor to the specified Point.
-/** Top-left cell of the terminal is Point{x:0, y:0}. x is horizontal and y is
- *  vertical. The next string output to stdout will happen starting at \p p. */
-[[nodiscard]] auto escape(Cursor_position p) -> std::string;
+/**
+ * Get the control sequence to move the cursor to the specified Point.
+ *
+ * @details Top-left cell of the terminal is Point{x:0, y:0}. x is horizontal
+ *          and y is vertical. The next string output to stdout will happen
+ *          starting at \p p.
+ * @param   p The Point to move the cursor to.
+ * @return  The control sequence to move the cursor to the specified Point.
+ */
+[[nodiscard]] auto escape(CursorPosition p) -> std::string;
 
 // CLEAR -----------------------------------------------------------------------
 
-/// Tag type to clear a row.
-struct Blank_row {};
+/**
+ * Tag type to clear the row the cursor is currently at.
+ */
+struct BlankRow {};
 
-/// Return control sequence to clear the row the cursor is currently at.
-/** Write escape(Cursor_position) result before to pick which line to clear. */
-[[nodiscard]] auto escape(Blank_row) -> std::string;
+/**
+ * Get the control sequence to clear the row the cursor is currently at.
+ *
+ * @details Write escape(CursorPosition) result before to pick which line to
+ *          clear.
+ * @param   BlankRow The tag type to clear the row the cursor is currently at.
+ * @return  The control sequence to clear the row the cursor is currently at.
+ */
+[[nodiscard]] auto escape(BlankRow) -> std::string;
 
-/// Tag type to clear the entire screen.
-struct Blank_screen {};
+/**
+ * Tag type to clear the entire screen.
+ */
+struct BlankScreen {};
 
-/// Return control sequence to erase everything on the screen.
-[[nodiscard]] auto escape(Blank_screen) -> std::string;
+/**
+ * Get the control sequence to erase everything on the screen.
+ *
+ * @param  BlankScreen The tag type to clear the entire screen.
+ * @return The control sequence to erase everything on the screen.
+ */
+[[nodiscard]] auto escape(BlankScreen) -> std::string;
 
 // TRAITS ----------------------------------------------------------------------
 
-/// Return control sequence to set any number of Traits, clears existing Traits.
-/** These Traits will be applied to any text written to the screen after this
- *  call, and before another call to escape(Traits). Traits can be built up into
- *  a Traits object with operator|, and can be implicitly converted into Traits
- *  objects. A single Trait::None will clear the set traits. */
+/**
+ * Get the control sequence to set any number of Traits, clears existing Traits.
+ *
+ * @details These Traits will be applied to any text written to the screen after
+ *          this call, and before another call to escape(Traits). Traits can be
+ *          built up into a Traits object with operator|, and can be implicitly
+ *          converted into Traits objects. A single Trait::None will clear the
+ *          set traits.
+ * @param   traits The Traits to set.
+ * @return  The control sequence to set any number of Traits, clears existing
+ */
 [[nodiscard]] auto escape(Traits traits) -> std::string;
 
-/// Overloaded needed so variadic escape() does not inf. recurse.
+/**
+ * Overload needed so variadic escape() does not infinite recurse.
+ */
 [[nodiscard]] auto escape(Trait trait) -> std::string;
 
-/// Return control sequence to remove all Traits currently set.
-/** Any text written after will have no Traits. */
+/**
+ * Get the control sequence to remove all Traits currently set.
+ *
+ * @details Any text written after will have no Traits.
+ * @return The control sequence to remove all Traits currently set.
+ */
 [[nodiscard]] auto clear_traits() -> std::string;
 
-/// Returns the last Traits that were created with escape(Traits).
-/** May not represent what is on the screen if the last call to escape(Traits)
- *  was not written to stdout. */
+/**
+ * Get the last Traits that were created with escape(Traits).
+ *
+ * @details May not represent what is on the screen if the last call to
+ *          escape(Traits) was not written to stdout.
+ * @return  The last Traits that were created with escape(Traits).
+ */
 [[nodiscard]] auto traits() -> Traits;
 
 // BACKGROUND COLOR ------------------------------------------------------------
 
-/// Return control sequence to set background to Color variant.
+/**
+ * Get the control sequence to set the background to the specified Color.
+ *
+ * @param  c The Color to set the background to.
+ * @return The control sequence to set the background to the specified Color.
+ */
 [[nodiscard]] auto escape(ColorBG c) -> std::string;
 
-/// Return control sequence to set background to given xterm palette index.
+/**
+ * Get the control sequence to set the background to the specified xterm palette
+ * index.
+ *
+ * @param  c The xterm palette index to set the background to.
+ * @return The control sequence to set the background to the specified xterm
+ *         palette index.
+ */
 [[nodiscard]] auto escape_bg(ColorIndex c) -> std::string;
 
-/// Return control sequence to set background to given terminal true color.
+/**
+ * Get the control sequence to set the background to the specified terminal true
+ * color.
+ *
+ * @param  c The terminal true color to set the background to.
+ * @return The control sequence to set the background to the specified terminal
+ *         true color.
+ */
 [[nodiscard]] auto escape_bg(TrueColor c) -> std::string;
 
 /// Return control sequence to reset the background to the terminal default
+
+/**
+ * Get the control sequence to reset the background to the terminal default.
+ * @return The control sequence to reset the background to the terminal default.
+ */
 [[nodiscard]] auto escape_bg(DefaultColor c) -> std::string;
 
-/// Returns the last color that was created with set_background().
-/** May not represent what is on the screen if the last call to set_background()
- *  was not written to stdout. */
+/**
+ * Get the last Color that was created with escape(ColorBG).
+ *
+ * @details May not represent what is on the screen if the last call to
+ *          escape(ColorBG) was not written to stdout.
+ * @return  The last Color that was created with escape(ColorBG).
+ */
 [[nodiscard]] auto background_color() -> Color;
 
 // FOREGROUND COLOR ------------------------------------------------------------
 
-/// Return control sequence to set foreground to Color variant.
+/**
+ * Get the control sequence to set the foreground to the specified Color.
+ *
+ * @param  c The Color to set the foreground to.
+ * @return The control sequence to set the foreground to the specified Color.
+ */
 [[nodiscard]] auto escape(ColorFG c) -> std::string;
 
-/// Return control sequence to set foreground to given xterm palette index.
+/**
+ * Get the control sequence to set the foreground to the specified xterm palette
+ * index.
+ *
+ * @param  c The xterm palette index to set the foreground to.
+ * @return The control sequence to set the foreground to the specified xterm
+ */
 [[nodiscard]] auto escape_fg(ColorIndex c) -> std::string;
 
-/// Return control sequence to set foreground to given terminal true color.
+/**
+ * Get the control sequence to set the foreground to the specified terminal true
+ * color.
+ *
+ * @param  c The terminal true color to set the foreground to.
+ * @return The control sequence to set the foreground to the specified terminal
+ *         true color.
+ */
 [[nodiscard]] auto escape_fg(TrueColor c) -> std::string;
 
-/// Return control sequence to reset the foreground to the terminal default
+/**
+ * Get the control sequence to reset the foreground to the terminal default.
+ * @return The control sequence to reset the foreground to the terminal default.
+ */
 [[nodiscard]] auto escape_fg(DefaultColor c) -> std::string;
 
-/// Returns the last color that was created with set_foreground().
-/** May not represent what is on the screen if the last call to set_foreground()
- *  was not written to stdout. */
+/**
+ * Get the last Color that was created with escape(ColorFG).
+ *
+ * @details May not represent what is on the screen if the last call to
+ *          escape(ColorFG) was not written to stdout.
+ * @return  The last Color that was created with escape(ColorFG).
+ */
 [[nodiscard]] auto foreground_color() -> Color;
 
 // BRUSH -----------------------------------------------------------------------
 
-/// Return control sequence to set Brush Colors and Traits.
+/**
+ * Get the control sequence to set Brush Colors and Traits.
+ *
+ * @param  b The Brush to set.
+ * @return The control sequence to set Brush Colors and Traits.
+ */
 [[nodiscard]] auto escape(Brush b) -> std::string;
 
 // GLYPH -----------------------------------------------------------------------
 
-/// Return control sequence to set Glyph Brush and Symbol.
+/**
+ * Get the control sequence to set the Glyph Brush and Symbol.
+ *
+ * @param  g The Glyph to set.
+ * @return The control sequence to set the Glyph Brush and Symbol.
+ */
 [[nodiscard]] auto escape(Glyph const& g) -> std::string;
 
 // CONVENIENCE -----------------------------------------------------------------
@@ -125,9 +224,9 @@ struct Blank_screen {};
  */
 template <typename T>
 concept Escapable = detail::AnyOf<T,
-                                  Cursor_position,
-                                  Blank_row,
-                                  Blank_screen,
+                                  CursorPosition,
+                                  BlankRow,
+                                  BlankScreen,
                                   Trait,
                                   Traits,
                                   ColorBG,
@@ -138,11 +237,10 @@ concept Escapable = detail::AnyOf<T,
 /**
  * Convenience function to concatenate multiple escapable objects at once.
  *
- * @details Returns a single string containing the escape sequences for all
- * args...
- * @tparam Args... A list of escapable types.
- * @param args... A list of escapable objects.
- * @return A single string containing the escape sequences for all args...
+ * @details Returns a single string containing the escape sequences for all args
+ * @tparam  Args... A list of escapable types.
+ * @param   args... A list of escapable objects.
+ * @return  A single string containing the escape sequences for all args...
  */
 template <Escapable... Args>
 [[nodiscard]] auto escape(Args&&... args) -> std::string

@@ -2,19 +2,33 @@
 
 namespace esc::detail {
 
-/// Try to open the current console device as a file. Returns file descriptor.
-/** Throws std::runtime_error if file cannot be opened, typically need superuser
- *  privileges to open.*/
-[[nodiscard]] auto open_console_file() noexcept(false) -> int;
+/**
+ * Try to open the current console device as a file. Returns file descriptor.
+ *
+ * @return The file descriptor for the console file.
+ * @throws std::runtime_error if file cannot be opened, typically need superuser
+ *         privileges to open.
+ */
+[[nodiscard]] auto open_console_file() -> int;
 
-/// Return the current keyboard mode from ioctl for given \p file_descriptor.
-/** Throws std::runtime_error if mode cannot be determined. */
-[[nodiscard]] auto current_keyboard_mode(int file_descriptor) noexcept(false)
-    -> long;
+/**
+ * Return the current keyboard mode from ioctl for given \p file_descriptor.
+ *
+ * @param file_descriptor The file descriptor to get the mode from.
+ * @return The current keyboard mode. Can be any of: K_RAW, K_XLATE,
+ *         K_MEDIUMRAW, K_UNICODE, K_OFF
+ * @throws std::runtime_error if this fails.
+ */
+[[nodiscard]] auto current_keyboard_mode(int file_descriptor) -> long;
 
-/// Set given \p mode to \p file_descriptor.
-/** Throws std::runtime_error if this fails.
- *  Mode can any of: K_RAW, K_XLATE, K_MEDIUMRAW, K_UNICODE, K_OFF */
-void set_keyboard_mode(int file_descriptor, long mode) noexcept(false);
+/**
+ * Set given \p mode to \p file_descriptor.
+ *
+ * @param file_descriptor The file descriptor to set the mode on.
+ * @param mode The mode to set. Can be any of: K_RAW, K_XLATE, K_MEDIUMRAW,
+ *             K_UNICODE, K_OFF
+ * @throws std::runtime_error if this fails.
+ */
+auto set_keyboard_mode(int file_descriptor, long mode) -> void;
 
 }  // namespace esc::detail

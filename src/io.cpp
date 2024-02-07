@@ -218,8 +218,16 @@ constexpr auto escape_keymap =
                              Key::Insert_gray,
                              Key::Delete_gray};
 
-/// Return true if there is nothing to read from file descriptor \p fd.
-/** Waits up to \p timeout for bytes to be written to the file. */
+/**
+ * Return true if there is nothing to read from file descriptor \p fd.
+ *
+ * @details Waits up to \p timeout for bytes to be written to the file.
+ * @param fd The file descriptor to check for readability.
+ * @param millisecond_timeout The maximum time to wait for bytes to be written
+ *                            to the file.
+ * @return True if there is nothing to read from the file, false if there is
+ *         something to read.
+ */
 [[nodiscard]] auto is_file_readable(int fd, int millisecond_timeout) -> bool
 {
     auto file   = pollfd{};
@@ -232,26 +240,41 @@ constexpr auto escape_keymap =
     auto constexpr timeout = 0;
 
     if (result == error) {
-        if (errno == EINTR)  // A signal interrupted poll.
+        if (errno == EINTR) {  // A signal interrupted poll.
             return true;
+        }
         throw std::runtime_error{"io.cpp is_file_readable(): Poll Error"};
     }
-    if (result == timeout)
+    if (result == timeout) {
         return true;
-    if (result > 0 && static_cast<bool>(file.revents & POLLIN))
+    }
+    if (result > 0 && static_cast<bool>(file.revents & POLLIN)) {
         return false;
+    }
     throw std::logic_error{"io.cpp is_file_readable(): logic_error."};
 }
 
-/// Return true if there is nothing to read from stdin.
-/** Waits up to \p timeout for bytes to be written to stdin. */
+/**
+ * Return true if there is nothing to read from stdin.
+ *
+ * @details Waits up to \p timeout for bytes to be written to stdin.
+ * @param millisecond_timeout The maximum time to wait for bytes to be written
+ *                            to stdin.
+ * @return True if there is nothing to read from stdin, false if there is
+ *         something to read.
+ */
 [[nodiscard]] auto is_stdin_empty(int millisecond_timeout) -> bool
 {
     return is_file_readable(STDIN_FILENO, millisecond_timeout);
 }
 
-/// Read a single byte from file descriptor \p fd.
-/** Throws std::runtime_error if there is an error reading from \p fd. */
+/**
+ * Read a single byte from file descriptor \p fd.
+ *
+ * @param fd The file descriptor to read from.
+ * @return The byte read from \p fd.
+ * @throws std::runtime_error if there is an error reading from \p fd.
+ */
 auto read_byte(int fd) -> unsigned char
 {
     unsigned char byte = '\0';
@@ -263,70 +286,121 @@ auto read_byte(int fd) -> unsigned char
     return byte;
 }
 
-/// Read a single byte, blocking until a byte is read or timeout happens.
-/** Returns std::nullopt on timeout. */
+/**
+ * Read a single byte from file descriptor \p fd, blocking until a byte is read
+ * or \p millisecond_timeout passes.
+ *
+ * @param fd The file descriptor to read from.
+ * @param millisecond_timeout The maximum time to wait for a byte to be read.
+ * @return The byte read from \p fd, or std::nullopt if the timeout is reached.
+ */
 auto read_byte(int fd, int millisecond_timeout) -> std::optional<char>
 {
-    if (!is_stdin_empty(millisecond_timeout))
+    if (!is_stdin_empty(millisecond_timeout)) {
         return read_byte(fd);
+    }
     return std::nullopt;
 }
 
 // Mouse -----------------------------------------------------------------------
 
+/**
+ * Used by urxvt to keep track of the previous mouse button pressed for mouse
+ * release events.
+ */
 auto previous_mouse_btn = esc::Mouse::Button{};
 
 // Token -----------------------------------------------------------------------
 
-class Control_sequence {
+/**
+ * A control sequence is a sequence of bytes that starts with an escape
+ * character and ends with a byte that is not in the range 0x20-0x2F.
+ * @details The control sequence is made up of parameter bytes, intermediate
+ *          bytes, and a final byte.
+ * @see https://en.wikipedia.org/wiki/ANSI_escape_code
+ */
+class ControlSequence {
    public:
     std::string parameter_bytes;
     std::string intermediate_bytes;
     char final_byte;
 
    public:
-    explicit Control_sequence(std::string sequence)
+    /**
+     * Construct a ControlSequence from a string of bytes.
+     * @param sequence The string of bytes to construct the ControlSequence
+     *                 from.
+     * @throws std::runtime_error if the input is empty.
+     */
+    explicit ControlSequence(std::string sequence)
     {
-        if (sequence.empty())
-            throw std::runtime_error{"Control_sequence(): Invalid Input"};
-        std::copy_if(std::cbegin(sequence), std::cend(sequence),
-                     std::back_inserter(parameter_bytes),
-                     [](char c) { return c >= '\x30' && c <= '\x3F'; });
-        std::copy_if(std::cbegin(sequence), std::cend(sequence),
-                     std::back_inserter(intermediate_bytes),
-                     [](char c) { return c >= '\x20' && c <= '\x2F'; });
+        if (sequence.empty()) {
+            throw std::runtime_error{"ControlSequence(): Invalid Input"};
+        }
+        std::ranges::copy_if(sequence, std::back_inserter(parameter_bytes),
+                             [](char c) { return c >= '\x30' && c <= '\x3F'; });
+        std::ranges::copy_if(sequence, std::back_inserter(intermediate_bytes),
+                             [](char c) { return c >= '\x20' && c <= '\x2F'; });
         final_byte = sequence.back();
     }
 };
 
+/**
+ * Represents an escaped character token.
+ */
 struct Escaped {
     char character;
 };
 
+/**
+ * Represents a UTF-8 character token.
+ */
 struct UTF8 {
     std::array<char, 4> bytes;
 };
 
+/**
+ * Represents a window resize token.
+ */
 struct Window {};
 
-using Token = std::variant<Control_sequence, Escaped, UTF8, Window>;
+/**
+ * A Token is one of ControlSequence, Escaped, UTF8, and Window parsed from the
+ * terminal's input stream.
+ */
+using Token = std::variant<ControlSequence, Escaped, UTF8, Window>;
 
 // -----------------------------------------------------------------------------
 
 /// Retrieves the integer type parameter at \p index, returns a type T.
 /** \p bytes should only be the parameter bytes. */
+
+/**
+ * Retrieves the integer type parameter at \p index, returns a type T.
+ * @tparam T The type to return.
+ * @tparam index The index of the parameter to retrieve.
+ * @param bytes The parameter bytes to retrieve the parameter from.
+ * @return The parameter at \p index.
+ */
 template <typename T, std::size_t index>
 auto parameter(std::string bytes) -> T
 {
     if constexpr (index != 0) {  // silence gcc warning
-        for (auto count = 0uL; count < index; ++count)
+        for (auto count = 0uL; count < index; ++count) {
             bytes = bytes.substr(bytes.find(';', 0) + 1);
+        }
     }
 
     return std::stoul(bytes.substr(0, bytes.find(';', 0)));
 }
 
-auto parse_mouse(Control_sequence cs) -> esc::Event
+/**
+ * Parses a mouse event from a control sequence.
+ * @param cs The control sequence to parse the mouse event from.
+ * @return The parsed mouse event.
+ * @throws std::runtime_error if the mouse event is not parseable.
+ */
+auto parse_mouse(ControlSequence cs) -> esc::Event
 {
     auto const is_sgr = cs.parameter_bytes.front() == '<';
     auto const btn    = [&] {
@@ -370,8 +444,9 @@ auto parse_mouse(Control_sequence cs) -> esc::Event
     }
 
     // Release Event
-    if (cs.final_byte == 'm')
+    if (cs.final_byte == 'm') {
         return esc::MouseRelease{mouse};
+    }
 
     // urxvt btn release does not mention the button that was released.
     if (!is_sgr && mouse.button == Mouse::Button::None) {
@@ -381,29 +456,49 @@ auto parse_mouse(Control_sequence cs) -> esc::Event
 
     // Press Event
     previous_mouse_btn = mouse.button;
-    if (cs.final_byte == 'M')
+    if (cs.final_byte == 'M') {
         return esc::MousePress{mouse};
+    }
 
     throw std::runtime_error{"io.cpp::parse_mouse(): Bad Mouse Event Parse"};
 }
 
+/**
+ * Returns the number of parameters in a control sequence string.
+ *
+ * @details Parameters are delimited by semicolons.
+ * @param parameter_bytes The parameter bytes to count.
+ * @return The number of parameters in \p parameter_bytes.
+ */
 auto parameter_count(std::string parameter_bytes) -> std::size_t
 {
-    if (parameter_bytes.empty())
-        return 0;
-    return std::count(std::cbegin(parameter_bytes), std::cend(parameter_bytes),
-                      ';') +
-           1;
+    return parameter_bytes.empty()
+               ? 0
+               : std::ranges::count(parameter_bytes, ';') + 1;
 }
 
+/**
+ * Parses a tilde key from a control sequence.
+ * @param parameter_bytes The parameter bytes to parse the tilde key from.
+ * @return The parsed tilde key.
+ * @throws std::runtime_error if there are no parameter bytes.
+ */
 auto parse_tilde(std::string parameter_bytes) -> esc::Key
 {
-    if (parameter_count(parameter_bytes) == 0)
+    if (parameter_count(parameter_bytes) == 0) {
         throw std::runtime_error{"io.cpp: parse_tilde: No Parameter Bytes"};
+    }
     return static_cast<esc::Key>(127 + parameter<int, 0>(parameter_bytes));
 }
 
-auto parse_key(Control_sequence cs) -> esc::Key
+/**
+ * Parses a key from a control sequence.
+ * @param cs The control sequence to parse the key from.
+ * @return The parsed key.
+ * @throws std::runtime_error if the final byte is unknown or there is a parsing
+ *         error.
+ */
+auto parse_key(ControlSequence cs) -> esc::Key
 {
     switch (cs.final_byte) {
         using Key = esc::Key;
@@ -428,10 +523,17 @@ auto parse_key(Control_sequence cs) -> esc::Key
                              std::string(1, cs.final_byte)};
 }
 
+/**
+ * Parses the key modifiers from a control sequence.
+ * @param parameter_bytes The parameter bytes to parse the key modifiers from.
+ * @return The parsed key modifiers.
+ * @throws std::runtime_error if the parameter bytes are empty.
+ */
 auto parse_key_modifiers(std::string parameter_bytes) -> esc::Mod
 {
-    if (parameter_count(parameter_bytes) < 2)
+    if (parameter_count(parameter_bytes) < 2) {
         return static_cast<esc::Mod>(0);
+    }
     auto const mod = parameter<int, 1>(parameter_bytes);
     switch (mod) {
         using esc::Mod;
@@ -455,24 +557,48 @@ auto parse_key_modifiers(std::string parameter_bytes) -> esc::Mod
                              std::to_string(mod)};
 }
 
-auto parse(Control_sequence const& cs) -> esc::Event
+/**
+ * Parses a control sequence into an Event.
+ * @details This will only produce a mouse or key event.
+ * @param cs The control sequence to parse.
+ * @return The parsed Event.
+ */
+auto parse(ControlSequence const& cs) -> esc::Event
 {
-    if (cs.final_byte == 'M' || cs.final_byte == 'm')
+    if (cs.final_byte == 'M' || cs.final_byte == 'm') {
         return parse_mouse(cs);
+    }
     return esc::KeyPress{parse_key(cs) |
                          parse_key_modifiers(cs.parameter_bytes)};
 }
 
+/**
+ * Parses an escaped character into an Event.
+ * @details This will only produce a key press event.
+ * @param e The escaped character to parse.
+ * @return The parsed Event.
+ */
 auto parse(Escaped e) -> esc::Event
 {
     return esc::KeyPress{static_cast<esc::Key>(e.character)};
 }
 
+/**
+ * Parses a UTF8 character into an Event.
+ * @details This will only produce a key press event.
+ * @param x The UTF8 character to parse.
+ * @return The parsed Event.
+ */
 auto parse(UTF8 x) -> esc::Event
 {
     return esc::KeyPress{esc::char32_to_key(esc::detail::u8_to_u32(x.bytes))};
 }
 
+/**
+ * Parses a window resize token into an Event.
+ * @param w The window resize token.
+ * @return The parsed Event.
+ */
 auto parse(Window) -> esc::Event { return esc::Resize{esc::terminal_area()}; }
 
 // Lexer -----------------------------------------------------------------------
@@ -495,6 +621,12 @@ struct CSI {
     std::string value;
 };
 
+/**
+ * Used to parse a control sequence from the terminal.
+ *
+ * @details Creates a state machine to do the parsing with this variant and the
+ * next_state function overloads.
+ */
 using Lexer =
     std::variant<Initial, Final, Escape, Maybe_escaped, Maybe_CSI, CSI, UTF8>;
 
@@ -513,10 +645,12 @@ auto next_state(Initial) -> Lexer
             return Final{Window{}};
         }
         if (auto const b = read_byte(STDIN_FILENO, timeout); b.has_value()) {
-            if (*b == escape)
+            if (*b == escape) {
                 return Escape{};
-            else
+            }
+            else {
                 return UTF8{{*b}};
+            }
         }
     }
 }
@@ -525,47 +659,67 @@ auto next_state(Final f) -> Lexer { return f; }
 
 auto next_state(Escape) -> Lexer
 {
-    if (is_stdin_empty(0))
+    if (is_stdin_empty(0)) {
         return Final{UTF8{{escape}}};
-    else
+    }
+    else {
         return Maybe_escaped{};
+    }
 }
 
 auto next_state(Maybe_escaped) -> Lexer
 {
     auto const c = read_byte(STDIN_FILENO);
-    if (c != '[' && c != 'O')
+    if (c != '[' && c != 'O') {
         return Final{Escaped{(char)c}};
-    else
+    }
+    else {
         return Maybe_CSI{(char)c};
+    }
 }
 
 auto next_state(Maybe_CSI state) -> Lexer
 {
-    if (is_stdin_empty(0))
+    if (is_stdin_empty(0)) {
         return Final{Escaped{state.c}};
-    else
+    }
+    else {
         return CSI{""};
+    }
 }
 
 auto next_state(CSI const& state) -> Lexer
 {
     auto const b = read_byte(STDIN_FILENO);
-    if (b >= 0x40 && b <= 0x7E)
-        return Final{Control_sequence{state.value + (char)b}};
-    else
+    if (b >= 0x40 && b <= 0x7E) {
+        return Final{ControlSequence{state.value + (char)b}};
+    }
+    else {
         return CSI{state.value + std::string(1, b)};
+    }
 }
 
-// Returns 1 if all set bits in \p mask match up with set bits in value, zeros
-// in the mask are treated as wildcards and can be anything in \p value.
+/**
+ * Returns 1 if all set bits in \p mask match up with set bits in value, zeros
+ * in mask are treated as wildcards and can be anything in \p value.
+ *
+ * @param mask The mask to compare with.
+ * @param value The value to compare with.
+ * @return 1 if all set bits in \p mask match up with set bits in \p value, 0
+ *         otherwise.
+ */
 auto matches_mask(std::uint8_t mask, char value) -> std::uint8_t
 {
     return static_cast<std::uint8_t>((mask & value) == mask);
 }
 
-/// Returns the number of bytes left to read to form a complete utf8 character.
-/** Should be branchless. */
+/**
+ * Returns the number of bytes left to read to form a complete utf8 character.
+ * @param first The first byte of the utf8 character.
+ * @return The number of bytes left to read to form a complete utf8 character.
+ * @details This function is branchless.
+ * @see https://en.wikipedia.org/wiki/UTF-8
+ */
 auto bytes_left_to_read(char first) -> std::uint8_t
 {
     // utf8 initial bytes
@@ -582,39 +736,61 @@ auto bytes_left_to_read(char first) -> std::uint8_t
 auto next_state(UTF8 state) -> Lexer
 {
     auto index = 1;
-    for (auto count = bytes_left_to_read(state.bytes[0]); count != 0; --count)
+    for (auto count = bytes_left_to_read(state.bytes[0]); count != 0; --count) {
         state.bytes[index++] = read_byte(STDIN_FILENO);
+    }
     return Final{state};
 }
 
 // -----------------------------------------------------------------------------
 
-/// Read a single input command from the terminal.
+/**
+ * Read a single input command from the terminal.
+ * @details This function will block until a command is read from the terminal.
+ * @return The command read from the terminal as a Token.
+ */
 auto read_single_token() -> Token
 {
     auto state = Lexer{Initial{}};
-    while (!std::holds_alternative<Final>(state))
+    while (!std::holds_alternative<Final>(state)) {
         state = std::visit([](auto s) { return next_state(s); }, state);
+    }
     return std::get<Final>(state).result;
 }
 
 // -----------------------------------------------------------------------------
 
 /// Read a single Event from stdin.
+
+/**
+ * Read a single Event from stdin.
+ *
+ * @details This reads a Token from the terminal and then parses it into an
+ *          Event.
+ * @return The Event read from stdin.
+ */
 [[nodiscard]] auto do_blocking_read() -> esc::Event
 {
     auto const token = read_single_token();
     return std::visit([](auto t) { return parse(t); }, token);
 }
 
-/// Return true if \p byte is a key release or false if it is a key press.
+/**
+ * Check if a byte is a key release or a key press.
+ * @param byte The byte to check.
+ * @return True if \p byte is a key release, false if it is a key press.
+ */
 [[nodiscard]] auto is_release(unsigned char byte) -> bool
 {
     return byte & 0x80;
 }
 
-/// Read and parse a keyboard scancode into a KeyPress or a KeyRelease event.
-/** Throws std::runtime_error if read fails. */
+/**
+ * Read and parse a keyboard scancode into a KeyPress or a KeyRelease event.
+ * @param fd The file descriptor to read the scancode from.
+ * @return The parsed Event.
+ * @throws std::runtime_error if the read fails.
+ */
 [[nodiscard]] auto read_and_parse_scancode(int fd) -> std::optional<esc::Event>
 {
     // TODO Cleanup and insert and delete don't quite work.
@@ -628,25 +804,30 @@ auto read_single_token() -> Token
             // Print Screen Press: e0 2a e0 37
             if (byte2 == 0x2A) {
                 if (auto const byte3 = read_byte(fd); byte3 == 0xE0) {
-                    if (auto const byte4 = read_byte(fd); byte4 == 0x37)
+                    if (auto const byte4 = read_byte(fd); byte4 == 0x37) {
                         return KeyPress{Key::Print_screen};
+                    }
                 }
             }
             // Print Screen Release: e0 2a+0x80 e0 37+0x80
             else if ((byte2 - 0x80) == 0x2A) {
                 if (auto const byte3 = read_byte(fd); byte3 == 0xE0) {
-                    if (auto const byte4 = read_byte(fd) - 0x80; byte4 == 0x37)
+                    if (auto const byte4 = read_byte(fd) - 0x80;
+                        byte4 == 0x37) {
                         return KeyRelease{Key::Print_screen};
+                    }
                 }
             }
 
             // Print Screen w/Shift: e0 37
-            else if (byte2 == 0x37)
+            else if (byte2 == 0x37) {
                 return KeyPress{Key::Print_screen_shift};
+            }
 
             // Print Screen w/Shift: e0 37+0x80
-            else if ((byte2 & 0x7F) == 0x37)
+            else if ((byte2 & 0x7F) == 0x37) {
                 return KeyRelease{Key::Print_screen_shift};
+            }
 
             // Pause w/left or right ctrl: e0 46 e0 c6
             else if (byte2 == 0x46) {
@@ -686,8 +867,9 @@ auto read_single_token() -> Token
                     }
                 }
             }
-            if (key_byte > 0x53)
+            if (key_byte > 0x53) {
                 return std::nullopt;
+            }
             return is_release(byte2)
                        ? Event{KeyRelease{escape_keymap[key_byte - 0x1C]}}
                        : Event{KeyPress{escape_keymap[key_byte - 0x1C]}};
@@ -713,8 +895,12 @@ auto read_single_token() -> Token
     }
 }
 
-/// Blocks until timeout for a read available for either file descriptor.
-/** Returns the file descriptor that is ready, or -1 if timeout or error. */
+/**
+ * Blocks until a read is available for either file descriptor.
+ * @param fd_a The first file descriptor to check for readability.
+ * @return The file descriptor that is ready, or -1 if timeout or error.
+ * @throws std::runtime_error if there is an error polling the file descriptors.
+ */
 [[nodiscard]] auto timeout_wait_for_reads(int fd_a, int fd_b, int timeout_ms)
     -> int
 {
@@ -725,48 +911,71 @@ auto read_single_token() -> Token
     auto const result = poll(files.data(), files.size(), timeout_ms);
 
     if (result == error) {
-        if (errno == EINTR)  // A signal interrupted poll.
+        if (errno == EINTR) {  // A signal interrupted poll.
             return -1;
+        }
         throw std::runtime_error{"timeout_wait_for_reads(): Poll Error"};
     }
-    if (result == timeout)
+    if (result == timeout) {
         return -1;
-    if (result > 0 && static_cast<bool>(files[0].revents & POLLIN))
+    }
+    if (result > 0 && static_cast<bool>(files[0].revents & POLLIN)) {
         return fd_a;
-    if (result > 0 && static_cast<bool>(files[1].revents & POLLIN))
+    }
+    if (result > 0 && static_cast<bool>(files[1].revents & POLLIN)) {
         return fd_b;
+    }
     throw std::logic_error{"timeout_wait_for_reads(): logic_error."};
 }
 
-/// Blocks until a read is available for either file descriptor.
-/** Returns the file descriptor that is ready. */
+/**
+ * Blocks until a read is available for either file descriptor.
+ * @param fd_a The first file descriptor to check for readability.
+ * @param fd_b The second file descriptor to check for readability.
+ * @return The file descriptor that is ready.
+ */
 [[nodiscard]] auto blocking_wait_for_reads(int fd_a, int fd_b) -> int
 {
-    return timeout_wait_for_reads(fd_a, fd_b,
-                                  -1);  // -1 inf timeout
+    // -1 inf timeout
+    return timeout_wait_for_reads(fd_a, fd_b, -1);
 }
 
-/// Read an event in alt mode, returns std::nullopt on non-event reads.
-/** non-event reads are KeyPress events on stdin, and nullopt from tty. */
+/**
+ * Read an event in alt mode, returns std::nullopt on non-event reads.
+ *
+ * @details Non-event reads are KeyPress events on stdin, and std::nullopt from
+ *          tty.
+ * @return The event read from stdin or tty, or std::nullopt if the read was not
+ *         an event.
+ * @throws std::logic_error if the file descriptor is not stdin or tty.
+ */
 [[nodiscard]] auto do_maybe_alt_blocking_read() -> std::optional<esc::Event>
 {
     auto const file = blocking_wait_for_reads(
         STDIN_FILENO, *esc::detail::tty_file_descriptor);
     if (file == STDIN_FILENO) {
         auto const event = do_blocking_read();
-        if (std::holds_alternative<esc::KeyPress>(event))
+        if (std::holds_alternative<esc::KeyPress>(event)) {
             return std::nullopt;
-        else
+        }
+        else {
             return event;
+        }
     }
-    else if (file == *esc::detail::tty_file_descriptor)
+    else if (file == *esc::detail::tty_file_descriptor) {
         return read_and_parse_scancode(*esc::detail::tty_file_descriptor);
-    else
+    }
+    else {
         throw std::logic_error{"do_maybe_alt_blocking_read(): signal int."};
+    }
 }
 
-/// Read an event in alt mode, throws out stdin key press events. Reads from tty
-/** Waits until an actual event is ready, throwing out non-event reads. */
+/**
+ * Read an event in alt mode, throws out stdin key press events. Reads from tty.
+ *
+ * @details Waits until an actual event is ready, throwing out non-event reads.
+ * @return The event read from stdin or tty.
+ */
 [[nodiscard]] auto do_alt_blocking_read() -> esc::Event
 {
     while (true) {
@@ -774,29 +983,39 @@ auto read_single_token() -> Token
             STDIN_FILENO, *esc::detail::tty_file_descriptor);
         if (window_resize_sig == 1 || file == STDIN_FILENO) {
             auto const event = do_blocking_read();
-            if (std::holds_alternative<esc::KeyPress>(event))
+            if (std::holds_alternative<esc::KeyPress>(event)) {
                 continue;
-            else
+            }
+            else {
                 return event;
+            }
         }
         else if (file == *esc::detail::tty_file_descriptor) {
             auto const event =
                 read_and_parse_scancode(*esc::detail::tty_file_descriptor);
-            if (event.has_value())
+            if (event.has_value()) {
                 return *event;
-            else
+            }
+            else {
                 continue;
+            }
         }
     }
 }
 
-/// Read a single event from stdin with timeout returning
-/// std::nullopt.
+/**
+ * Read a single event from stdin with a timeout, returning std::nullopt if no
+ * event is read.
+ *
+ * @param millisecond_timeout The maximum time to wait for an event to be read.
+ * @return The event read from stdin, or std::nullopt if no event is read.
+ */
 [[nodiscard]] auto do_timeout_read(int millisecond_timeout)
     -> std::optional<esc::Event>
 {
-    if (window_resize_sig == 1 || !is_stdin_empty(millisecond_timeout))
+    if (window_resize_sig == 1 || !is_stdin_empty(millisecond_timeout)) {
         return esc::read();
+    }
     return std::nullopt;
 }
 
@@ -804,6 +1023,16 @@ auto read_single_token() -> Token
 /** Assumes the tty_file_descriptor is valid. Returns std::nullopt if nothing
  *  was read in the given timeout time. Can return earlier than timeout with
  *  std::nullopt. */
+
+/**
+ * Reads a single token from either STDIN_FILENO or detail::tty_file_descriptor.
+ * @details Assumes the tty_file_descriptor is valid. Returns std::nullopt if
+ *         nothing was read in the given timeout time. Can return earlier than
+ *         timeout with std::nullopt.
+ * @param millisecond_timeout The maximum time to wait for a token to be read.
+ * @return The token read from STDIN_FILENO or detail::tty_file_descriptor, or
+ *         std::nullopt if no token is read.
+ */
 [[nodiscard]] auto do_alt_timeout_read(int millisecond_timeout)
     -> std::optional<esc::Event>
 {
@@ -811,13 +1040,16 @@ auto read_single_token() -> Token
         STDIN_FILENO, *esc::detail::tty_file_descriptor, millisecond_timeout);
     if (file == STDIN_FILENO) {
         auto const result = do_blocking_read();
-        if (std::holds_alternative<esc::KeyPress>(result))
+        if (std::holds_alternative<esc::KeyPress>(result)) {
             return std::nullopt;
-        else
+        }
+        else {
             return result;
+        }
     }
-    else if (file == *esc::detail::tty_file_descriptor)
+    else if (file == *esc::detail::tty_file_descriptor) {
         return do_maybe_alt_blocking_read();
+    }
     return std::nullopt;
 }
 
@@ -851,18 +1083,22 @@ void flush() { std::fflush(::stdout); }
 
 auto read() -> Event
 {
-    if (detail::tty_file_descriptor.has_value())
+    if (detail::tty_file_descriptor.has_value()) {
         return do_alt_blocking_read();
-    else
+    }
+    else {
         return do_blocking_read();
+    }
 }
 
 auto read(int millisecond_timeout) -> std::optional<Event>
 {
-    if (detail::tty_file_descriptor.has_value())
+    if (detail::tty_file_descriptor.has_value()) {
         return do_alt_timeout_read(millisecond_timeout);
-    else
+    }
+    else {
         return do_timeout_read(millisecond_timeout);
+    }
 }
 
 }  // namespace esc

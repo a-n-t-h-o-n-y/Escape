@@ -2,38 +2,47 @@
 
 __Terminal Escape Sequence Library__
 
-Consists mainly of functions returning escape sequence strings, that, when
-written to stdout, will alter the appearance or functionality of the terminal
-emulator.
+This library provides support for generating terminal escape sequences. These
+sequences, when written to `stdout`, enable control over terminal visual
+presentation and behavior.
 
-Also provides a read() function that returns an Event variant for keyboard,
-mouse and window resize events.
+## Features
 
-This library tries to be as general as possible and work with as many terminals
-as possible without relying on the terminfo database.
-
-Please open an issue if you find any bugs.
-
-Note that not all terminals implement these features in the same way.
+- **Dynamic Terminal Control**: Generate escape sequences for cursor movement, text formatting, color settings, and more.
+- **Event Handling**: Includes a `read()` function to handle keyboard, mouse inputs, and window resize events, enhancing interactive applications.
+- **Cross-Terminal Compatibility**: Designed to work across various terminals without relying on a terminfo database.
 
 ## Dependencies
 
-- [ICU Library](https://icu.unicode.org/)
+- [ICU Library](https://icu.unicode.org/): For Unicode support.
 
-## Future Features
+## Example Code
 
-- Add `Terminal_focus_in` and `Terminal_focus_out` Events that are triggered on
-  `CSI I` and `CSI O` input sequences. Enabled by Focus Event Mouse 1004. Only
-  if most terminal emulators support this.
+- [tools/termcaps.cpp](./tools/termcaps.cpp)
+- [tests/glyph.test.cpp](./tests/glyph.test.cpp)
 
-- Add BELL modifier sequences for frequency and duration.
+## Planned Enhancements
 
-- Check MacOS support
+- **Focus Events**: Integrate `TerminalFocusIn` and `TerminalFocusOut` events
+for focus tracking. Events are triggered on `CSI I` and `CSI O` input sequences,
+enabled by Focus Event Mouse 1004. Dependent on widespread terminal emulator
+support.
+- **BELL Sequences**: Add BELL sequences to adjust alert frequency and duration.
+- **MacOS Compatibility**: Ensure full support across MacOS terminals.
+- **Sixel Graphics**: Explore incorporating Sixel graphics for advanced terminal
+imaging, contingent on emulator compatibility.
 
-- Sixel graphics, but only if most terminal emulators support this.
+## Current Limitations
 
-## Known Issues
+- **Incompatible Terminals**: Known issues with `aterm` and `eterm`.
+- **Mouse Input Handling**: In Konsole, mouse input is limited to `MouseMode::Drag`.
 
-- Does not work with: aterm, eterm
+## Contributing
 
-- Some terminal emulators(Konsole) mouse input is always in `MouseMode::Drag`.
+Feedback and contributions are highly appreciated. If you encounter any issues
+or have suggestions for improvements, please open an issue on our repository.
+
+## Note
+
+Terminal features and support vary significantly across emulators. It's
+recommended to test functionality in your target environments.

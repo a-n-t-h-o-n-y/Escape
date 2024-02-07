@@ -25,8 +25,10 @@ extern "C" auto sigint_handler(int sig) -> void
     }
 }
 
-/// Set the window_resize_sig flag to true on SIGWINCH signals.
-extern "C" void resize_handler(int sig)
+/**
+ * Set the window_resize_sig flag to true on SIGWINCH signals.
+ */
+extern "C" auto resize_handler(int sig) -> void
 {
     if (sig == SIGWINCH) {
         esc::detail::window_resize_sig = 1;
@@ -45,7 +47,7 @@ namespace esc::detail {
 
 std::sig_atomic_t window_resize_sig = 0;
 
-void register_signals(bool sigint)
+auto register_signals(bool sigint) -> void
 {
 #if !defined(__APPLE__) && !defined(__MACH__)
     std::at_quick_exit(::esc::uninitialize_terminal);

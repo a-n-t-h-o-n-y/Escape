@@ -14,6 +14,7 @@
 #include <esc/detail/is_urxvt.hpp>
 #include <esc/io.hpp>
 #include <esc/mouse.hpp>
+#include <esc/terminfo.hpp>
 
 #include "detail/tty_file.hpp"
 #include "esc/detail/signals.hpp"
@@ -34,9 +35,15 @@ void fix_ctrl_m()
     ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &settings);
 }
 
-[[nodiscard]] auto turn_off_auto_wrap() -> std::string { return "\033[?7l"; }
+[[nodiscard]] constexpr auto turn_off_auto_wrap() -> std::string
+{
+    return "\033[?7l";
+}
 
-[[nodiscard]] auto turn_on_auto_wrap() -> std::string { return "\033[?7h"; }
+[[nodiscard]] constexpr auto turn_on_auto_wrap() -> std::string
+{
+    return "\033[?7h";
+}
 
 auto original_termios = ::termios{};
 
@@ -44,43 +51,36 @@ auto original_termios = ::termios{};
 
 namespace esc {
 
-void set(Echo e)
+void set(Echo x)
 {
-    auto const echo_flag = [e] {
-        if (e == esc::Echo::On)
-            return ECHO;
-        else
-            return ~(ECHO);
-    }();
+    auto const echo_flag = (x == Echo::On) ? ECHO : ~ECHO;
 
     auto settings = current_termios();
     settings.c_lflag &= echo_flag;
     ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &settings);
 }
 
-void set(Input_buffer ib)
+void set(InputBuffer x)
 {
-    auto const canon_flag =
-        (ib == esc::Input_buffer::Canonical) ? ICANON : ~(ICANON);
+    auto const canon_flag = (x == InputBuffer::Canonical) ? ICANON : ~(ICANON);
 
     auto settings = current_termios();
     settings.c_lflag &= canon_flag;
-    if (ib == esc::Input_buffer::Immediate)
+    if (x == InputBuffer::Immediate) {
         settings.c_cc[VMIN] = 1;  // Min. number of bytes before sending.
+    }
     ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &settings);
 }
 
-void set(Signals s)
+void set(Signals x)
 {
     // ctrl-c, ctrl-z, ctrl-s, ctrl-q, ctrl-v all send their ctrl byte value
     // rather than changing the terminal's behaviour.
-    auto const [lflags, iflags] = [s] {
+    auto const [lflags, iflags] = [x] {
         auto const lflags = ISIG | IEXTEN;
         auto const iflags = IXON;
-        if (s == esc::Signals::On)
-            return std::pair{lflags, iflags};
-        else
-            return std::pair{~(lflags), ~(iflags)};
+        return (x == Signals::On) ? std::pair{lflags, iflags}
+                                  : std::pair{~lflags, ~iflags};
     }();
 
     auto settings = current_termios();
@@ -89,15 +89,15 @@ void set(Signals s)
     ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &settings);
 }
 
-void set(Screen_buffer sb)
+void set(ScreenBuffer x)
 {
-    switch (sb) {
-        case Screen_buffer::Normal:
+    switch (x) {
+        case ScreenBuffer::Normal:
             write(
                 "\033["
                 "?1049l");
             break;
-        case Screen_buffer::Alternate:
+        case ScreenBuffer::Alternate:
             write(
                 "\033["
                 "?1049h");
@@ -105,14 +105,14 @@ void set(Screen_buffer sb)
     }
 }
 
-void set(KeyMode km)
+void set(KeyMode x)
 {
     // TODO implementation is messy, depends on call order.
 
     // from linux/kd.h
     constexpr auto k_xlate = 0x01;
     constexpr auto k_raw   = 0x00;
-    switch (km) {
+    switch (x) {
         case KeyMode::Normal:
             if (detail::tty_file_descriptor.has_value()) {
                 detail::set_keyboard_mode(*detail::tty_file_descriptor,
@@ -126,9 +126,9 @@ void set(KeyMode km)
     }
 }
 
-void set(Cursor c)
+void set(Cursor x)
 {
-    switch (c) {
+    switch (x) {
         case Cursor::Show:
             write(
                 "\033["
@@ -142,12 +142,12 @@ void set(Cursor c)
     }
 }
 
-void set(MouseMode mm)
+void set(MouseMode x)
 {
     auto const ext_mode = detail::is_urxvt(TERM_var()) ? "1015" : "1006";
 
     auto result = std::string{};
-    switch (mm) {
+    switch (x) {
         case MouseMode::Off:
             result.append("\033[?1000;1002;1003;").append(ext_mode).append("l");
             break;
@@ -167,11 +167,11 @@ void set(MouseMode mm)
     write(result);
 }
 
-void initialize_terminal(Screen_buffer screen_buffer,
+void initialize_terminal(ScreenBuffer screen_buffer,
                          MouseMode mouse_mode,
                          Cursor cursor,
                          Echo echo,
-                         Input_buffer input_buffer,
+                         InputBuffer input_buffer,
                          Signals signals,
                          KeyMode key_mode,
                          bool sigint_uninit)
@@ -202,8 +202,8 @@ void initialize_terminal(Screen_buffer screen_buffer,
 
 void initialize_normal_terminal()
 {
-    initialize_terminal(Screen_buffer::Normal, MouseMode::Off, Cursor::Show,
-                        Echo::On, Input_buffer::Canonical, Signals::On,
+    initialize_terminal(ScreenBuffer::Normal, MouseMode::Off, Cursor::Show,
+                        Echo::On, InputBuffer::Canonical, Signals::On,
                         KeyMode::Normal);
 }
 
@@ -211,8 +211,8 @@ void initialize_interactive_terminal(MouseMode mouse_mode,
                                      KeyMode key_mode,
                                      Signals signals)
 {
-    initialize_terminal(Screen_buffer::Alternate, mouse_mode, Cursor::Hide,
-                        Echo::Off, Input_buffer::Immediate, signals, key_mode);
+    initialize_terminal(ScreenBuffer::Alternate, mouse_mode, Cursor::Hide,
+                        Echo::Off, InputBuffer::Immediate, signals, key_mode);
 }
 
 void uninitialize_terminal()
@@ -220,9 +220,12 @@ void uninitialize_terminal()
     // TODO take settings parameter and use that to reset the terminal to
     // settings before.
     write(turn_on_auto_wrap());
-    set(Screen_buffer::Normal, MouseMode::Off, Cursor::Show, KeyMode::Normal);
+    set(ScreenBuffer::Normal, MouseMode::Off, Cursor::Show, KeyMode::Normal);
     flush();
     ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &original_termios);
+    if (detail::tty_file_descriptor.has_value()) {
+        close(detail::tty_file_descriptor.value());
+    }
 }
 
 auto terminal_width() -> int
@@ -247,6 +250,12 @@ auto terminal_height() -> int
     return w.ws_row;
 }
 
-auto terminal_area() -> Area { return {terminal_width(), terminal_height()}; }
+auto terminal_area() -> Area
+{
+    return {
+        .width  = terminal_width(),
+        .height = terminal_height(),
+    };
+}
 
 }  // namespace esc

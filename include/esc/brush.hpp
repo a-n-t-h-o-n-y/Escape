@@ -1,13 +1,16 @@
 #pragma once
 
 #include <esc/color.hpp>
-#include <esc/default_color.hpp>
 #include <esc/trait.hpp>
 
 namespace esc {
 
-/// Convenience type to hold visual aspects of the terminal display.
-/** use set_brush() */
+/**
+ * Represents characteristics of the terminal display for text.
+ *
+ * @details An escape sequence can be generated from this type using
+ *          escape(Brush) in sequence.hpp
+ */
 struct Brush {
     Color background = DefaultColor{};
     Color foreground = DefaultColor{};

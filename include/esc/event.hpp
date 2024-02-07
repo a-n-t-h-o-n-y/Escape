@@ -8,43 +8,59 @@
 
 namespace esc {
 
-/// Mouse Button Pressed
+/**
+ * Mouse button pressed event.
+ */
 struct MousePress {
     Mouse mouse;
 };
 
-/// Mouse Button Released
+/**
+ * Mouse button released event.
+ */
 struct MouseRelease {
     Mouse mouse;
 };
 
-/// Mouse Wheel Scrolled
+/**
+ * Mouse wheel scrolled event.
+ */
 struct MouseWheel {
     Mouse mouse;
 };
 
-/// Mouse Pointer Moved
+/**
+ * Mouse pointer moved event.
+ */
 struct MouseMove {
     Mouse mouse;
 };
 
-/// Key Press Event
+/**
+ * Key press event.
+ */
 struct KeyPress {
     Key key;
 };
 
-/// Key Release Event
-/** Only used with KeyMode::Alternate set. */
+/**
+ * Key release event.
+ * @details Only used with KeyMode::Alternate set.
+ */
 struct KeyRelease {
     Key key;
 };
 
-/// Terminal Window Resized
+/**
+ * Terminal window resized event.
+ */
 struct Resize {
     Area area;
 };
 
-/// Any input event type that can be returned from esc::read().
+/**
+ * Any input event type that can be returned from esc::read().
+ */
 using Event = std::variant<MousePress,
                            MouseRelease,
                            MouseWheel,

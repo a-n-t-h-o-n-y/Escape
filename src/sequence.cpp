@@ -1,35 +1,91 @@
 #include <esc/sequence.hpp>
 
+#include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <variant>
 
-#include <esc/detail/traits_to_int_sequence.hpp>
 #include <esc/detail/transcode.hpp>
+#include <esc/trait.hpp>
 
 namespace {
 
-// Modifiable currently set Traits & Colors, yes, they are global to this TU.
+// Mutable, currently set Traits & Colors. Yes, they are global to this TU.
 auto current_traits     = esc::Traits{esc::Trait::None};
 auto current_background = esc::Color{esc::DefaultColor{}};
 auto current_foreground = esc::Color{esc::DefaultColor{}};
+
+/**
+ * Translate a single Trait into its control sequence parameter integer.
+ *
+ * @details Returns empty string for Trait::None.
+ * @param   t The Trait to translate.
+ * @return  The control sequence parameter int as string.
+ * @throws  std::runtime_error If the Trait is invalid.
+ */
+auto trait_to_int_sequence(esc::Trait t) -> std::string
+{
+    using esc::Trait;
+    switch (t) {
+        case Trait::Standout:
+            return trait_to_int_sequence(Trait::Bold) + ';' +
+                   trait_to_int_sequence(Trait::Inverse);
+        case Trait::None: return "";
+        case Trait::Bold: return "1";
+        case Trait::Dim: return "2";
+        case Trait::Italic: return "3";
+        case Trait::Underline: return "4";
+        case Trait::Blink: return "5";
+        case Trait::Inverse: return "7";
+        case Trait::Invisible: return "8";
+        case Trait::Crossed_out: return "9";
+        case Trait::Double_underline: return "21";
+    }
+    throw std::runtime_error{"traits_to_int_sequence: Invalid Trait Value"};
+}
+
+/**
+ * Turn a mask of traits into a string control sequence of parameter integers.
+ *
+ * @param  traits The traits to translate.
+ * @return The control sequence parameter integers as a string.
+ * @throws std::logic_error If a Trait is invalid.
+ */
+auto traits_to_int_sequence(esc::Traits traits) -> std::string
+{
+    using esc::Trait;
+    auto constexpr last_trait = 512;
+
+    auto result = std::string{};
+    for (auto i = std::underlying_type_t<Trait>{1}; i <= last_trait; i <<= 1) {
+        if (auto const t = static_cast<Trait>(i); traits.contains(t)) {
+            result.append(trait_to_int_sequence(t));
+            result.push_back(';');
+        }
+    }
+    if (!result.empty()) {
+        result.pop_back();  // Remove last semi-colon.
+    }
+    return result;
+}
 
 }  // namespace
 
 namespace esc {
 
-auto escape(Cursor_position p) -> std::string
+auto escape(CursorPosition p) -> std::string
 {
     return "\033[" + std::to_string(p.at.y + 1) + ';' +
            std::to_string(p.at.x + 1) + 'H';
 }
 
-auto escape(Blank_row) -> std::string
+auto escape(BlankRow) -> std::string
 {
     return "\033["
            "2K";
 }
 
-auto escape(Blank_screen) -> std::string
+auto escape(BlankScreen) -> std::string
 {
     return "\033["
            "?2J";
@@ -46,8 +102,7 @@ auto escape(Traits traits) -> std::string
     else {
         return "\033["
                "22;23;24;25;27;28;29;" +
-               detail::traits_to_int_sequence(traits) + 'm';
-        // TODO maybe anon namespace instead of detail? if only used here.
+               ::traits_to_int_sequence(traits) + 'm';
     }
 }
 

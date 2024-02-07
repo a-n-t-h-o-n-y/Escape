@@ -4,22 +4,28 @@
 #include <array>
 #include <cstdint>
 #include <cstdlib>
+#include <iterator>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 
 namespace {
 
-/// Very basic info about a particular terminal emulator.
-/** Currently just color_palette_size. Was going to contain supported mouse
- *  modes, but terminfo doesn't seem to have that. */
+/**
+ * Very basic info about a particular terminal emulator.
+ *
+ * @details Currently just color_palette_size. Was going to contain supported
+ *          mouse modes, but terminfo doesn't seem to have that.
+ */
 struct Terminfo {
     std::string_view TERM_name;
     std::uint16_t color_palette_size;
 };
 
-/// Small database of term names and color counts.
-/** Generated with tools/terminfo.sh */
+/**
+ * Small database of term names and color counts.
+ * @details Generated with tools/terminfo.sh
+ */
 inline auto const terminfo_db = std::array<Terminfo, 140>{
     Terminfo{"xterm-256color", 256},
     Terminfo{"tmux-256color", 256},
@@ -163,18 +169,30 @@ inline auto const terminfo_db = std::array<Terminfo, 140>{
     Terminfo{"cons25", 8},
 };
 
+/**
+ * Find the terminfo for the given term_name using the terminfo_db object.
+ *
+ * @param  term_name The name of the terminal to find.
+ * @return The terminfo for the given term_name.
+ * @throws std::runtime_error if term_name is not found.
+ */
 [[nodiscard]] auto find_terminfo(std::string_view term_name) -> Terminfo
 {
-    auto at = std::find_if(
-        std::cbegin(terminfo_db), std::cend(terminfo_db),
-        [&term_name](auto const& ti) { return ti.TERM_name == term_name; });
+    auto const at = std::ranges::find_if(terminfo_db, [term_name](auto ti) {
+        return ti.TERM_name == term_name;
+    });
     if (at == std::cend(terminfo_db)) {
         throw std::runtime_error{"find_terminfo(): term_name not found."};
     }
     return *at;
 }
 
-/// Return env variable, or empty string if it doesn't exist.
+/**
+ * Return the value of the given environment variable.
+ * @param  name The name of the environment variable to get.
+ * @return The value of the environment variable, or an empty string if not
+ *         found.
+ */
 auto get_env(char const* name) -> std::string
 {
     char const* const v = std::getenv(name);
