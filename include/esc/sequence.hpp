@@ -129,7 +129,7 @@ struct BlankScreen {};
  * @return The control sequence to set the background to the specified xterm
  *         palette index.
  */
-[[nodiscard]] auto escape_bg(ColorIndex c) -> std::string;
+[[nodiscard]] auto escape_bg(XColor c) -> std::string;
 
 /**
  * Get the control sequence to set the background to the specified terminal true
@@ -175,7 +175,7 @@ struct BlankScreen {};
  * @param  c The xterm palette index to set the foreground to.
  * @return The control sequence to set the foreground to the specified xterm
  */
-[[nodiscard]] auto escape_fg(ColorIndex c) -> std::string;
+[[nodiscard]] auto escape_fg(XColor c) -> std::string;
 
 /**
  * Get the control sequence to set the foreground to the specified terminal true

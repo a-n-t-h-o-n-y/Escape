@@ -125,7 +125,7 @@ auto escape(ColorBG c) -> std::string
     return std::visit([](auto c) { return escape_bg(c); }, c.value);
 }
 
-auto escape_bg(ColorIndex c) -> std::string
+auto escape_bg(XColor c) -> std::string
 {
     ::current_background = c;
     return "\033["
@@ -156,7 +156,7 @@ auto escape(ColorFG c) -> std::string
     return std::visit([](auto c) { return escape_fg(c); }, c.value);
 }
 
-auto escape_fg(ColorIndex c) -> std::string
+auto escape_fg(XColor c) -> std::string
 {
     ::current_foreground = c;
     return "\033["

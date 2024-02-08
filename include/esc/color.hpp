@@ -34,47 +34,47 @@ struct DefaultColor {
  * @see https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit
  * @see https://www.ditig.com/publications/256-colors-cheat-sheet
  */
-struct ColorIndex {
+struct XColor {
     std::uint8_t value;
 
-    static ColorIndex const Black;
-    static ColorIndex const Red;
-    static ColorIndex const Green;
-    static ColorIndex const Yellow;
-    static ColorIndex const Blue;
-    static ColorIndex const Magenta;
-    static ColorIndex const Cyan;
-    static ColorIndex const White;
-    static ColorIndex const BrightBlack;
-    static ColorIndex const BrightRed;
-    static ColorIndex const BrightGreen;
-    static ColorIndex const BrightYellow;
-    static ColorIndex const BrightBlue;
-    static ColorIndex const BrightMagenta;
-    static ColorIndex const BrightCyan;
-    static ColorIndex const BrightWhite;
+    static XColor const Black;
+    static XColor const Red;
+    static XColor const Green;
+    static XColor const Yellow;
+    static XColor const Blue;
+    static XColor const Magenta;
+    static XColor const Cyan;
+    static XColor const White;
+    static XColor const BrightBlack;
+    static XColor const BrightRed;
+    static XColor const BrightGreen;
+    static XColor const BrightYellow;
+    static XColor const BrightBlue;
+    static XColor const BrightMagenta;
+    static XColor const BrightCyan;
+    static XColor const BrightWhite;
 
-    [[nodiscard]] constexpr bool operator==(ColorIndex const&) const = default;
-    [[nodiscard]] constexpr bool operator!=(ColorIndex const&) const = default;
+    [[nodiscard]] constexpr bool operator==(XColor const&) const = default;
+    [[nodiscard]] constexpr bool operator!=(XColor const&) const = default;
 };
 
 // Yes, defining constexpr with const declaration is legal here.
-constexpr ColorIndex ColorIndex::Black         = ColorIndex{0};
-constexpr ColorIndex ColorIndex::Red           = ColorIndex{1};
-constexpr ColorIndex ColorIndex::Green         = ColorIndex{2};
-constexpr ColorIndex ColorIndex::Yellow        = ColorIndex{3};
-constexpr ColorIndex ColorIndex::Blue          = ColorIndex{4};
-constexpr ColorIndex ColorIndex::Magenta       = ColorIndex{5};
-constexpr ColorIndex ColorIndex::Cyan          = ColorIndex{6};
-constexpr ColorIndex ColorIndex::White         = ColorIndex{7};
-constexpr ColorIndex ColorIndex::BrightBlack   = ColorIndex{8};
-constexpr ColorIndex ColorIndex::BrightRed     = ColorIndex{9};
-constexpr ColorIndex ColorIndex::BrightGreen   = ColorIndex{10};
-constexpr ColorIndex ColorIndex::BrightYellow  = ColorIndex{11};
-constexpr ColorIndex ColorIndex::BrightBlue    = ColorIndex{12};
-constexpr ColorIndex ColorIndex::BrightMagenta = ColorIndex{13};
-constexpr ColorIndex ColorIndex::BrightCyan    = ColorIndex{14};
-constexpr ColorIndex ColorIndex::BrightWhite   = ColorIndex{15};
+constexpr XColor XColor::Black         = XColor{0};
+constexpr XColor XColor::Red           = XColor{1};
+constexpr XColor XColor::Green         = XColor{2};
+constexpr XColor XColor::Yellow        = XColor{3};
+constexpr XColor XColor::Blue          = XColor{4};
+constexpr XColor XColor::Magenta       = XColor{5};
+constexpr XColor XColor::Cyan          = XColor{6};
+constexpr XColor XColor::White         = XColor{7};
+constexpr XColor XColor::BrightBlack   = XColor{8};
+constexpr XColor XColor::BrightRed     = XColor{9};
+constexpr XColor XColor::BrightGreen   = XColor{10};
+constexpr XColor XColor::BrightYellow  = XColor{11};
+constexpr XColor XColor::BrightBlue    = XColor{12};
+constexpr XColor XColor::BrightMagenta = XColor{13};
+constexpr XColor XColor::BrightCyan    = XColor{14};
+constexpr XColor XColor::BrightWhite   = XColor{15};
 
 // -----------------------------------------------------------------------------
 
@@ -276,7 +276,7 @@ struct TrueColor {
  *
  * @details escape(Color) will generate an escape sequence for the color.
  */
-using Color = std::variant<ColorIndex, TrueColor, DefaultColor>;
+using Color = std::variant<XColor, TrueColor, DefaultColor>;
 
 // -----------------------------------------------------------------------------
 

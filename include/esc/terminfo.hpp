@@ -17,8 +17,8 @@ namespace esc {
 /**
  * Return the number of colors in the terminal's color palette.
  *
- * @details This is the number of possible ColorIndex values that will work with
- *          the current terminal emulator. This is looked up with the TERM env
+ * @details This is the number of possible XColor values that will work with the
+ *          current terminal emulator. This is looked up with the TERM env
  *          variable via the terminfo db. It is not always accurate, as some
  *          terminals are capable of displaying more colors than they report;
  *          this should be seen as a lower bound.

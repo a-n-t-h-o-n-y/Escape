@@ -184,7 +184,7 @@ using namespace esc;
             Cursor{offset},
             Trait::Bold
         ) + "Click to Change Mouse Mode:" +
-        escape(Trait::None) + ' ' + to_string(mm);
+        escape(Trait::None) + ' ' + to_string(mm) + ' ';
 }
 
 [[nodiscard]] auto color_palette_display(Point offset) -> std::string
@@ -195,7 +195,7 @@ using namespace esc;
         result.append(escape(Cursor{
                 .x = offset.x + (i % width),
                 .y = offset.y + (i / width) + 1
-            }, bg(ColorIndex{static_cast<std::uint8_t>(i)})));
+            }, bg(XColor{static_cast<std::uint8_t>(i)})));
         result.push_back(' ');
     }
     return result.append(escape(bg(DefaultColor{})));
