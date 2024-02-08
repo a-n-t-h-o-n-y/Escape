@@ -91,7 +91,7 @@ auto escape(BlankRow) -> std::string
 auto escape(BlankScreen) -> std::string
 {
     return "\033["
-           "?2J";
+           "2J";
 }
 
 auto escape(Traits traits) -> std::string
