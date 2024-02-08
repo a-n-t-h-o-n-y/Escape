@@ -9,7 +9,6 @@
 #include <esc/brush.hpp>
 #include <esc/color.hpp>
 #include <esc/detail/any_of.hpp>
-#include <esc/glyph.hpp>
 #include <esc/point.hpp>
 #include <esc/trait.hpp>
 
@@ -213,32 +212,6 @@ struct BlankScreen {};
  */
 [[nodiscard]] auto escape(Brush b) -> std::string;
 
-// GLYPH -----------------------------------------------------------------------
-
-/**
- * Get the control sequence to set the Glyph Brush and Symbol.
- *
- * @param  g The Glyph to set.
- * @return The control sequence to set the Glyph Brush and Symbol.
- */
-[[nodiscard]] auto escape(Glyph const& g) -> std::string;
-
-/**
- * Get the control sequence to set each Glyph in the GlyphString.
- *
- * @param  gs The GlyphString to set.
- * @return The control sequence to set each Glyph in the GlyphString.
- */
-template <GlyphString T>
-[[nodiscard]] auto escape(T const& gs) -> std::string
-{
-    auto result = std::string{};
-    for (auto const& g : gs) {
-        result += escape(g);
-    }
-    return result;
-}
-
 // CONVENIENCE -----------------------------------------------------------------
 
 /**
@@ -253,9 +226,7 @@ concept Escapable = detail::AnyOf<T,
                                   Traits,
                                   ColorBG,
                                   ColorFG,
-                                  Brush,
-                                  Glyph> ||
-                    GlyphString<T>;
+                                  Brush>;
 
 /**
  * Convenience function to concatenate multiple escapable objects at once.

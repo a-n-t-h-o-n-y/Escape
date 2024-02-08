@@ -188,9 +188,4 @@ auto escape(Brush b) -> std::string
            escape(b.traits);
 }
 
-auto escape(Glyph const& g) -> std::string
-{
-    return escape(g.brush) + detail::u32_to_u8(g.symbol);
-}
-
 }  // namespace esc
