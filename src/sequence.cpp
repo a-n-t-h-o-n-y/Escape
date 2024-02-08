@@ -5,7 +5,10 @@
 #include <type_traits>
 #include <variant>
 
+#include <esc/brush.hpp>
+#include <esc/color.hpp>
 #include <esc/detail/transcode.hpp>
+#include <esc/glyph.hpp>
 #include <esc/trait.hpp>
 
 namespace {
@@ -73,10 +76,10 @@ auto traits_to_int_sequence(esc::Traits traits) -> std::string
 
 namespace esc {
 
-auto escape(CursorPosition p) -> std::string
+auto escape(Cursor p) -> std::string
 {
-    return "\033[" + std::to_string(p.at.y + 1) + ';' +
-           std::to_string(p.at.x + 1) + 'H';
+    return "\033[" + std::to_string(p.y + 1) + ';' + std::to_string(p.x + 1) +
+           'H';
 }
 
 auto escape(BlankRow) -> std::string
@@ -181,7 +184,7 @@ auto foreground_color() -> Color { return ::current_foreground; }
 
 auto escape(Brush b) -> std::string
 {
-    return escape(background(b.background)) + escape(foreground(b.foreground)) +
+    return escape(bg(b.background)) + escape(fg(b.foreground)) +
            escape(b.traits);
 }
 

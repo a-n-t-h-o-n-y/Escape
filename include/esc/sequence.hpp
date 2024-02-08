@@ -2,6 +2,8 @@
 
 #include <concepts>
 #include <string>
+#include <string_view>
+#include <type_traits>
 #include <variant>
 
 #include <esc/brush.hpp>
@@ -16,17 +18,22 @@ namespace esc {
 // MOVE CURSOR -----------------------------------------------------------------
 
 /**
+ * Type alias to move the cursor to a Point.
+ */
+using Cursor = Point;
+
+/**
  * Tag type to move the cursor to a Point.
  */
-struct CursorPosition {
-   public:
-    constexpr CursorPosition(int x, int y) : at{.x = x, .y = y} {}
+// struct CursorPosition {
+//    public:
+//     constexpr CursorPosition(int x, int y) : at{.x = x, .y = y} {}
 
-    constexpr CursorPosition(Point p) : at{p} {}
+//     constexpr CursorPosition(Point p) : at{p} {}
 
-   public:
-    Point at;
-};
+//    public:
+//     Point at;
+// };
 
 /**
  * Get the control sequence to move the cursor to the specified Point.
@@ -37,7 +44,7 @@ struct CursorPosition {
  * @param   p The Point to move the cursor to.
  * @return  The control sequence to move the cursor to the specified Point.
  */
-[[nodiscard]] auto escape(CursorPosition p) -> std::string;
+[[nodiscard]] auto escape(Cursor p) -> std::string;
 
 // CLEAR -----------------------------------------------------------------------
 
@@ -49,8 +56,7 @@ struct BlankRow {};
 /**
  * Get the control sequence to clear the row the cursor is currently at.
  *
- * @details Write escape(CursorPosition) result before to pick which line to
- *          clear.
+ * @details Write escape(Cursor) result before to pick which line to clear.
  * @param   BlankRow The tag type to clear the row the cursor is currently at.
  * @return  The control sequence to clear the row the cursor is currently at.
  */
@@ -217,6 +223,22 @@ struct BlankScreen {};
  */
 [[nodiscard]] auto escape(Glyph const& g) -> std::string;
 
+/**
+ * Get the control sequence to set each Glyph in the GlyphString.
+ *
+ * @param  gs The GlyphString to set.
+ * @return The control sequence to set each Glyph in the GlyphString.
+ */
+template <GlyphString T>
+[[nodiscard]] auto escape(T const& gs) -> std::string
+{
+    auto result = std::string{};
+    for (auto const& g : gs) {
+        result += escape(g);
+    }
+    return result;
+}
+
 // CONVENIENCE -----------------------------------------------------------------
 
 /**
@@ -224,7 +246,7 @@ struct BlankScreen {};
  */
 template <typename T>
 concept Escapable = detail::AnyOf<T,
-                                  CursorPosition,
+                                  Cursor,
                                   BlankRow,
                                   BlankScreen,
                                   Trait,
@@ -232,7 +254,8 @@ concept Escapable = detail::AnyOf<T,
                                   ColorBG,
                                   ColorFG,
                                   Brush,
-                                  Glyph>;
+                                  Glyph> ||
+                    GlyphString<T>;
 
 /**
  * Convenience function to concatenate multiple escapable objects at once.
@@ -242,11 +265,10 @@ concept Escapable = detail::AnyOf<T,
  * @param   args... A list of escapable objects.
  * @return  A single string containing the escape sequences for all args...
  */
-template <Escapable... Args>
+template <Escapable... Args,
+          typename = std::enable_if_t<(sizeof...(Args) > 1), void>>
 [[nodiscard]] auto escape(Args&&... args) -> std::string
 {
-    static_assert(sizeof...(Args) > 0,
-                  "escape(...): Must have at least one argument.");
     return (escape(std::forward<Args>(args)) + ...);
 }
 

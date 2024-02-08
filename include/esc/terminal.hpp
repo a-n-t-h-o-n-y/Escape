@@ -96,14 +96,14 @@ void set(KeyMode x);
 /**
  * `Show` will display the cursor on screen; `Hide` will not.
  */
-enum class Cursor { Show, Hide };
+enum class CursorMode { Show, Hide };
 
 /**
  * Set the cursor to the given value.
  * @details Calls on write internally, but does not call flush().
- * @param   x The Cursor value to set.
+ * @param   x The CursorMode to set.
  */
-void set(Cursor x);
+void set(CursorMode x);
 
 // MOUSE MODE ------------------------------------------------------------------
 
@@ -125,7 +125,7 @@ concept Setable = detail::AnyOf<T,
                                 InputBuffer,
                                 Signals,
                                 ScreenBuffer,
-                                Cursor,
+                                CursorMode,
                                 MouseMode,
                                 KeyMode>;
 
@@ -167,7 +167,7 @@ auto set(Args&&... args) -> void
  *     Move:  Basic, plus Mouse Move Events are generated with or without a
  *            button pressed.
  *
- * @param Cursor
+ * @param CursorMode
  *     Show: The Cursor will be displayed on screen.
  *     Hide: The Cursor will not be displayed on screen.
  *
@@ -195,7 +195,7 @@ auto set(Args&&... args) -> void
  */
 void initialize_terminal(ScreenBuffer,
                          MouseMode,
-                         Cursor,
+                         CursorMode,
                          Echo,
                          InputBuffer,
                          Signals,

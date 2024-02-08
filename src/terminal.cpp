@@ -126,15 +126,15 @@ void set(KeyMode x)
     }
 }
 
-void set(Cursor x)
+void set(CursorMode x)
 {
     switch (x) {
-        case Cursor::Show:
+        case CursorMode::Show:
             write(
                 "\033["
                 "?25h");
             break;
-        case Cursor::Hide:
+        case CursorMode::Hide:
             write(
                 "\033["
                 "?25l");
@@ -169,7 +169,7 @@ void set(MouseMode x)
 
 void initialize_terminal(ScreenBuffer screen_buffer,
                          MouseMode mouse_mode,
-                         Cursor cursor,
+                         CursorMode cursor,
                          Echo echo,
                          InputBuffer input_buffer,
                          Signals signals,
@@ -202,7 +202,7 @@ void initialize_terminal(ScreenBuffer screen_buffer,
 
 void initialize_normal_terminal()
 {
-    initialize_terminal(ScreenBuffer::Normal, MouseMode::Off, Cursor::Show,
+    initialize_terminal(ScreenBuffer::Normal, MouseMode::Off, CursorMode::Show,
                         Echo::On, InputBuffer::Canonical, Signals::On,
                         KeyMode::Normal);
 }
@@ -211,7 +211,7 @@ void initialize_interactive_terminal(MouseMode mouse_mode,
                                      KeyMode key_mode,
                                      Signals signals)
 {
-    initialize_terminal(ScreenBuffer::Alternate, mouse_mode, Cursor::Hide,
+    initialize_terminal(ScreenBuffer::Alternate, mouse_mode, CursorMode::Hide,
                         Echo::Off, InputBuffer::Immediate, signals, key_mode);
 }
 
@@ -220,7 +220,8 @@ void uninitialize_terminal()
     // TODO take settings parameter and use that to reset the terminal to
     // settings before.
     write(turn_on_auto_wrap());
-    set(ScreenBuffer::Normal, MouseMode::Off, Cursor::Show, KeyMode::Normal);
+    set(ScreenBuffer::Normal, MouseMode::Off, CursorMode::Show,
+        KeyMode::Normal);
     flush();
     ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &original_termios);
     if (detail::tty_file_descriptor.has_value()) {
