@@ -16,6 +16,16 @@ struct Point {
 
     auto constexpr operator==(Point const& other) const -> bool = default;
     auto constexpr operator!=(Point const& other) const -> bool = default;
+
+    auto constexpr operator+(Point const& other) const -> Point
+    {
+        return Point{x + other.x, y + other.y};
+    }
+
+    auto constexpr operator-(Point const& other) const -> Point
+    {
+        return Point{x - other.x, y - other.y};
+    }
 };
 
 }  // namespace esc

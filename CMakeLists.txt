@@ -82,4 +82,5 @@ if (NOT TARGET Catch2)
     add_subdirectory(external/Catch2)
 endif()
 
+add_subdirectory(examples)
 add_subdirectory(tests)

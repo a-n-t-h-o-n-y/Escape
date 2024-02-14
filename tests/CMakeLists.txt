@@ -1,4 +1,3 @@
-
 add_executable(escape.tests.unit EXCLUDE_FROM_ALL
     glyph.test.cpp
 )

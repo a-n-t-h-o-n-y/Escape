@@ -16,9 +16,20 @@ presentation and behavior.
 
 - [ICU Library](https://icu.unicode.org/): For Unicode support.
 
+## Build Instructions
+
+    git clone https://github.com/a-n-t-h-o-n-y/Escape.git
+    git submodule update --init --recursive     # Pull in Dependencies
+    mkdir Escape/build && cd Escape/build
+    cmake ..
+    make escape                                 # Build Library
+    make escape.tests.unit                      # Build Unit Tests (Optional)
+    make escape.examples.pong                   # Build PONG Game (Optional)
+
 ## Example Code
 
 - [tools/termcaps.cpp](./tools/termcaps.cpp)
+- [examples/pong.cpp](./examples/pong.cpp)
 - [tests/glyph.test.cpp](./tests/glyph.test.cpp)
 
 ## Planned Enhancements

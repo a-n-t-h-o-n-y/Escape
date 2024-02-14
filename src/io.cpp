@@ -57,8 +57,8 @@ constexpr auto keymap =
                               Key::i,
                               Key::o,
                               Key::p,
-                              Key::Left_bracket,
-                              Key::Right_bracket,
+                              Key::LeftBracket,
+                              Key::RightBracket,
                               Key::Enter,
                               Key::LCtrl,
                               Key::a,
@@ -84,9 +84,9 @@ constexpr auto keymap =
                               Key::m,
                               Key::Comma,
                               Key::Period,
-                              Key::Forward_slash,
+                              Key::ForwardSlash,
                               Key::RShift,
-                              Key::Keypad_asterisk,
+                              Key::KeypadAsterisk,
                               Key::LAlt,
                               Key::Space,
                               Key::CapsLock,
@@ -105,18 +105,18 @@ constexpr auto keymap =
                               Key::Keypad7,
                               Key::Keypad8,
                               Key::Keypad9,
-                              Key::Keypad_minus,
+                              Key::KeypadMinus,
                               Key::Keypad4,
                               Key::Keypad5,
                               Key::Keypad6,
-                              Key::Keypad_plus,
+                              Key::KeypadPlus,
                               Key::Keypad1,
                               Key::Keypad2,
                               Key::Keypad3,
                               Key::Keypad0,
-                              Key::Keypad_period,
-                              Key::Alt_system_request,  // "magic SysRq key"
-                              Key::Null,                // Not commonly used.
+                              Key::KeypadPeriod,
+                              Key::AltSystemRequest,  // "magic SysRq key"
+                              Key::Null,              // Not commonly used.
                               Key::Null,  // Unlabeled key on non-us keyboards
                               Key::Function11,
                               Key::Function12,
@@ -160,63 +160,62 @@ constexpr auto keymap =
                               Key::Null,
                               Key::Null};
 
-constexpr auto escape_keymap =
-    std::array<esc::Key, 56>{Key::Keypad_enter,
-                             Key::RCtrl,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::LShift_fake,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Keypad_forward_slash,
-                             Key::RShift_fake,
-                             Key::Print_screen_ctrl,
-                             Key::RAlt,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Null,
-                             Key::Ctrl_break,
-                             Key::Home_gray,
-                             Key::Up_gray,
-                             Key::Page_up_gray,
-                             Key::Null,
-                             Key::Left_gray,
-                             Key::Null,
-                             Key::Right_gray,
-                             Key::End_gray,
-                             Key::Down_gray,
-                             Key::Page_down_gray,
-                             Key::Insert_gray,
-                             Key::Delete_gray};
+constexpr auto escape_keymap = std::array<esc::Key, 56>{Key::KeypadEnter,
+                                                        Key::RCtrl,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::LShiftFake,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::KeypadForwardSlash,
+                                                        Key::RShiftFake,
+                                                        Key::PrintScreenCtrl,
+                                                        Key::RAlt,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::Null,
+                                                        Key::CtrlBreak,
+                                                        Key::HomeGray,
+                                                        Key::UpGray,
+                                                        Key::PageUpGray,
+                                                        Key::Null,
+                                                        Key::LeftGray,
+                                                        Key::Null,
+                                                        Key::RightGray,
+                                                        Key::EndGray,
+                                                        Key::DownGray,
+                                                        Key::PageDownGray,
+                                                        Key::InsertGray,
+                                                        Key::DeleteGray};
 
 /**
  * Return true if there is nothing to read from file descriptor \p fd.
@@ -502,21 +501,21 @@ auto parse_key(ControlSequence cs) -> esc::Key
 {
     switch (cs.final_byte) {
         using Key = esc::Key;
-        case 'A': return Key::Arrow_up;
-        case 'B': return Key::Arrow_down;
-        case 'C': return Key::Arrow_right;
-        case 'D': return Key::Arrow_left;
+        case 'A': return Key::ArrowUp;
+        case 'B': return Key::ArrowDown;
+        case 'C': return Key::ArrowRight;
+        case 'D': return Key::ArrowLeft;
         case 'E': return Key::Begin;
         case 'F': return Key::End;
-        case 'G': return Key::Page_down;
+        case 'G': return Key::PageDown;
         case 'H': return Key::Home;
-        case 'I': return Key::Page_up;
+        case 'I': return Key::PageUp;
         case 'L': return Key::Insert;
         case 'P': return Key::Function1;
         case 'Q': return Key::Function2;
         case 'R': return Key::Function3;
         case 'S': return Key::Function4;
-        case 'Z': return Key::Back_tab;
+        case 'Z': return Key::BackTab;
         case '~': return parse_tilde(cs.parameter_bytes);
     }
     throw std::runtime_error{"io.cpp parse_key(): Unknown final_byte: " +
@@ -805,7 +804,7 @@ auto read_single_token() -> Token
             if (byte2 == 0x2A) {
                 if (auto const byte3 = read_byte(fd); byte3 == 0xE0) {
                     if (auto const byte4 = read_byte(fd); byte4 == 0x37) {
-                        return KeyPress{Key::Print_screen};
+                        return KeyPress{Key::PrintScreen};
                     }
                 }
             }
@@ -814,39 +813,39 @@ auto read_single_token() -> Token
                 if (auto const byte3 = read_byte(fd); byte3 == 0xE0) {
                     if (auto const byte4 = read_byte(fd) - 0x80;
                         byte4 == 0x37) {
-                        return KeyRelease{Key::Print_screen};
+                        return KeyRelease{Key::PrintScreen};
                     }
                 }
             }
 
             // Print Screen w/Shift: e0 37
             else if (byte2 == 0x37) {
-                return KeyPress{Key::Print_screen_shift};
+                return KeyPress{Key::PrintScreenShift};
             }
 
             // Print Screen w/Shift: e0 37+0x80
             else if ((byte2 & 0x7F) == 0x37) {
-                return KeyRelease{Key::Print_screen_shift};
+                return KeyRelease{Key::PrintScreenShift};
             }
 
             // Pause w/left or right ctrl: e0 46 e0 c6
             else if (byte2 == 0x46) {
                 if (auto const byte3 = read_byte(fd); byte3 == 0xE0) {
                     if (auto const byte4 = read_byte(fd); byte4 == 0xC6) {
-                        return KeyPress{Key::Pause_ctrl};
+                        return KeyPress{Key::PauseCtrl};
                     }
                 }
             }
 
             switch (byte2) {
-                case 0x48: return KeyPress{Key::Arrow_up};
-                case 0x48 + 0x80: return KeyRelease{Key::Arrow_up};
-                case 0x50: return KeyPress{Key::Arrow_down};
-                case 0x50 + 0x80: return KeyRelease{Key::Arrow_down};
-                case 0x4D: return KeyPress{Key::Arrow_right};
-                case 0x4D + 0x80: return KeyRelease{Key::Arrow_right};
-                case 0x4B: return KeyPress{Key::Arrow_left};
-                case 0x4B + 0x80: return KeyRelease{Key::Arrow_left};
+                case 0x48: return KeyPress{Key::ArrowUp};
+                case 0x48 + 0x80: return KeyRelease{Key::ArrowUp};
+                case 0x50: return KeyPress{Key::ArrowDown};
+                case 0x50 + 0x80: return KeyRelease{Key::ArrowDown};
+                case 0x4D: return KeyPress{Key::ArrowRight};
+                case 0x4D + 0x80: return KeyRelease{Key::ArrowRight};
+                case 0x4B: return KeyPress{Key::ArrowLeft};
+                case 0x4B + 0x80: return KeyRelease{Key::ArrowLeft};
                 default: return std::nullopt;
             }
         }
@@ -875,8 +874,8 @@ auto read_single_token() -> Token
                        : Event{KeyPress{escape_keymap[key_byte - 0x1C]}};
         }
 
-        case 0x54: return KeyPress{Key::Print_screen_alt};
-        case 0x54 + 0x80: return KeyRelease{Key::Print_screen_alt};
+        case 0x54: return KeyPress{Key::PrintScreenAlt};
+        case 0x54 + 0x80: return KeyRelease{Key::PrintScreenAlt};
 
         case 0x00:  // Keyboard Error
         case 0xAA:  // Basic Assurance Test OK

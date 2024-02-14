@@ -22,19 +22,6 @@ namespace esc {
 using Cursor = Point;
 
 /**
- * Tag type to move the cursor to a Point.
- */
-// struct CursorPosition {
-//    public:
-//     constexpr CursorPosition(int x, int y) : at{.x = x, .y = y} {}
-
-//     constexpr CursorPosition(Point p) : at{p} {}
-
-//    public:
-//     Point at;
-// };
-
-/**
  * Get the control sequence to move the cursor to the specified Point.
  *
  * @details Top-left cell of the terminal is Point{x:0, y:0}. x is horizontal

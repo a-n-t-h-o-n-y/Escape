@@ -16,57 +16,57 @@ namespace esc {
  */
 enum class Key : char32_t {
     // C0 Control Codes
-    Null = 0,                   // Ctrl + Space, or Ctrl + 2, OR Ctrl + @
-    Start_of_heading,           // Ctrl + a
-    Start_of_text,              // Ctrl + b
-    End_of_text,                // Ctrl + c
-    End_of_transmission,        // Ctrl + d
-    Enquiry,                    // Ctrl + e
-    Acknowledge,                // Ctrl + f
-    Bell,                       // Ctrl + g
-    Backspace_1,                // Ctrl + h - Not necessarily the Backspace Key.
-    Tab,                        // Ctrl + i OR Tab Key
-    New_line,                   // Ctrl + j AKA Line Feed
-    Vertical_tab,               // Ctrl + k
-    Form_feed,                  // Ctrl + l
-    Enter,                      // Ctrl + m - Mapped to Enter key
-    Shift_out,                  // Ctrl + n
-    Shift_in,                   // Ctrl + o
-    Data_link_escape,           // Ctrl + p
-    Device_control_one,         // Ctrl + q
-    Device_control_two,         // Ctrl + r
-    Device_control_three,       // Ctrl + s
-    Device_control_four,        // Ctrl + t
-    Negative_acknowledge,       // Ctrl + u
-    Synchronous_idle,           // Ctrl + v
-    End_of_transmission_block,  // Ctrl + w
-    Cancel,                     // Ctrl + x
-    End_of_medium,              // Ctrl + y
-    Substitute,                 // Ctrl + z
-    Escape,                     // Ctrl + 3 OR Ctrl + [
-    File_separator,             // Ctrl + 4 OR Ctrl + Backslash
-    Group_separator,            // Ctrl + 5 OR Ctrl + ]
-    Record_separator,           // Ctrl + 6 OR Ctrl + ^
-    Unit_separator,             // Ctrl + 7 OR Ctrl + _
-    Backspace = 127,            // Ctrl + 8
+    Null = 0,                // Ctrl + Space, or Ctrl + 2, OR Ctrl + @
+    StartOfHeading,          // Ctrl + a
+    StartOfText,             // Ctrl + b
+    EndOfText,               // Ctrl + c
+    EndOfTransmission,       // Ctrl + d
+    Enquiry,                 // Ctrl + e
+    Acknowledge,             // Ctrl + f
+    Bell,                    // Ctrl + g
+    Backspace1,              // Ctrl + h - Not necessarily the Backspace Key.
+    Tab,                     // Ctrl + i OR Tab Key
+    NewLine,                 // Ctrl + j AKA Line Feed
+    VerticalTab,             // Ctrl + k
+    FormFeed,                // Ctrl + l
+    Enter,                   // Ctrl + m - Mapped to Enter key
+    ShiftOut,                // Ctrl + n
+    ShiftIn,                 // Ctrl + o
+    DataLinkEscape,          // Ctrl + p
+    DeviceControlOne,        // Ctrl + q
+    DeviceControlTwo,        // Ctrl + r
+    DeviceControlThree,      // Ctrl + s
+    DeviceControlFour,       // Ctrl + t
+    NegativeAcknowledge,     // Ctrl + u
+    SynchronousIdle,         // Ctrl + v
+    EndOfTransmissionBlock,  // Ctrl + w
+    Cancel,                  // Ctrl + x
+    EndOfMedium,             // Ctrl + y
+    Substitute,              // Ctrl + z
+    Escape,                  // Ctrl + 3 OR Ctrl + [
+    FileSeparator,           // Ctrl + 4 OR Ctrl + Backslash
+    GroupSeparator,          // Ctrl + 5 OR Ctrl + ]
+    RecordSeparator,         // Ctrl + 6 OR Ctrl + ^
+    UnitSeparator,           // Ctrl + 7 OR Ctrl + _
+    Backspace = 127,         // Ctrl + 8
 
     // Graphic Characters
     Space = 32,
-    Exclamation_mark,
-    Double_quotation,
+    ExclamationMark,
+    DoubleQuotation,
     Hash,
     Dollar,
     Percent,
     Ampersand,
     Apostrophe,
-    Left_parenthesis,
-    Right_parenthesis,
+    LeftParenthesis,
+    RightParenthesis,
     Asterisk,
     Plus,
     Comma,
     Minus,
     Period,
-    Forward_slash,
+    ForwardSlash,
     Zero,
     One,
     Two,
@@ -79,11 +79,11 @@ enum class Key : char32_t {
     Nine,
     Colon,
     Semicolon,
-    Less_than,
+    LessThan,
     Equals,
-    Greater_than,
-    Question_mark,
-    At_sign,
+    GreaterThan,
+    QuestionMark,
+    AtSign,
     A,
     B,
     C,
@@ -110,9 +110,9 @@ enum class Key : char32_t {
     X,
     Y,
     Z,
-    Left_bracket,
+    LeftBracket,
     Backslash,
-    Right_bracket,
+    RightBracket,
     Caret,
     Underscore,
     Accent,
@@ -142,9 +142,9 @@ enum class Key : char32_t {
     x,
     y,
     z,
-    Left_curly_bracket,
+    LeftCurlyBracket,
     Pipe,
-    Right_curly_bracket,
+    RightCurlyBracket,
     Tilde = 126,
 
     // Special Keys - These overlap with C1 (128 - 159)
@@ -152,8 +152,8 @@ enum class Key : char32_t {
     Insert,
     Delete,
     End,
-    Page_up,
-    Page_down = 133,
+    PageUp,
+    PageDown = 133,
     // empty
     // empty
     // empty
@@ -172,12 +172,12 @@ enum class Key : char32_t {
     // empty
     Function11 = 150,
     Function12,
-    Arrow_down,  // Cursor Keys
-    Arrow_up,
-    Arrow_left,
-    Arrow_right,
-    Back_tab,     // Shift + Tab
-    Backspace_2,  // Numpad backspace and backspace on some laptops
+    ArrowDown,  // Cursor Keys
+    ArrowUp,
+    ArrowLeft,
+    ArrowRight,
+    BackTab,     // Shift + Tab
+    Backspace2,  // Numpad backspace and backspace on some laptops
     // empty
     Begin = 159,  // Middle Numpad Key
 
@@ -189,39 +189,39 @@ enum class Key : char32_t {
     LCtrl = 0x40000,
     RCtrl,
     LShift,
-    LShift_fake,
+    LShiftFake,
     RShift,
-    RShift_fake,
+    RShiftFake,
     LAlt,
     RAlt,
     CapsLock,
     NumLock,
     ScrollLock,
 
-    Print_screen,
-    Print_screen_ctrl,
-    Print_screen_alt,
-    Print_screen_shift,
+    PrintScreen,
+    PrintScreenCtrl,
+    PrintScreenAlt,
+    PrintScreenShift,
     Pause,
-    Pause_ctrl,
-    Ctrl_break,
-    Home_gray,
-    Up_gray,
-    Page_up_gray,
-    Left_gray,
-    Right_gray,
-    End_gray,
-    Down_gray,
-    Page_down_gray,
-    Insert_gray,
-    Delete_gray,
+    PauseCtrl,
+    CtrlBreak,
+    HomeGray,
+    UpGray,
+    PageUpGray,
+    LeftGray,
+    RightGray,
+    EndGray,
+    DownGray,
+    PageDownGray,
+    InsertGray,
+    DeleteGray,
 
-    Keypad_enter,
-    Keypad_asterisk,
-    Keypad_minus,
-    Keypad_plus,
-    Keypad_period,
-    Keypad_forward_slash,
+    KeypadEnter,
+    KeypadAsterisk,
+    KeypadMinus,
+    KeypadPlus,
+    KeypadPeriod,
+    KeypadForwardSlash,
     Keypad0,
     Keypad1,
     Keypad2,
@@ -232,7 +232,7 @@ enum class Key : char32_t {
     Keypad7,
     Keypad8,
     Keypad9,
-    Alt_system_request,
+    AltSystemRequest,
 };
 
 /**
