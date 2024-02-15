@@ -2,14 +2,41 @@
 
 __Terminal Escape Sequence Library__
 
-This library provides support for generating terminal escape sequences. These
-sequences, when written to `stdout`, enable control over terminal visual
-presentation and behavior.
+`Escape` provides support for generating and interpreting terminal escape
+sequences. These can be written to the terminal to control cursor movement, text
+formatting, and colors. It also includes a `read()` function to produce
+keyboard, mouse input, and window resize events.
+
+```cpp
+#include <iostream>
+#include <esc/esc.hpp>
+
+using namespace esc;
+
+int main()
+{
+    std::cout
+        << escape(Brush{
+                .background = XColor::Cyan,
+                .foreground = TrueColor{0xF02127},
+                .traits     = Trait::Italic,
+            }) << "Hello"
+
+        << escape(Brush{}) << " 👽 "
+
+        << escape(
+              fg(TrueColor{0x76F09C}),
+              Trait::Bold | Trait::Underline
+            ) << "World!"
+
+        << escape(Brush{}) << std::endl;
+}
+```
 
 ## Features
 
-- **Dynamic Terminal Control**: Generate escape sequences for cursor movement, text formatting, color settings, and more.
-- **Event Handling**: Includes a `read()` function to handle keyboard, mouse inputs, and window resize events, enhancing interactive applications.
+- **Dynamic Terminal Control**: Generate escape sequences for cursor movement, text formatting, and colors.
+- **Event Handling**: Includes a `read()` function to handle keyboard, mouse input, and window resize events, enabling interactive terminal applications.
 - **Cross-Terminal Compatibility**: Designed to work across various terminals without relying on a terminfo database.
 
 ## Dependencies

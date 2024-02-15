@@ -72,7 +72,7 @@ struct Game {
     };
 
     struct {
-        std::size_t score;
+        std::size_t score = 0;
         Player player;
         Paddle paddle{
             .top = {.x = 1, .y = (game_space.height - Paddle::height) / 2},
@@ -81,7 +81,7 @@ struct Game {
     } left;
 
     struct {
-        std::size_t score;
+        std::size_t score = 0;
         Player player;
         Paddle paddle{
             .top = {.x = game_space.width - 2,
@@ -96,7 +96,7 @@ struct Game {
             float dx = 0;
             float dy = 0;
         } velocity;
-    } ball;
+    } ball{};
 };
 
 struct PlayerSelectMenu {
