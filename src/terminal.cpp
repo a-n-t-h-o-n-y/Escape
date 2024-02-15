@@ -35,15 +35,9 @@ void fix_ctrl_m()
     ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &settings);
 }
 
-[[nodiscard]] constexpr auto turn_off_auto_wrap() -> std::string
-{
-    return "\033[?7l";
-}
+[[nodiscard]] auto turn_off_auto_wrap() -> std::string { return "\033[?7l"; }
 
-[[nodiscard]] constexpr auto turn_on_auto_wrap() -> std::string
-{
-    return "\033[?7h";
-}
+[[nodiscard]] auto turn_on_auto_wrap() -> std::string { return "\033[?7h"; }
 
 auto original_termios = ::termios{};
 

@@ -20,14 +20,14 @@ int main()
                 .background = XColor::Cyan,
                 .foreground = TrueColor{0xF02127},
                 .traits     = Trait::Italic,
-            }) << "Hello"
+           }) << "Hello"
 
         << escape(Brush{}) << " 👽 "
 
         << escape(
-              fg(TrueColor{0x76F09C}),
-              Trait::Bold | Trait::Underline
-            ) << "World!"
+                fg(TrueColor{0x76F09C}),
+                Trait::Bold | Trait::Underline
+           ) << "World!"
 
         << escape(Brush{}) << std::endl;
 }
