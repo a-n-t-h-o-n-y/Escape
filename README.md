@@ -33,6 +33,9 @@ int main()
 }
 ```
 
+See [TermOx](https://github.com/a-n-t-h-o-n-y/TermOx) for a more full-featured
+widget based library that uses `Escape` under the hood.
+
 ## Features
 
 - **Dynamic Terminal Control**: Generate escape sequences for cursor movement, text formatting, and colors.
