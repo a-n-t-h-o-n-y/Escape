@@ -198,7 +198,7 @@ using namespace esc;
             }, bg(XColor{static_cast<std::uint8_t>(i)})));
         result.push_back(' ');
     }
-    return result.append(escape(bg(DefaultColor{})));
+    return result.append(escape(bg(XColor::Default)));
 }
 
 [[nodiscard]] auto hue_increment_row(int width, HSL start) -> std::string
@@ -253,7 +253,7 @@ using namespace esc;
         saturation_increment_row(width, init) +
         escape(Cursor{offset.x, offset.y + 3}) +
         lightness_increment_row(width, init) +
-        escape(bg(DefaultColor{})
+        escape(bg(XColor::Default)
     );
 }
 

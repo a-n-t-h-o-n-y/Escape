@@ -6,20 +6,6 @@
 
 namespace esc {
 
-/**
- * Represents the default color of the terminal.
- *
- * @details When used with foregound() this will be the default foreground color
- *          of the terminal. When used with background() this will be the
- *          default background color of the terminal.
- */
-struct DefaultColor {
-    [[nodiscard]] constexpr bool operator==(DefaultColor const&) const =
-        default;
-    [[nodiscard]] constexpr bool operator!=(DefaultColor const&) const =
-        default;
-};
-
 // -----------------------------------------------------------------------------
 
 /**
@@ -35,8 +21,9 @@ struct DefaultColor {
  * @see https://www.ditig.com/publications/256-colors-cheat-sheet
  */
 struct XColor {
-    std::uint8_t value;
+    std::uint16_t value;
 
+    static XColor const Default;
     static XColor const Black;
     static XColor const Red;
     static XColor const Green;
@@ -59,6 +46,7 @@ struct XColor {
 };
 
 // Yes, defining constexpr with const declaration is legal here.
+constexpr XColor XColor::Default       = XColor{256};
 constexpr XColor XColor::Black         = XColor{0};
 constexpr XColor XColor::Red           = XColor{1};
 constexpr XColor XColor::Green         = XColor{2};
@@ -269,6 +257,11 @@ struct TrueColor {
     [[nodiscard]] constexpr bool operator!=(TrueColor const&) const = default;
 };
 
+/**
+ * Alias for TrueColor.
+ */
+using TColor = TrueColor;
+
 // -----------------------------------------------------------------------------
 
 /**
@@ -276,7 +269,7 @@ struct TrueColor {
  *
  * @details escape(Color) will generate an escape sequence for the color.
  */
-using Color = std::variant<XColor, TrueColor, DefaultColor>;
+using Color = std::variant<XColor, TrueColor>;
 
 // -----------------------------------------------------------------------------
 

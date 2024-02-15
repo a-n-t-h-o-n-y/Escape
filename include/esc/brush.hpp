@@ -12,8 +12,8 @@ namespace esc {
  *          escape(Brush) in sequence.hpp
  */
 struct Brush {
-    Color background = DefaultColor{};
-    Color foreground = DefaultColor{};
+    Color background = XColor::Default;
+    Color foreground = XColor::Default;
     Traits traits    = Traits{Trait::None};
 
     [[nodiscard]] constexpr bool operator==(Brush const&) const = default;

@@ -328,19 +328,15 @@ using EventResponse = std::optional<State>;
         return std::string(std::max((dimensions.width - width) / 2, 0), ' ');
     }();
 
-    auto hsl = HSL{
-        .hue        = hue,
-        .saturation = 90,
-        .lightness  = 70,
-    };
+    auto hsl = HSL{.hue = hue, .saturation = 90, .lightness = 70};
 
     auto bytes = escape(Cursor{.x = 0, .y = 6}, Trait::Bold);
-    bytes += escape(fg(TrueColor{hsl})) + padding;
+    bytes += escape(fg(TColor{hsl})) + padding;
     for (char c : state.display) {
         bytes += c;
         if (c == '\n') {
             hsl.hue = (hsl.hue + 20) % 360;
-            bytes += escape(fg(TrueColor{hsl})) + padding;
+            bytes += escape(fg(TColor{hsl})) + padding;
         }
     }
 
@@ -390,7 +386,7 @@ using EventResponse = std::optional<State>;
     auto const speed =
         std::sqrt(velocity.dx * velocity.dx + velocity.dy * velocity.dy);
 
-    return TrueColor{HSL{
+    return TColor{HSL{
         .hue        = std::uint16_t((90 + (int)(speed * 160)) % 360),
         .saturation = 80,
         .lightness  = 70,

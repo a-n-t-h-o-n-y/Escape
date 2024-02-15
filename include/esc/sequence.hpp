@@ -128,14 +128,6 @@ struct BlankScreen {};
  */
 [[nodiscard]] auto escape_bg(TrueColor c) -> std::string;
 
-/// Return control sequence to reset the background to the terminal default
-
-/**
- * Get the control sequence to reset the background to the terminal default.
- * @return The control sequence to reset the background to the terminal default.
- */
-[[nodiscard]] auto escape_bg(DefaultColor c) -> std::string;
-
 /**
  * Get the last Color that was created with escape(ColorBG).
  *
@@ -173,12 +165,6 @@ struct BlankScreen {};
  *         true color.
  */
 [[nodiscard]] auto escape_fg(TrueColor c) -> std::string;
-
-/**
- * Get the control sequence to reset the foreground to the terminal default.
- * @return The control sequence to reset the foreground to the terminal default.
- */
-[[nodiscard]] auto escape_fg(DefaultColor c) -> std::string;
 
 /**
  * Get the last Color that was created with escape(ColorFG).

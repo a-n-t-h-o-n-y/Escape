@@ -18,14 +18,14 @@ int main()
     std::cout
         << escape(Brush{
                 .background = XColor::Cyan,
-                .foreground = TrueColor{0xF02127},
+                .foreground = TColor{0xF02127},
                 .traits     = Trait::Italic,
            }) << "Hello"
 
         << escape(Brush{}) << " 👽 "
 
         << escape(
-                fg(TrueColor{0x76F09C}),
+                fg(TColor{0x76F09C}),
                 Trait::Bold | Trait::Underline
            ) << "World!"
 
