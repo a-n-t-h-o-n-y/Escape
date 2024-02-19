@@ -36,8 +36,6 @@ struct SplashScreen {
 };
 
 struct Menu {
-    std::string title{"PONG"};
-
     std::vector<std::string> options{
         "Play",
         "How-To",
@@ -483,7 +481,8 @@ using EventResponse = std::optional<State>;
     }
 
     {  // Border
-        bytes += escape(offset - Point{.x = 1, .y = 1}) + escape(Trait::Dim);
+        bytes += escape(offset - Point{.x = 1, .y = 1}) +
+                 escape(fg(XColor::Blue), Trait::Dim);
         bytes += "╭";
 
         for (int i = 0; i < display_space.width; ++i) {
@@ -505,7 +504,7 @@ using EventResponse = std::optional<State>;
         for (int i = 0; i < display_space.width; ++i) {
             bytes += "─";
         }
-        bytes += "╯" + escape(Trait::None);
+        bytes += "╯" + escape(Brush{});
     }
 
     bytes += escape(Cursor{.x = 0, .y = dimensions.height - 1});

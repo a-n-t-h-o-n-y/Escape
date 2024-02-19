@@ -47,7 +47,8 @@ concept Character =
  */
 template <typename T>
 concept Attribute = std::same_as<T, ColorBG> || std::same_as<T, ColorFG> ||
-                    std::same_as<T, Trait> || std::same_as<T, RemoveTrait>;
+                    std::same_as<T, Trait> || std::same_as<T, RemoveTrait> ||
+                    std::same_as<T, Brush>;
 
 /**
  * Defines the requirements for a type to be considered a GlyphString.
@@ -281,6 +282,48 @@ auto operator|(T&& gs, RemoveTrait t) -> decltype(auto)
     return std::forward<T>(gs);
 }
 
+// -------------------------------- BRUSH --------------------------------------
+
+/**
+ * Creates a Glyph with the given symbol and Brush.
+ *
+ * @param symbol The symbol to display.
+ * @param b The Brush to apply to the return Glyph.
+ * @return A Glyph with the given symbol and Brush.
+ */
+[[nodiscard]] constexpr auto operator|(Character auto symbol, Brush b) -> Glyph
+{
+    return {.symbol = static_cast<char32_t>(symbol), .brush = b};
+}
+
+/**
+ * Copy the Glyph and replace its Brush.
+ *
+ * @param g The Glyph to work from.
+ * @param b The Brush to apply to the return Glyph.
+ * @return The passed in Glyph with the given Brush.
+ */
+[[nodiscard]] constexpr auto operator|(Glyph g, Brush b) -> Glyph
+{
+    return {.symbol = g.symbol, .brush = b};
+}
+
+/**
+ * Modify the Glyphs in the GlyphString to have the given Brush.
+ *
+ * @param gs The GlyphString to work from.
+ * @param b The Brush to apply to each Glyph.
+ * @return The passed in GlyphString with the given Trait.
+ */
+template <GlyphString T>
+auto operator|(T&& gs, Brush b) -> decltype(auto)
+{
+    for (auto& glyph : gs) {
+        glyph.brush = b;
+    }
+    return std::forward<T>(gs);
+}
+
 // ------------------------------- STRINGS -------------------------------------
 
 /**
@@ -301,7 +344,6 @@ template <Attribute T>
  * Creates a std::vector<Glyph> from the given string_view and Attribute.
  *
  * @details UTF-8 encoding of the input string is assumed.
- *
  * @param sv The string_view to create Glyphs from.
  * @param attr The Attribute to apply to each Glyph's brush.
  * @return A std::vector<Glyph> with the given Attribute applied to each Glyph.
