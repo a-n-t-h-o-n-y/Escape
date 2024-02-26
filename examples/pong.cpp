@@ -307,7 +307,7 @@ using EventResponse = std::optional<State>;
 
 [[nodiscard]] auto process(Resize event, auto state) -> EventResponse
 {
-    screen_dimensions = event.area;
+    screen_dimensions = event.size;
     return state;
 }
 

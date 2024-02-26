@@ -352,7 +352,7 @@ auto process(KeyRelease kr) -> EventResponse
 
 auto process(Resize r) -> EventResponse
 {
-    return term_size_display(offset.term_size, r.area);
+    return term_size_display(offset.term_size, r.size);
 }
 
 auto main() -> int

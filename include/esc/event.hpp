@@ -55,7 +55,7 @@ struct KeyRelease {
  * Terminal window resized event.
  */
 struct Resize {
-    Area area;
+    Area size;
 };
 
 /**

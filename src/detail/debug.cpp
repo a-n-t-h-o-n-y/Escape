@@ -94,7 +94,7 @@ auto print(::esc::MouseMove m, std::ostream& os) -> std::ostream&
 auto print(::esc::Resize r, std::ostream& os) -> std::ostream&
 {
     os << "struct Resize {\n"
-       << "    Area{width: " << r.area.width << " height: " << r.area.height
+       << "    Area{width: " << r.size.width << " height: " << r.size.height
        << "}\n"
        << "};\n";
     return os;
