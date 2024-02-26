@@ -14,7 +14,7 @@ TEST_CASE("Constructor", "[Glyph]")
     SECTION("Default")
     {
         auto const glyph = Glyph{};
-        REQUIRE(glyph.symbol == U'\0');
+        REQUIRE(glyph.symbol == U' ');
         REQUIRE(glyph.brush == Brush{});
     }
 

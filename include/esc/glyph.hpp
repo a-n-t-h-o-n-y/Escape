@@ -24,7 +24,7 @@ namespace esc {
  * displayed.
  */
 struct Glyph {
-    char32_t symbol = U'\0';
+    char32_t symbol = U' ';
     Brush brush     = {};
 
     [[nodiscard]] constexpr bool operator==(Glyph const&) const = default;
