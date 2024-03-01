@@ -61,7 +61,6 @@ concept Writable = std::convertible_to<T, char32_t> ||
 
 /**
  * Write any number of writable objects to the console, in parameter order.
- *
  * @tparam Args The types of the objects to write.
  * @param args The objects to write.
  */
@@ -71,8 +70,6 @@ auto write(Args&&... args) -> void
 {
     (write(args), ...);
 }
-
-/// Send all buffered bytes from calls to write(...) to the console device.
 
 /**
  * Flush the stdout buffer.
@@ -87,9 +84,6 @@ auto flush() -> void;
  * @return The Event read from stdin.
  */
 auto read() -> Event;
-
-/// Read a single input Event from stdin, with timeout.
-/** Returns std::nullopt if timeout passes without an Event. */
 
 /**
  * Timeout version of read().

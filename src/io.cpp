@@ -371,9 +371,6 @@ using Token = std::variant<ControlSequence, Escaped, UTF8, Window>;
 
 // -----------------------------------------------------------------------------
 
-/// Retrieves the integer type parameter at \p index, returns a type T.
-/** \p bytes should only be the parameter bytes. */
-
 /**
  * Retrieves the integer type parameter at \p index, returns a type T.
  * @tparam T The type to return.
@@ -759,8 +756,6 @@ auto read_single_token() -> Token
 
 // -----------------------------------------------------------------------------
 
-/// Read a single Event from stdin.
-
 /**
  * Read a single Event from stdin.
  *
@@ -941,7 +936,6 @@ auto read_single_token() -> Token
 
 /**
  * Read an event in alt mode, returns std::nullopt on non-event reads.
- *
  * @details Non-event reads are KeyPress events on stdin, and std::nullopt from
  *          tty.
  * @return The event read from stdin or tty, or std::nullopt if the read was not
@@ -1017,11 +1011,6 @@ auto read_single_token() -> Token
     }
     return std::nullopt;
 }
-
-/// Reads a single token from either STDIN_FILENO or detail::tty_file_descriptor
-/** Assumes the tty_file_descriptor is valid. Returns std::nullopt if nothing
- *  was read in the given timeout time. Can return earlier than timeout with
- *  std::nullopt. */
 
 /**
  * Reads a single token from either STDIN_FILENO or detail::tty_file_descriptor.

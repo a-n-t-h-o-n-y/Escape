@@ -239,7 +239,9 @@ enum class Key : char32_t {
  * The Mod enum is used to represent modifier keys on a keyboard.
  *
  * @details It is designed to be used with the Key enum to represent key
- * combinations.
+ * combinations. These are only generated when KeyMode::Raw is set. In
+ * KeyMode::Normal these not seen as separate keys, for instance ctrl + a is
+ * seen as Key::StartOfHeading and shift + a is seen as Key::A.
  */
 enum class Mod : std::underlying_type_t<Key> {
     // Last bit of unicode currently used is (1 << 20).
