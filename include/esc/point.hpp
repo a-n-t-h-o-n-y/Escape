@@ -17,14 +17,19 @@ struct Point {
     auto constexpr operator==(Point const& other) const -> bool = default;
     auto constexpr operator!=(Point const& other) const -> bool = default;
 
-    auto constexpr operator+(Point const& other) const -> Point
+    [[nodiscard]] auto constexpr operator+(Point const& other) const -> Point
     {
         return Point{x + other.x, y + other.y};
     }
 
-    auto constexpr operator-(Point const& other) const -> Point
+    [[nodiscard]] auto constexpr operator-(Point const& other) const -> Point
     {
         return Point{x - other.x, y - other.y};
+    }
+
+    [[nodiscard]] constexpr auto operator<(Point const& other) const -> bool
+    {
+        return std::tie(x, y) < std::tie(other.x, other.y);
     }
 };
 
