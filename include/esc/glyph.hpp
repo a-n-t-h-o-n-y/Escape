@@ -88,7 +88,10 @@ namespace detail {
 
     while (i < length) {
         UChar32 ch;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
         U8_NEXT(sv.data(), i, length, ch);
+#pragma GCC diagnostic pop
         if (ch < 0) {
             throw std::runtime_error{"Invalid UTF-8 sequence"};
         }
