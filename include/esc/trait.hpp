@@ -25,14 +25,6 @@ enum class Trait : std::uint16_t {
 };
 
 /**
- * Return Trait \p t as a descriptive string.
- * @param t The Trait to convert to a string.
- * @return The string representation of the Trait.
- * @throws std::runtime_error if t is not a valid Trait.
- */
-[[nodiscard]] auto to_string(Trait t) -> std::string;
-
-/**
  * Mask type for the Trait flag to represent multiple Trait objects.
  */
 using Traits = detail::Mask<Trait>;

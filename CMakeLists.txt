@@ -28,9 +28,7 @@ add_library(escape STATIC
     src/io.cpp
     src/terminfo.cpp
     src/terminal.cpp
-    src/trait.cpp
     src/sequence.cpp
-    src/mouse.cpp
     src/detail/is_urxvt.cpp
     src/detail/transcode.cpp
     src/detail/console_file.cpp
