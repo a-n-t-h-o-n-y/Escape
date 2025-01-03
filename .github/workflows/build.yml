@@ -238,8 +238,9 @@ jobs:
                   CC: gcc-14
                   CXX: g++-14
               run: |
+                  ICU_PATH=$(brew --prefix icu4c)
                   mkdir build && cd build
-                  cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+                  cmake .. -DICU_ROOT=$ICU_PATH && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
     build-MacOS14-gcc13:
         runs-on: macos-14
         steps:
@@ -252,8 +253,9 @@ jobs:
                   CC: gcc-13
                   CXX: g++-13
               run: |
+                  ICU_PATH=$(brew --prefix icu4c)
                   mkdir build && cd build
-                  cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+                  cmake .. -DICU_ROOT=$ICU_PATH && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
     build-MacOS14-gcc12:
         runs-on: macos-14
         steps:
@@ -266,8 +268,9 @@ jobs:
                   CC: gcc-12
                   CXX: g++-12
               run: |
+                  ICU_PATH=$(brew --prefix icu4c)
                   mkdir build && cd build
-                  cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+                  cmake .. -DICU_ROOT=$ICU_PATH && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
 
     # MacOS-14 Clang
     build-MacOS14-clang15:
@@ -282,8 +285,9 @@ jobs:
                   CC: clang-15
                   CXX: clang++-15
               run: |
+                  ICU_PATH=$(brew --prefix icu4c)
                   mkdir build && cd build
-                  cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+                  cmake .. -DICU_ROOT=$ICU_PATH && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
 
     # MacOS-13 GCC
     build-MacOS13-gcc14:
@@ -298,8 +302,9 @@ jobs:
                   CC: gcc-14
                   CXX: g++-14
               run: |
+                  ICU_PATH=$(brew --prefix icu4c)
                   mkdir build && cd build
-                  cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+                  cmake .. -DICU_ROOT=$ICU_PATH && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
     build-MacOS13-gcc13:
         runs-on: macos-13
         steps:
@@ -312,8 +317,9 @@ jobs:
                   CC: gcc-13
                   CXX: g++-13
               run: |
+                  ICU_PATH=$(brew --prefix icu4c)
                   mkdir build && cd build
-                  cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+                  cmake .. -DICU_ROOT=$ICU_PATH && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
     build-MacOS13-gcc12:
         runs-on: macos-13
         steps:
@@ -326,8 +332,9 @@ jobs:
                   CC: gcc-12
                   CXX: g++-12
               run: |
+                  ICU_PATH=$(brew --prefix icu4c)
                   mkdir build && cd build
-                  cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+                  cmake .. -DICU_ROOT=$ICU_PATH && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
 
     # MacOS-13 Clang
     build-MacOS13-clang14:
@@ -342,5 +349,6 @@ jobs:
                   CC: clang-14
                   CXX: clang++-14
               run: |
+                  ICU_PATH=$(brew --prefix icu4c)
                   mkdir build && cd build
-                  cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+                  cmake .. -DICU_ROOT=$ICU_PATH && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
