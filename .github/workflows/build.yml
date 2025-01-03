@@ -282,8 +282,8 @@ jobs:
             - name: Install ICU
               run: brew install icu4c
             - env:
-                  CC: clang-15
-                  CXX: clang++-15
+                  CC: clang
+                  CXX: clang++
               run: |
                   ICU_PATH=$(brew --prefix icu4c)
                   mkdir build && cd build
@@ -301,21 +301,6 @@ jobs:
             - env:
                   CC: gcc-14
                   CXX: g++-14
-              run: |
-                  ICU_PATH=$(brew --prefix icu4c)
-                  mkdir build && cd build
-                  cmake .. -DICU_ROOT=$ICU_PATH && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
-    build-MacOS13-gcc13:
-        runs-on: macos-13
-        steps:
-            - uses: actions/checkout@v4
-              with:
-                  submodules: recursive
-            - name: Install ICU
-              run: brew install icu4c
-            - env:
-                  CC: gcc-13
-                  CXX: g++-13
               run: |
                   ICU_PATH=$(brew --prefix icu4c)
                   mkdir build && cd build
@@ -346,8 +331,8 @@ jobs:
             - name: Install ICU
               run: brew install icu4c
             - env:
-                  CC: clang-14
-                  CXX: clang++-14
+                  CC: clang
+                  CXX: clang++
               run: |
                   ICU_PATH=$(brew --prefix icu4c)
                   mkdir build && cd build
