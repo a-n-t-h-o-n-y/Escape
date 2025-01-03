@@ -2,10 +2,10 @@
 
 __Terminal Escape Sequence Library__
 
-`Escape` provides support for generating and interpreting terminal escape
-sequences. These can be written to the terminal to control cursor movement, text
-formatting, and colors. It also includes a `read()` function to produce
-keyboard, mouse input, and window resize events.
+`Escape` provides support for generating and interpreting terminal escape sequences.
+These can be written to the terminal to control cursor movement, text formatting, and
+colors. It also includes a `read()` function to produce keyboard, mouse input, and
+window resize events.
 
 ```cpp
 #include <iostream>
@@ -33,8 +33,8 @@ int main()
 }
 ```
 
-See [TermOx](https://github.com/a-n-t-h-o-n-y/TermOx) for a more full-featured
-widget based library that uses `Escape` under the hood.
+See [TermOx](https://github.com/a-n-t-h-o-n-y/TermOx) for a more full-featured widget
+based library that uses `Escape` under the hood.
 
 ## Features
 
@@ -62,16 +62,12 @@ widget based library that uses `Escape` under the hood.
 - [examples/pong.cpp](./examples/pong.cpp)
 - [tests/glyph.test.cpp](./tests/glyph.test.cpp)
 
-## Planned Enhancements
+## TODO
 
-- **Focus Events**: Integrate `TerminalFocusIn` and `TerminalFocusOut` events
-for focus tracking. Events are triggered on `CSI I` and `CSI O` input sequences,
-enabled by Focus Event Mouse 1004. Dependent on widespread terminal emulator
-support.
+- **Focus Events**: Integrate `TerminalFocusIn` and `TerminalFocusOut` events for focus
+tracking. Events are triggered on `CSI I` and `CSI O` input sequences, enabled by Focus
+Event Mouse 1004. Dependent on widespread terminal emulator support.
 - **BELL Sequences**: Add BELL sequences to adjust alert frequency and duration.
-- **MacOS Compatibility**: Ensure full support across MacOS terminals.
-- **Sixel Graphics**: Explore incorporating Sixel graphics for advanced terminal
-imaging, contingent on emulator compatibility.
 
 ## Current Limitations
 
@@ -80,10 +76,10 @@ imaging, contingent on emulator compatibility.
 
 ## Contributing
 
-Feedback and contributions are highly appreciated. If you encounter any issues
-or have suggestions for improvements, please open an issue on our repository.
+Feedback and contributions are appreciated. If you encounter any issues or have
+suggestions for improvements, please open an issue on our repository.
 
 ## Note
 
-Terminal features and support vary significantly across emulators. It's
-recommended to test functionality in your target environments.
+Terminal features and support vary significantly across emulators. It's recommended to
+test functionality in your target environments.
