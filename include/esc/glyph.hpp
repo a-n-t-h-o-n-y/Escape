@@ -19,43 +19,41 @@ namespace esc {
 
 /**
  * A single terminal cell display unit.
- *
  * @details Contains a symbol and a Brush to describe how the symbol should be
  * displayed.
  */
 struct Glyph {
     char32_t symbol = U' ';
-    Brush brush     = {};
+    Brush brush = {};
 
     [[nodiscard]] constexpr bool operator==(Glyph const&) const = default;
     [[nodiscard]] constexpr bool operator!=(Glyph const&) const = default;
 };
 
-// ------------------------------ CONCEPTS -------------------------------------
+// ---------------------------------- CONCEPTS -----------------------------------------
 
 /**
  * Defines the requirements for a type to be considered a Character.
  */
 template <typename T>
-concept Character =
-    std::same_as<T, char> || std::same_as<T, signed char> ||
-    std::same_as<T, unsigned char> || std::same_as<T, char8_t> ||
-    std::same_as<T, char16_t> || std::same_as<T, char32_t>;
+concept Character = std::same_as<T, char> || std::same_as<T, signed char> ||
+                    std::same_as<T, unsigned char> || std::same_as<T, char8_t> ||
+                    std::same_as<T, char16_t> || std::same_as<T, char32_t>;
 
 /**
  * Defines the requirements for a type to be considered an Attribute.
  */
 template <typename T>
-concept Attribute = std::same_as<T, ColorBG> || std::same_as<T, ColorFG> ||
-                    std::same_as<T, Trait> || std::same_as<T, RemoveTrait> ||
-                    std::same_as<T, Brush>;
+concept Attribute =
+    std::same_as<T, ColorBG> || std::same_as<T, ColorFG> || std::same_as<T, Trait> ||
+    std::same_as<T, RemoveTrait> || std::same_as<T, Brush>;
 
 /**
  * Defines the requirements for a type to be considered a GlyphString.
  */
 template <typename T>
-concept GlyphString = std::ranges::forward_range<T> &&
-                      std::same_as<std::ranges::range_value_t<T>, Glyph>;
+concept GlyphString =
+    std::ranges::forward_range<T> && std::same_as<std::ranges::range_value_t<T>, Glyph>;
 
 /**
  * Defines the requirements for a type that is a GlyphString and can have Glyphs
@@ -63,27 +61,23 @@ concept GlyphString = std::ranges::forward_range<T> &&
  */
 template <typename T>
 concept InsertableGlyphString = GlyphString<T> && requires(T& t, Glyph g) {
-    {
-        *std::inserter(t, std::begin(t)) = g
-    } -> std::same_as<std::insert_iterator<T>&>;
+    { *std::inserter(t, std::begin(t)) = g } -> std::same_as<std::insert_iterator<T>&>;
 };
 
-// ------------------------------ HELPERS --------------------------------------
+// ---------------------------------- HELPERS ------------------------------------------
 
 namespace detail {
 
 /**
  * Creates a std::vector<Glyph> from the given UTF8 string_view.
- *
  * @param sv The string_view to create Glyphs from.
  * @return A std::vector<Glyph> with each code point as a Glyph.
  * @throws std::runtime_error If the input string is not valid UTF-8.
  */
-[[nodiscard]] inline auto utf8_to_glyphs(std::string_view sv)
-    -> std::vector<Glyph>
+[[nodiscard]] inline auto utf8_to_glyphs(std::string_view sv) -> std::vector<Glyph>
 {
-    auto glyphs       = std::vector<Glyph>{};
-    auto i            = std::int32_t{0};  // Index in the UTF-8 string
+    auto glyphs = std::vector<Glyph>{};
+    auto i = std::int32_t{0};  // Index in the UTF-8 string
     auto const length = static_cast<std::int32_t>(sv.length());
 
     while (i < length) {
@@ -103,12 +97,10 @@ namespace detail {
 
 /**
  * Creates a std::vector<Glyph> from the given UTF32 string_view.
- *
  * @param sv The string_view to create Glyphs from.
  * @return A std::vector<Glyph> with each code point as a Glyph.
  */
-[[nodiscard]] inline auto utf32_to_glyphs(std::u32string_view sv)
-    -> std::vector<Glyph>
+[[nodiscard]] inline auto utf32_to_glyphs(std::u32string_view sv) -> std::vector<Glyph>
 {
     auto glyphs = std::vector<Glyph>{};
     glyphs.reserve(sv.length());
@@ -119,25 +111,22 @@ namespace detail {
 
 }  // namespace detail
 
-// ------------------------------ PIPE OPS -------------------------------------
-// ------------------------------ COLORBG --------------------------------------
+// ---------------------------------- PIPE OPS -----------------------------------------
+// ---------------------------------- COLORBG ------------------------------------------
 
 /**
  * Creates a Glyph with the given symbol and background Color.
- *
  * @param symbol The symbol to display.
- * @param c The ColorBG to apply to the return Glyph's brush.
+ * @param c      The ColorBG to apply to the return Glyph's brush.
  * @return A Glyph with the given symbol and Color background.
  */
-[[nodiscard]] constexpr auto operator|(Character auto symbol, ColorBG c)
-    -> Glyph
+[[nodiscard]] constexpr auto operator|(Character auto symbol, ColorBG c) -> Glyph
 {
     return {static_cast<char32_t>(symbol), {.background = c.value}};
 }
 
 /**
  * Copy the Glyph and modify its background Color.
- *
  * @param g The Glyph to work from.
  * @param c The ColorBG to apply to the return Glyph's brush.
  * @return The passed in Glyph with the given Color background.
@@ -150,9 +139,8 @@ namespace detail {
 
 /**
  * Modify the Glyphs in the GlyphString to have the given background Color.
- *
  * @param gs The GlyphString to work from.
- * @param c The ColorBG to apply to each Glyph's brush.
+ * @param c  The ColorBG to apply to each Glyph's brush.
  * @return The passed in GlyphString with the given Color background.
  */
 template <GlyphString T>
@@ -164,13 +152,12 @@ auto operator|(T&& gs, ColorBG c) -> decltype(auto)
     return std::forward<T>(gs);
 }
 
-// ------------------------------ COLORFG --------------------------------------
+// ---------------------------------- COLORFG ------------------------------------------
 
 /**
  * Creates a Glyph with the given symbol and foreground Color.
- *
  * @param symbol The symbol to display.
- * @param c The ColorFG to apply to the return Glyph's brush.
+ * @param c      The ColorFG to apply to the return Glyph's brush.
  * @return A Glyph with the given symbol and Color foreground.
  */
 template <Character T>
@@ -181,7 +168,6 @@ template <Character T>
 
 /**
  * Copy the Glyph and modify its foreground Color.
- *
  * @param g The Glyph to work from.
  * @param c The ColorFG to apply to the return Glyph's brush.
  * @return The passed in Glyph with the given Color foreground.
@@ -194,9 +180,8 @@ template <Character T>
 
 /**
  * Modify the Glyphs in the GlyphString to have the given foreground Color.
- *
  * @param gs The GlyphString to work from.
- * @param c The ColorFG to apply to each Glyph's brush.
+ * @param c  The ColorFG to apply to each Glyph's brush.
  * @return The passed in GlyphString with the given Color foreground.
  */
 template <GlyphString T>
@@ -208,13 +193,12 @@ auto operator|(T&& gs, ColorFG c) -> decltype(auto)
     return std::forward<T>(gs);
 }
 
-// ------------------------------- TRAIT ---------------------------------------
+// ----------------------------------- TRAIT -------------------------------------------
 
 /**
  * Creates a Glyph with the given symbol and Trait.
- *
  * @param symbol The symbol to display.
- * @param t The Trait to apply to the return Glyph's brush.
+ * @param t      The Trait to apply to the return Glyph's brush.
  * @return A Glyph with the given symbol and Trait.
  */
 [[nodiscard]] constexpr auto operator|(Character auto symbol, Trait t) -> Glyph
@@ -224,7 +208,6 @@ auto operator|(T&& gs, ColorFG c) -> decltype(auto)
 
 /**
  * Copy the Glyph and add a Trait.
- *
  * @param g The Glyph to work from.
  * @param t The Trait to apply to the return Glyph's brush.
  * @return The passed in Glyph with the given Trait added.
@@ -237,9 +220,8 @@ auto operator|(T&& gs, ColorFG c) -> decltype(auto)
 
 /**
  * Modify the Glyphs in the GlyphString to have the given Trait.
- *
  * @param gs The GlyphString to work from.
- * @param t The Trait to apply to each Glyph's brush.
+ * @param t  The Trait to apply to each Glyph's brush.
  * @return The passed in GlyphString with the given Trait.
  */
 template <GlyphString T>
@@ -251,14 +233,11 @@ auto operator|(T&& gs, Trait t) -> decltype(auto)
     return std::forward<T>(gs);
 }
 
-// ---------------------------- REMOVE TRAIT -----------------------------------
+// -------------------------------- REMOVE TRAIT ---------------------------------------
 
 /**
  * Removes a Trait from a Glyph's brush.
- *
- * @details Use the remove_trait(Trait) function to create the RemoveTrait
- * object.
- *
+ * @details Use the remove_trait(Trait) function to create the RemoveTrait object.
  * @param g The Glyph to remove the Trait from.
  * @param t The Trait to remove from the Glyph's brush.
  * @return The Glyph with the Trait removed from its brush.
@@ -271,9 +250,8 @@ auto operator|(T&& gs, Trait t) -> decltype(auto)
 
 /**
  * Modify the Glyphs in the GlyphString to remove the given Trait.
- *
  * @param gs The GlyphString to work from.
- * @param c The Trait to remove from each Glyph's brush.
+ * @param c  The Trait to remove from each Glyph's brush.
  * @return The passed in GlyphString with the given Trait removed.
  */
 template <GlyphString T>
@@ -285,13 +263,12 @@ auto operator|(T&& gs, RemoveTrait t) -> decltype(auto)
     return std::forward<T>(gs);
 }
 
-// -------------------------------- BRUSH --------------------------------------
+// ------------------------------------ BRUSH ------------------------------------------
 
 /**
  * Creates a Glyph with the given symbol and Brush.
- *
  * @param symbol The symbol to display.
- * @param b The Brush to apply to the return Glyph.
+ * @param b      The Brush to apply to the return Glyph.
  * @return A Glyph with the given symbol and Brush.
  */
 [[nodiscard]] constexpr auto operator|(Character auto symbol, Brush b) -> Glyph
@@ -301,7 +278,6 @@ auto operator|(T&& gs, RemoveTrait t) -> decltype(auto)
 
 /**
  * Copy the Glyph and replace its Brush.
- *
  * @param g The Glyph to work from.
  * @param b The Brush to apply to the return Glyph.
  * @return The passed in Glyph with the given Brush.
@@ -313,9 +289,8 @@ auto operator|(T&& gs, RemoveTrait t) -> decltype(auto)
 
 /**
  * Modify the Glyphs in the GlyphString to have the given Brush.
- *
  * @param gs The GlyphString to work from.
- * @param b The Brush to apply to each Glyph.
+ * @param b  The Brush to apply to each Glyph.
  * @return The passed in GlyphString with the given Trait.
  */
 template <GlyphString T>
@@ -327,27 +302,24 @@ auto operator|(T&& gs, Brush b) -> decltype(auto)
     return std::forward<T>(gs);
 }
 
-// ------------------------------- STRINGS -------------------------------------
+// ----------------------------------- STRINGS -----------------------------------------
 
 /**
  * Creates a std::vector<Glyph> from the given u32string_view and Attribute.
- *
- * @param sv The string_view to create Glyphs from.
+ * @param sv   The string_view to create Glyphs from.
  * @param attr The Attribute to apply to each Glyph's brush.
  * @return A std::vector<Glyph> with the given Attribute applied to each Glyph.
  */
 template <Attribute T>
-[[nodiscard]] auto operator|(std::u32string_view sv, T attr)
-    -> std::vector<Glyph>
+[[nodiscard]] auto operator|(std::u32string_view sv, T attr) -> std::vector<Glyph>
 {
     return detail::utf32_to_glyphs(sv) | attr;
 }
 
 /**
  * Creates a std::vector<Glyph> from the given string_view and Attribute.
- *
  * @details UTF-8 encoding of the input string is assumed.
- * @param sv The string_view to create Glyphs from.
+ * @param sv   The string_view to create Glyphs from.
  * @param attr The Attribute to apply to each Glyph's brush.
  * @return A std::vector<Glyph> with the given Attribute applied to each Glyph.
  * @throws std::runtime_error If the input string is not valid UTF-8.
@@ -358,7 +330,7 @@ template <Attribute T>
     return detail::utf8_to_glyphs(sv) | attr;
 }
 
-// ----------------------------- OPERATOR+= ------------------------------------
+// --------------------------------- OPERATOR+= ----------------------------------------
 
 template <InsertableGlyphString T, GlyphString U>
 auto operator+=(T& lhs, U const& rhs) -> T&
@@ -380,7 +352,7 @@ auto operator+=(T& lhs, std::u32string_view rhs) -> T&
 template <InsertableGlyphString T>
 auto operator+=(T& lhs, std::string_view rhs) -> T&
 {
-    auto i            = std::int32_t{0};  // Index in the UTF-8 string
+    auto i = std::int32_t{0};  // Index in the UTF-8 string
     auto const length = static_cast<std::int32_t>(rhs.length());
 
     auto inserter = std::inserter(lhs, std::end(lhs));
@@ -410,7 +382,7 @@ auto operator+=(T& lhs, U rhs) -> T&
     return lhs;
 }
 
-// ----------------------------- OPERATOR+ -------------------------------------
+// --------------------------------- OPERATOR+ -----------------------------------------
 
 [[nodiscard]] inline auto operator+(Glyph const& lhs, Glyph const& rhs)
     -> std::vector<Glyph>
@@ -439,7 +411,7 @@ template <InsertableGlyphString T>
 template <InsertableGlyphString T>
 [[nodiscard]] auto operator+(std::string_view lhs, T rhs) -> T
 {
-    auto i            = std::int32_t{0};  // Index in the UTF-8 string
+    auto i = std::int32_t{0};  // Index in the UTF-8 string
     auto const length = static_cast<std::int32_t>(lhs.length());
 
     auto inserter = std::inserter(rhs, std::begin(rhs));

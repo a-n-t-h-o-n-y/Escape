@@ -8,16 +8,17 @@
 
 namespace {
 
+#if defined(__APPLE__) && defined(__MACH__)
+#    define PLATFORM_EXIT() std::_Exit(1)
+#else
+#    define PLATFORM_EXIT() std::quick_exit(1)
+#endif
+
 extern "C" auto sigint_handler(int sig) -> void
 {
     if (sig == SIGINT) {
-        if (esc::sigint_flag == 1) {
-            // If this is second time ctrl + c is pressed, force exit.
-#if defined(__APPLE__) && defined(__MACH__)
-            std::_Exit(1);
-#else
-            std::quick_exit(1);
-#endif
+        if (esc::sigint_flag == 1) {  // Force exit on second ctrl + c.
+            PLATFORM_EXIT();
         }
         else {
             esc::sigint_flag = 1;

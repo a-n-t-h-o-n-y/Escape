@@ -8,11 +8,8 @@
 namespace esc {
 
 /**
- * The Key enum is a superset of all keys on a keyboard, including control
- * codes.
- *
- * @details It is designed to be used with the Mod enum to represent key
- * combinations.
+ * The Key enum is a superset of all keys on a keyboard, including control codes.
+ * @details It is designed to be used with the Mod enum to represent key combinations.
  */
 enum class Key : char32_t {
     // C0 Control Codes
@@ -237,23 +234,21 @@ enum class Key : char32_t {
 
 /**
  * The Mod enum is used to represent modifier keys on a keyboard.
- *
- * @details It is designed to be used with the Key enum to represent key
- * combinations. These are only generated when KeyMode::Raw is set. In
- * KeyMode::Normal these not seen as separate keys, for instance ctrl + a is
- * seen as Key::StartOfHeading and shift + a is seen as Key::A.
+ * @details It is designed to be used with the Key enum to represent key combinations.
+ * These are only generated when KeyMode::Raw is set. In KeyMode::Normal these not seen
+ * as separate keys, for instance ctrl + a is seen as Key::StartOfHeading and shift + a
+ * is seen as Key::A.
  */
 enum class Mod : std::underlying_type_t<Key> {
     // Last bit of unicode currently used is (1 << 20).
     Shift = (std::underlying_type_t<Key>{1} << 30),
-    Ctrl  = (std::underlying_type_t<Key>{1} << 29),
-    Alt   = (std::underlying_type_t<Key>{1} << 28),
-    Meta  = (std::underlying_type_t<Key>{1} << 27)
+    Ctrl = (std::underlying_type_t<Key>{1} << 29),
+    Alt = (std::underlying_type_t<Key>{1} << 28),
+    Meta = (std::underlying_type_t<Key>{1} << 27)
 };
 
 /**
  * Combine a Key and a Mod to create a new Key with the modifier added.
- *
  * @param mod The modifier to add to the key.
  * @param key The key to add the modifier to.
  * @return A new Key with the modifier added.
@@ -266,19 +261,14 @@ constexpr auto operator|(Mod mod, Key key) -> Key
 
 /**
  * Combine a Key and a Mod to create a new Key with the modifier added.
- *
  * @param key The key to add the modifier to.
  * @param mod The modifier to add to the key.
  * @return A new Key with the modifier added.
  */
-constexpr auto operator|(Key key, Mod mod) -> Key
-{
-    return ::esc::operator|(mod, key);
-}
+constexpr auto operator|(Key key, Mod mod) -> Key { return ::esc::operator|(mod, key); }
 
 /**
  * Combine two Mod enums into a single Mod enum.
- *
  * @param a The first Mod to combine.
  * @param b The second Mod to combine.
  * @return A new Mod with both modifiers combined.
@@ -289,11 +279,8 @@ constexpr auto operator|(Mod a, Mod b) -> Mod
                             static_cast<std::underlying_type_t<Mod>>(b));
 }
 
-/// Return true if \p mod is set on the given \p key.
-
 /**
  * Return true if \p mod is set on the given \p key.
- *
  * @param key The key to check for the modifier.
  * @param mod The modifier to check for on the key.
  * @return True if the modifier is set on the key, false otherwise.
@@ -306,7 +293,6 @@ constexpr auto is_set(Key key, Mod mod) -> bool
 
 /**
  * Translate a char to one of the first 256 Key enum values.
- *
  * @param c The char to translate to a Key.
  * @return The Key value that corresponds to the given char.
  */
@@ -314,7 +300,6 @@ constexpr auto char_to_key(char c) -> Key { return static_cast<Key>(c); }
 
 /**
  * Translate a char32_t to a Key value.
- *
  * @param c The char32_t to translate to a Key.
  * @return The Key value that corresponds to the given char32_t.
  */
@@ -322,33 +307,31 @@ constexpr auto char32_to_key(char32_t c) -> Key { return static_cast<Key>(c); }
 
 /**
  * Translate a keycode \p k into its char representation.
- *
- * @details Return '\0' if \p k does not have a printable representation, or
- * it's too large to fit in a single char. See key_to_char32(Key).
+ * @details Return '\0' if \p k does not have a printable representation, or it's too
+ * large to fit in a single char. See key_to_char32(Key).
  * @param k The keycode to translate to a char.
  * @return The char representation of the keycode.
  */
 constexpr auto key_to_char(Key k) -> char
 {
-    constexpr auto low  = 32;
+    constexpr auto low = 32;
     constexpr auto high = 126;
-    auto const value    = static_cast<char32_t>(k);
+    auto const value = static_cast<char32_t>(k);
     return (value < low || value > high) ? '\0' : static_cast<char>(value);
 }
 
 /**
  * Translate a keycode \p k into its char32_t representation.
- *
  * @details Return U'\0' if \p k is a ctrl char or special key.
  * @param k The keycode to translate to a char32_t.
  * @return The char32_t representation of the keycode.
  */
 constexpr auto key_to_char32(Key k) -> char32_t
 {
-    constexpr auto low  = short{32};
-    constexpr auto mid  = short{126};
+    constexpr auto low = short{32};
+    constexpr auto mid = short{126};
     constexpr auto high = short{160};
-    auto const value    = static_cast<char32_t>(k);
+    auto const value = static_cast<char32_t>(k);
     if (is_set(k, Mod::Shift) || is_set(k, Mod::Ctrl) || is_set(k, Mod::Alt) ||
         is_set(k, Mod::Meta)) {
         return U'\0';
@@ -368,8 +351,8 @@ template <>
 struct hash<esc::Key> {
    public:
     using argument_type = esc::Key;
-    using result_type   = std::size_t;
-    using underlying_t  = std::underlying_type_t<argument_type>;
+    using result_type = std::size_t;
+    using underlying_t = std::underlying_type_t<argument_type>;
 
    public:
     auto operator()(argument_type const& key) const noexcept -> result_type

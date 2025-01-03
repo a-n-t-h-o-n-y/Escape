@@ -6,15 +6,12 @@
 namespace esc {
 
 /**
- * Represents characteristics of the terminal display for text.
- *
- * @details An escape sequence can be generated from this type using
- *          escape(Brush) in sequence.hpp
+ * Holds traits and colors for text display on a terminal.
  */
 struct Brush {
     Color background = XColor::Default;
     Color foreground = XColor::Default;
-    Traits traits    = Traits{Trait::None};
+    Traits traits = Traits{Trait::None};
 
     [[nodiscard]] constexpr bool operator==(Brush const&) const = default;
     [[nodiscard]] constexpr bool operator!=(Brush const&) const = default;

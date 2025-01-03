@@ -14,7 +14,7 @@
 
 namespace esc {
 
-// MOVE CURSOR -----------------------------------------------------------------
+// MOVE CURSOR -------------------------------------------------------------------------
 
 /**
  * Type alias to move the cursor to a Point.
@@ -23,16 +23,14 @@ using Cursor = Point;
 
 /**
  * Get the control sequence to move the cursor to the specified Point.
- *
- * @details Top-left cell of the terminal is Point{x:0, y:0}. x is horizontal
- *          and y is vertical. The next string output to stdout will happen
- *          starting at \p p.
- * @param   p The Point to move the cursor to.
- * @return  The control sequence to move the cursor to the specified Point.
+ * @details Top-left cell of the terminal is Point{x:0, y:0}. x is horizontal and y is
+ * vertical. The next string output to stdout will happen starting at \p p.
+ * @param p The Point to move the cursor to.
+ * @return The control sequence to move the cursor to the specified Point.
  */
 [[nodiscard]] auto escape(Cursor p) -> std::string;
 
-// CLEAR -----------------------------------------------------------------------
+// CLEAR -------------------------------------------------------------------------------
 
 /**
  * Tag type to clear the row the cursor is currently at.
@@ -41,10 +39,9 @@ struct BlankRow {};
 
 /**
  * Get the control sequence to clear the row the cursor is currently at.
- *
  * @details Write escape(Cursor) result before to pick which line to clear.
- * @param   BlankRow The tag type to clear the row the cursor is currently at.
- * @return  The control sequence to clear the row the cursor is currently at.
+ * @param BlankRow The tag type to clear the row the cursor is currently at.
+ * @return The control sequence to clear the row the cursor is currently at.
  */
 [[nodiscard]] auto escape(BlankRow) -> std::string;
 
@@ -55,24 +52,21 @@ struct BlankScreen {};
 
 /**
  * Get the control sequence to erase everything on the screen.
- *
- * @param  BlankScreen The tag type to clear the entire screen.
+ * @param BlankScreen The tag type to clear the entire screen.
  * @return The control sequence to erase everything on the screen.
  */
 [[nodiscard]] auto escape(BlankScreen) -> std::string;
 
-// TRAITS ----------------------------------------------------------------------
+// TRAITS ------------------------------------------------------------------------------
 
 /**
  * Get the control sequence to set any number of Traits, clears existing Traits.
- *
- * @details These Traits will be applied to any text written to the screen after
- *          this call, and before another call to escape(Traits). Traits can be
- *          built up into a Traits object with operator|, and can be implicitly
- *          converted into Traits objects. A single Trait::None will clear the
- *          set traits.
- * @param   traits The Traits to set.
- * @return  The control sequence to set any number of Traits, clears existing
+ * @details These Traits will be applied to any text written to the screen after this
+ * call, and before another call to escape(Traits). Traits can be built up into a Traits
+ * object with operator|, and can be implicitly converted into Traits objects. A single
+ * Trait::None will clear the set traits.
+ * @param traits The Traits to set.
+ * @return control sequence to set any number of Traits, clears existing
  */
 [[nodiscard]] auto escape(Traits traits) -> std::string;
 
@@ -83,7 +77,6 @@ struct BlankScreen {};
 
 /**
  * Get the control sequence to remove all Traits currently set.
- *
  * @details Any text written after will have no Traits.
  * @return The control sequence to remove all Traits currently set.
  */
@@ -91,126 +84,103 @@ struct BlankScreen {};
 
 /**
  * Get the last Traits that were created with escape(Traits).
- *
- * @details May not represent what is on the screen if the last call to
- *          escape(Traits) was not written to stdout.
- * @return  The last Traits that were created with escape(Traits).
+ * @details May not represent what is on the screen if the last call to escape(Traits)
+ * was not written to stdout.
+ * @return The last Traits that were created with escape(Traits).
  */
 [[nodiscard]] auto traits() -> Traits;
 
-// BACKGROUND COLOR ------------------------------------------------------------
+// BACKGROUND COLOR --------------------------------------------------------------------
 
 /**
  * Get the control sequence to set the background to the specified Color.
- *
- * @param  c The Color to set the background to.
+ * @param c The Color to set the background to.
  * @return The control sequence to set the background to the specified Color.
  */
 [[nodiscard]] auto escape(ColorBG c) -> std::string;
 
 /**
- * Get the control sequence to set the background to the specified xterm palette
+ * Get the control sequence to set the background to the specified xterm palette index.
+ * @param c The xterm palette index to set the background to.
+ * @return The control sequence to set the background to the specified xterm palette
  * index.
- *
- * @param  c The xterm palette index to set the background to.
- * @return The control sequence to set the background to the specified xterm
- *         palette index.
  */
 [[nodiscard]] auto escape_bg(XColor c) -> std::string;
 
 /**
- * Get the control sequence to set the background to the specified terminal true
+ * Get the control sequence to set the background to the specified terminal true color.
+ * @param c The terminal true color to set the background to.
+ * @return The control sequence to set the background to the specified terminal true
  * color.
- *
- * @param  c The terminal true color to set the background to.
- * @return The control sequence to set the background to the specified terminal
- *         true color.
  */
 [[nodiscard]] auto escape_bg(TrueColor c) -> std::string;
 
 /**
  * Get the last Color that was created with escape(ColorBG).
- *
- * @details May not represent what is on the screen if the last call to
- *          escape(ColorBG) was not written to stdout.
- * @return  The last Color that was created with escape(ColorBG).
+ * @details May not represent what is on the screen if the last call to escape(ColorBG)
+ * was not written to stdout.
+ * @return The last Color that was created with escape(ColorBG).
  */
 [[nodiscard]] auto background_color() -> Color;
 
-// FOREGROUND COLOR ------------------------------------------------------------
+// FOREGROUND COLOR --------------------------------------------------------------------
 
 /**
  * Get the control sequence to set the foreground to the specified Color.
- *
- * @param  c The Color to set the foreground to.
+ * @param c The Color to set the foreground to.
  * @return The control sequence to set the foreground to the specified Color.
  */
 [[nodiscard]] auto escape(ColorFG c) -> std::string;
 
 /**
- * Get the control sequence to set the foreground to the specified xterm palette
- * index.
- *
- * @param  c The xterm palette index to set the foreground to.
+ * Get the control sequence to set the foreground to the specified xterm palette index.
+ * @param c The xterm palette index to set the foreground to.
  * @return The control sequence to set the foreground to the specified xterm
  */
 [[nodiscard]] auto escape_fg(XColor c) -> std::string;
 
 /**
- * Get the control sequence to set the foreground to the specified terminal true
+ * Get the control sequence to set the foreground to the specified terminal true color.
+ * @param c The terminal true color to set the foreground to.
+ * @return The control sequence to set the foreground to the specified terminal true
  * color.
- *
- * @param  c The terminal true color to set the foreground to.
- * @return The control sequence to set the foreground to the specified terminal
- *         true color.
  */
 [[nodiscard]] auto escape_fg(TrueColor c) -> std::string;
 
 /**
  * Get the last Color that was created with escape(ColorFG).
- *
- * @details May not represent what is on the screen if the last call to
- *          escape(ColorFG) was not written to stdout.
- * @return  The last Color that was created with escape(ColorFG).
+ * @details May not represent what is on the screen if the last call to escape(ColorFG)
+ * was not written to stdout.
+ * @return The last Color that was created with escape(ColorFG).
  */
 [[nodiscard]] auto foreground_color() -> Color;
 
-// BRUSH -----------------------------------------------------------------------
+// BRUSH -------------------------------------------------------------------------------
 
 /**
  * Get the control sequence to set Brush Colors and Traits.
- *
- * @param  b The Brush to set.
+ * @param b The Brush to set.
  * @return The control sequence to set Brush Colors and Traits.
  */
 [[nodiscard]] auto escape(Brush b) -> std::string;
 
-// CONVENIENCE -----------------------------------------------------------------
+// CONVENIENCE -------------------------------------------------------------------------
 
 /**
  * Types that can have a control sequence generated for them.
  */
 template <typename T>
-concept Escapable = detail::AnyOf<T,
-                                  Cursor,
-                                  BlankRow,
-                                  BlankScreen,
-                                  Trait,
-                                  Traits,
-                                  ColorBG,
-                                  ColorFG,
-                                  Brush>;
+concept Escapable = detail::
+    AnyOf<T, Cursor, BlankRow, BlankScreen, Trait, Traits, ColorBG, ColorFG, Brush>;
 
 /**
  * Convenience function to concatenate multiple escapable objects at once.
- *
  * @details Returns a single string containing the escape sequences for all args
- * @tparam  Args... A list of escapable types.
- * @param   args... A list of escapable objects.
- * @return  A single string containing the escape sequences for all args...
+ * @tparam Args... A list of escapable types.
+ * @param args... A list of escapable objects.
+ * @return A single string containing the escape sequences for all args...
  */
-template <Escapable... Args,
-          typename = std::enable_if_t<(sizeof...(Args) > 1), void>>
+template <Escapable... Args, typename = std::enable_if_t<(sizeof...(Args) > 1), void>>
 [[nodiscard]] auto escape(Args&&... args) -> std::string
 {
     return (escape(std::forward<Args>(args)) + ...);

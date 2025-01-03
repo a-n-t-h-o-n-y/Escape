@@ -1,11 +1,5 @@
 #pragma once
 
-/**
- * @file debug.hpp
- *
- * Debugging utilities for Escape.
- */
-
 #include <iosfwd>
 #include <string>
 
@@ -17,7 +11,6 @@ namespace esc::detail {
 
 /**
  * Translate a single non-visible character into a visible string.
- *
  * @details Visible chars pass through unchanged, into a string.
  * @param c The character to translate.
  * @return A visible string representation of the character.
@@ -26,7 +19,6 @@ namespace esc::detail {
 
 /**
  * Translate any control characters to a visible byte string.
- *
  * @details Visible chars pass through unchanged.
  * @param sequence The string to translate.
  * @return A visible string representation of the sequence.
@@ -35,8 +27,7 @@ namespace esc::detail {
 
 /**
  * Print KeyPress struct display to \p os.
- *
- * @param k The KeyPress struct to print.
+ * @param k  The KeyPress struct to print.
  * @param os The output stream to print to.
  * @return The output stream \p os.
  */
@@ -44,8 +35,7 @@ auto print(::esc::KeyPress k, std::ostream& os) -> std::ostream&;
 
 /**
  * Print MousePress struct display to \p os.
- *
- * @param m The MousePress struct to print.
+ * @param m  The MousePress struct to print.
  * @param os The output stream to print to.
  * @return The output stream \p os.
  */
@@ -53,8 +43,7 @@ auto print(::esc::MousePress m, std::ostream& os) -> std::ostream&;
 
 /**
  * Print MouseRelease struct display to \p os.
- *
- * @param m The MouseRelease struct to print.
+ * @param m  The MouseRelease struct to print.
  * @param os The output stream to print to.
  * @return The output stream \p os.
  */
@@ -62,8 +51,7 @@ auto print(::esc::MouseRelease m, std::ostream& os) -> std::ostream&;
 
 /**
  * Print MouseWheel struct display to \p os.
- *
- * @param m The MouseWheel struct to print.
+ * @param m  The MouseWheel struct to print.
  * @param os The output stream to print to.
  * @return The output stream \p os.
  */
@@ -71,8 +59,7 @@ auto print(::esc::MouseWheel m, std::ostream& os) -> std::ostream&;
 
 /**
  * Print MouseMove struct display to \p os.
- *
- * @param m The MouseMove struct to print.
+ * @param m  The MouseMove struct to print.
  * @param os The output stream to print to.
  * @return The output stream \p os.
  */
@@ -80,8 +67,7 @@ auto print(::esc::MouseMove m, std::ostream& os) -> std::ostream&;
 
 /**
  * Print Resize struct display to \p os.
- *
- * @param w The Resize struct to print.
+ * @param w  The Resize struct to print.
  * @param os The output stream to print to.
  * @return The output stream \p os.
  */

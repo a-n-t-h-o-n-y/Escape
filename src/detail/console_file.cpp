@@ -13,22 +13,18 @@ namespace {
 constexpr auto get_kb_type = 0x4B33;
 constexpr auto get_kb_mode = 0x4B44;
 constexpr auto set_kb_mode = 0x4B45;
-constexpr auto kb_84       = 0x01;
-constexpr auto kb_101      = 0x02;
+constexpr auto kb_84 = 0x01;
+constexpr auto kb_101 = 0x02;
 
 constexpr auto console_paths = std::array<char const*, 6>{
     "/proc/self/fd/0", "/dev/tty",    "/dev/tty0",
     "/dev/vc/0",       "/dev/systty", "/dev/console",
 };
 
-/// Return true if \p file_descriptor is a console.
-
 /**
  * Return true if \p file_descriptor is a console.
- *
- * @details This checks if the file descriptor is a console by checking if it is
- * a TTY and then checking the keyboard type.
- *
+ * @details This checks if the file descriptor is a console by checking if it is a TTY
+ * and then checking the keyboard type.
  * @param file_descriptor The file descriptor to check.
  * @return True if \p file_descriptor is a console.
  */
@@ -42,12 +38,10 @@ constexpr auto console_paths = std::array<char const*, 6>{
 
 /**
  * Attempt to open device file descriptor for \p filename.
- *
- * @details This function attempts to open the file descriptor for \p filename
- * with O_RDWR, O_WRONLY, and O_RDONLY in that order. If the file descriptor is
- * opened successfully, it is returned. If the file descriptor cannot be opened,
- * -1 is returned.
- *
+ * @details This function attempts to open the file descriptor for \p filename with
+ * O_RDWR, O_WRONLY, and O_RDONLY in that order. If the file descriptor is opened
+ * successfully, it is returned. If the file descriptor cannot be opened, -1 is
+ * returned.
  * @param filename The filename to open.
  * @return The file descriptor if successful, or -1 if not.
  */
@@ -90,8 +84,7 @@ auto open_console_file() -> int
         }
     }
 
-    throw std::runtime_error{
-        "open_console_file(): Can't open console file. Try sudo."};
+    throw std::runtime_error{"open_console_file(): Can't open console file. Try sudo."};
 }
 
 auto current_keyboard_mode(int file_descriptor) -> long

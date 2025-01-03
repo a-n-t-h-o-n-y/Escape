@@ -318,8 +318,7 @@ auto process(MousePress m) -> EventResponse
         set(mouse_mode);
         result.append(mouse_mode_display(offset.change_mouse_mode, mouse_mode));
     }
-    return result.append(
-        mouse_display(offset.mouse_display, m.mouse, "MousePress"));
+    return result.append(mouse_display(offset.mouse_display, m.mouse, "MousePress"));
 }
 
 auto process(MouseRelease m) -> EventResponse
@@ -364,8 +363,8 @@ auto main() -> int
         flush();
 
         while (true) {
-            auto const r = std::visit([](auto event) { return process(event); },
-                                      esc::read());
+            auto const r =
+                std::visit([](auto event) { return process(event); }, esc::read());
             if (!r) {
                 break;
             }

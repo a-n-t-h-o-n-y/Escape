@@ -28,7 +28,7 @@ constexpr auto logo = std::string_view{
 // get_display_bytes() to retrieve the display for each state type and process()
 // to handle events for each state.
 
-// STATES ----------------------------------------------------------------------
+// STATES ------------------------------------------------------------------------------
 
 struct SplashScreen {
     std::uint16_t hue{0};
@@ -74,7 +74,7 @@ struct Game {
         Player player;
         Paddle paddle{
             .top = {.x = 1, .y = (game_space.height - Paddle::height) / 2},
-            .dy  = 0,
+            .dy = 0,
         };
     } left;
 
@@ -84,7 +84,7 @@ struct Game {
         Paddle paddle{
             .top = {.x = game_space.width - 2,
                     .y = (game_space.height - Paddle::height) / 2},
-            .dy  = 0,
+            .dy = 0,
         };
     } right;
 
@@ -102,11 +102,11 @@ struct PlayerSelectMenu {
 
     Game::Player left_player = {
         .name = "Human",
-        .ai   = std::nullopt,
+        .ai = std::nullopt,
     };
     Game::Player right_player = {
         .name = "Human",
-        .ai   = std::nullopt,
+        .ai = std::nullopt,
     };
 
     bool left_selected{true};
@@ -115,33 +115,33 @@ struct PlayerSelectMenu {
         {
             "Slow AI",
             Game::AI{
-                .action_interval    = 7,
+                .action_interval = 7,
                 .reaction_threshold = 60.f,
-                .velocity           = 0.1f,
+                .velocity = 0.1f,
             },
         },
         {
             "Medium AI",
             Game::AI{
-                .action_interval    = 5,
+                .action_interval = 5,
                 .reaction_threshold = 30.f,
-                .velocity           = 0.2f,
+                .velocity = 0.2f,
             },
         },
         {
             "Fast AI",
             Game::AI{
-                .action_interval    = 3,
+                .action_interval = 3,
                 .reaction_threshold = 25.f,
-                .velocity           = 0.25f,
+                .velocity = 0.25f,
             },
         },
         {
             "Aggressive AI",
             Game::AI{
-                .action_interval    = 1,
+                .action_interval = 1,
                 .reaction_threshold = 10.f,
-                .velocity           = 0.75f,
+                .velocity = 0.75f,
             },
         },
         {
@@ -164,7 +164,7 @@ struct HowTo {
 
 using State = std::variant<SplashScreen, Menu, Game, PlayerSelectMenu, HowTo>;
 
-// EVENTS ----------------------------------------------------------------------
+// EVENTS ------------------------------------------------------------------------------
 
 // Event handlers return the next State.
 // std::nullopt is a quit request
@@ -183,8 +183,8 @@ using EventResponse = std::optional<State>;
     switch (event.key) {
         case Key::ArrowUp:
         case Key::k: {
-            state.selected = (state.selected + state.options.size() - 1) %
-                             state.options.size();
+            state.selected =
+                (state.selected + state.options.size() - 1) % state.options.size();
             return state;
         }
 
@@ -208,12 +208,12 @@ using EventResponse = std::optional<State>;
 
 [[nodiscard]] auto generate_initial_velocity() -> Game::Ball::Velocity
 {
-    using int_dist   = std::uniform_int_distribution<int>;
+    using int_dist = std::uniform_int_distribution<int>;
     using float_dist = std::uniform_real_distribution<float>;
 
     auto rng = std::mt19937{std::random_device{}()};
-    auto dx  = float_dist{0.5, 0.8}(rng);
-    auto dy  = float_dist{0.1, 0.4}(rng);
+    auto dx = float_dist{0.5, 0.8}(rng);
+    auto dy = float_dist{0.1, 0.4}(rng);
     if (int_dist{0, 1}(rng) == 0) {
         dx = -dx;
     }
@@ -260,16 +260,15 @@ using EventResponse = std::optional<State>;
     }
 }
 
-[[nodiscard]] auto process(KeyPress event, PlayerSelectMenu state)
-    -> EventResponse
+[[nodiscard]] auto process(KeyPress event, PlayerSelectMenu state) -> EventResponse
 {
     switch (event.key) {
         case Key::Escape: return Menu{};
 
         case Key::ArrowUp:
         case Key::k: {
-            state.selected = (state.selected + state.options.size() - 1) %
-                             state.options.size();
+            state.selected =
+                (state.selected + state.options.size() - 1) % state.options.size();
             return state;
         }
 
@@ -281,14 +280,14 @@ using EventResponse = std::optional<State>;
 
         case Key::Enter: {
             if (state.left_selected) {
-                state.left_player   = state.options[state.selected];
+                state.left_player = state.options[state.selected];
                 state.left_selected = false;
                 return state;
             }
             else {
                 state.right_player = state.options[state.selected];
                 return Game{
-                    .left  = {.player = state.left_player},
+                    .left = {.player = state.left_player},
                     .right = {.player = state.right_player},
                 };
             }
@@ -314,7 +313,7 @@ using EventResponse = std::optional<State>;
 // Catch-All
 [[nodiscard]] auto process(auto, auto state) -> EventResponse { return state; }
 
-// DISPLAY ---------------------------------------------------------------------
+// DISPLAY -----------------------------------------------------------------------------
 
 [[nodiscard]] auto get_display_bytes(SplashScreen const& state, Area dimensions)
     -> std::string
@@ -348,8 +347,7 @@ using EventResponse = std::optional<State>;
     return bytes += escape(Trait::Dim) + enter + escape(Trait::None);
 }
 
-[[nodiscard]] auto get_display_bytes(Menu const& state, Area dimensions)
-    -> std::string
+[[nodiscard]] auto get_display_bytes(Menu const& state, Area dimensions) -> std::string
 {
     auto const padding = [&] {
         auto const width = (int)logo.find('\n');
@@ -381,25 +379,22 @@ using EventResponse = std::optional<State>;
 
 [[nodiscard]] auto velocity_to_color(Game::Ball::Velocity velocity) -> Color
 {
-    auto const speed =
-        std::sqrt(velocity.dx * velocity.dx + velocity.dy * velocity.dy);
+    auto const speed = std::sqrt(velocity.dx * velocity.dx + velocity.dy * velocity.dy);
 
     return TColor{HSL{
-        .hue        = std::uint16_t((90 + (int)(speed * 160)) % 360),
+        .hue = std::uint16_t((90 + (int)(speed * 160)) % 360),
         .saturation = 80,
-        .lightness  = 70,
+        .lightness = 70,
     }};
 }
 
-[[nodiscard]] auto get_display_bytes(Game const& state, Area dimensions)
-    -> std::string
+[[nodiscard]] auto get_display_bytes(Game const& state, Area dimensions) -> std::string
 {
     static constexpr auto display_space = Game::game_space;
 
     if (dimensions.width < display_space.width ||
         dimensions.height < display_space.height) {
-        return escape(Cursor{.x = 0, .y = 0}) +
-               "Terminal too small to display game";
+        return escape(Cursor{.x = 0, .y = 0}) + "Terminal too small to display game";
     }
 
     auto const offset = Point{
@@ -457,8 +452,7 @@ using EventResponse = std::optional<State>;
                 cursor.y += 1;
             }
 
-            return bytes +=
-                   escape(cursor, Trait::Inverse) + edge + escape(Trait::None);
+            return bytes += escape(cursor, Trait::Inverse) + edge + escape(Trait::None);
         };
 
         bytes += paint_paddle(state.left.paddle);
@@ -471,11 +465,10 @@ using EventResponse = std::optional<State>;
         bytes += std::to_string(state.left.score);
 
         auto const rhs = state.right.player.name + ": ";
-        bytes +=
-            escape(offset + Point{
-                                .x = display_space.width - (int)rhs.size() - 1,
-                                .y = -2,
-                            });
+        bytes += escape(offset + Point{
+                                     .x = display_space.width - (int)rhs.size() - 1,
+                                     .y = -2,
+                                 });
         bytes += rhs;
         bytes += std::to_string(state.right.score);
     }
@@ -520,8 +513,8 @@ using EventResponse = std::optional<State>;
     return bytes;
 }
 
-[[nodiscard]] auto get_display_bytes(PlayerSelectMenu const& state,
-                                     Area dimensions) -> std::string
+[[nodiscard]] auto get_display_bytes(PlayerSelectMenu const& state, Area dimensions)
+    -> std::string
 {
     auto bytes = escape(Cursor{
         .x = (dimensions.width - (int)state.title.size()) / 2,
@@ -567,24 +560,21 @@ using EventResponse = std::optional<State>;
     return bytes;
 }
 
-[[nodiscard]] auto get_display_bytes(HowTo const& state, Area dimensions)
-    -> std::string
+[[nodiscard]] auto get_display_bytes(HowTo const& state, Area dimensions) -> std::string
 {
     auto bytes = escape(Cursor{
         .x = (dimensions.width - (int)state.title.size()) / 2,
         .y = 2,
     });
 
-    bytes += escape(Trait::Bold | Trait::Underline) + state.title +
-             escape(Trait::None);
+    bytes += escape(Trait::Bold | Trait::Underline) + state.title + escape(Trait::None);
 
     for (std::size_t i = 0; i < state.instructions.size(); ++i) {
         bytes += escape(Cursor{
             .x = (dimensions.width - 40) / 2,
             .y = 4 + (int)i,
         });
-        bytes += escape(Trait::Bold) + state.instructions[i][0] +
-                 escape(Trait::None);
+        bytes += escape(Trait::Bold) + state.instructions[i][0] + escape(Trait::None);
         bytes += escape(Cursor{
             .x = (dimensions.width + 8) / 2,
             .y = 4 + (int)i,
@@ -621,12 +611,12 @@ using EventResponse = std::optional<State>;
     return bytes;
 }
 
-// INCREMENT -------------------------------------------------------------------
+// INCREMENT ---------------------------------------------------------------------------
 
 [[nodiscard]] auto increment_game_state(Game state) -> std::optional<State>
 {
-    auto& ball  = state.ball;
-    auto& left  = state.left;
+    auto& ball = state.ball;
+    auto& left = state.left;
     auto& right = state.right;
 
     // paddle/ball collisions
@@ -637,8 +627,7 @@ using EventResponse = std::optional<State>;
         ball.velocity.dy += left.paddle.dy * 0.25f;
         ball.at.x = 2.f;
     }
-    else if (ball.velocity.dx > 0.f &&
-             ball.at.x > Game::game_space.width - 3.f &&
+    else if (ball.velocity.dx > 0.f && ball.at.x > Game::game_space.width - 3.f &&
              ball.at.y + 0.5f >= right.paddle.top.y &&
              ball.at.y - 0.5f <= right.paddle.top.y + Game::Paddle::height) {
         ball.velocity.dx *= -1.07;
@@ -665,16 +654,15 @@ using EventResponse = std::optional<State>;
     // check for ball/wall collisions
     if (ball.at.y <= 0.5) {
         ball.velocity.dy = -ball.velocity.dy;
-        ball.at.y        = 0.51;
+        ball.at.y = 0.51;
     }
     else if (ball.at.y >= Game::game_space.height - 0.5) {
         ball.velocity.dy = -ball.velocity.dy;
-        ball.at.y        = Game::game_space.height - 0.51;
+        ball.at.y = Game::game_space.height - 0.51;
     }
 
     constexpr auto init_ball = Game::Ball{
-        .at       = {.x = Game::game_space.width / 2,
-                     .y = Game::game_space.height / 2},
+        .at = {.x = Game::game_space.width / 2, .y = Game::game_space.height / 2},
         .velocity = {0, 0},
     };
 
@@ -692,30 +680,27 @@ using EventResponse = std::optional<State>;
     if (left.paddle.top.y < 0) {
         left.paddle = {
             .top = {.x = 1, .y = 0},
-            .dy  = 0,
+            .dy = 0,
         };
     }
-    else if (left.paddle.top.y >
-             Game::game_space.height - Game::Paddle::height) {
+    else if (left.paddle.top.y > Game::game_space.height - Game::Paddle::height) {
         left.paddle = {
-            .top = {.x = 1,
-                    .y = Game::game_space.height - Game::Paddle::height},
-            .dy  = 0,
+            .top = {.x = 1, .y = Game::game_space.height - Game::Paddle::height},
+            .dy = 0,
         };
     }
 
     if (right.paddle.top.y < 0) {
         right.paddle = {
             .top = {.x = Game::game_space.width - 2, .y = 0},
-            .dy  = 0,
+            .dy = 0,
         };
     }
-    else if (right.paddle.top.y >
-             Game::game_space.height - Game::Paddle::height) {
+    else if (right.paddle.top.y > Game::game_space.height - Game::Paddle::height) {
         right.paddle = {
             .top = {.x = Game::game_space.width - 2,
                     .y = Game::game_space.height - Game::Paddle::height},
-            .dy  = 0,
+            .dy = 0,
         };
     }
 
@@ -723,13 +708,13 @@ using EventResponse = std::optional<State>;
     if (left.player.ai.has_value()) {
         static auto frame_count = 0;
 
-        auto& ai     = *left.player.ai;
+        auto& ai = *left.player.ai;
         auto& paddle = left.paddle;
 
         if (ball.velocity.dx < 0.f && ball.at.x < ai.reaction_threshold) {
             if (frame_count % ai.action_interval == 0) {
                 auto const paddle_center = paddle.top.y + paddle.height / 2.f;
-                auto const distance      = ball.at.y - paddle_center;
+                auto const distance = ball.at.y - paddle_center;
                 paddle.dy += ai.velocity * std::min(distance, 5.f) /
                              ((ball.at.x / ai.reaction_threshold) + 1);
             }
@@ -744,18 +729,18 @@ using EventResponse = std::optional<State>;
     if (right.player.ai.has_value()) {
         static auto frame_count = 0;
 
-        auto& ai     = *right.player.ai;
+        auto& ai = *right.player.ai;
         auto& paddle = right.paddle;
 
         if (ball.velocity.dx > 0.f &&
             ball.at.x > Game::game_space.width - ai.reaction_threshold) {
             if (frame_count % ai.action_interval == 0) {
                 auto const paddle_center = paddle.top.y + paddle.height / 2.f;
-                auto const distance      = ball.at.y - paddle_center;
-                paddle.dy += ai.velocity * std::min(distance, 5.f) /
-                             (((Game::game_space.width - ball.at.x) /
-                               ai.reaction_threshold) +
-                              1);
+                auto const distance = ball.at.y - paddle_center;
+                paddle.dy +=
+                    ai.velocity * std::min(distance, 5.f) /
+                    (((Game::game_space.width - ball.at.x) / ai.reaction_threshold) +
+                     1);
             }
             ++frame_count;
         }
@@ -767,7 +752,7 @@ using EventResponse = std::optional<State>;
     return state;
 }
 
-// MAIN ------------------------------------------------------------------------
+// MAIN --------------------------------------------------------------------------------
 
 auto try_main() -> int
 {
@@ -806,8 +791,8 @@ auto try_main() -> int
             }
             else if (std::holds_alternative<SplashScreen>(*state)) {
                 auto& splash = std::get<SplashScreen>(*state);
-                splash.hue   = (splash.hue + 1) % 360;
-                state        = splash;
+                splash.hue = (splash.hue + 1) % 360;
+                state = splash;
             }
             timeout = init_timeout;
         }

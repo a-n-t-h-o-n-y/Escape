@@ -6,7 +6,6 @@ namespace esc::detail {
 
 /**
  * Check if \p TERM is a unicode rxvt terminal type.
- *
  * @param TERM The terminal type to check.
  * @return True if \p TERM is a unicode rxvt terminal type.
  */

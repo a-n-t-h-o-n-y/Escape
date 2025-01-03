@@ -10,9 +10,8 @@ concept ScopedEnum =
 
 /**
  * Container for Scope Enum Flag Types.
- *
- * @details E must be a scoped enum and it is assumed each value in the enum is
- *          assigned a power of two.
+ * @details E must be a scoped enum and it is assumed each value in the enum is assigned
+ * a power of two.
  * @tparam E The scoped enum type to use as the flag type.
  */
 template <ScopedEnum E>
@@ -31,7 +30,6 @@ class Mask {
    public:
     /**
      * Check if the mask contains the flag \p e.
-     *
      * @param e The flag to check for.
      * @return True if the mask contains the flag \p e.
      */
@@ -42,7 +40,6 @@ class Mask {
 
     /**
      * Modifies the container by adding the flag \p e.
-     *
      * @param e The flag to insert.
      * @return A reference to the container with the new flag inserted.
      */
@@ -54,7 +51,6 @@ class Mask {
 
     /**
      * Modifies the container by adding all flags from the Mask \p m.
-     *
      * @param m The mask to insert.
      * @return A reference to the container with the new flags inserted.
      */
@@ -66,7 +62,6 @@ class Mask {
 
     /**
      * Modifies the container by removing the flag \p e.
-     *
      * @param e The flag to remove.
      * @return A reference to the container with the flag removed.
      */
@@ -78,7 +73,6 @@ class Mask {
 
     /**
      * Modifies the container by removing the flags contained within \p m.
-     *
      * @param m The mask to remove.
      * @return A reference to the container with the flags removed.
      */
@@ -90,7 +84,6 @@ class Mask {
 
     /**
      * Returns the underlying bitmask representation of the container.
-     *
      * @return std::underlying_type_t<E> The underlying bitmask representation.
      */
     [[nodiscard]] constexpr auto data() const -> std::underlying_type_t<E>
@@ -104,7 +97,6 @@ class Mask {
    private:
     /**
      * Return \p e as its underlying type.
-     *
      * @param e The enum value to cast.
      * @return std::underlying_type_t<E> The underlying type of \p e.
      */
@@ -116,7 +108,6 @@ class Mask {
 
 /**
  * Check if two Mask objects are equal.
- *
  * @tparam E The scoped enum type of the Mask objects.
  * @param a The first Mask to compare.
  * @param b The second Mask to compare.
@@ -130,7 +121,6 @@ template <typename E>
 
 /**
  * Check if two Mask objects are not equal.
- *
  * @tparam E The scoped enum type of the Mask objects.
  * @param a The first Mask to compare.
  * @param b The second Mask to compare.

@@ -14,17 +14,16 @@
 namespace {
 
 // Mutable, currently set Traits & Colors. Yes, they are global to this TU.
-auto current_traits     = esc::Traits{esc::Trait::None};
+auto current_traits = esc::Traits{esc::Trait::None};
 auto current_background = esc::Color{esc::XColor::Default};
 auto current_foreground = esc::Color{esc::XColor::Default};
 
 /**
  * Translate a single Trait into its control sequence parameter integer.
- *
  * @details Returns empty string for Trait::None.
- * @param   t The Trait to translate.
- * @return  The control sequence parameter int as string.
- * @throws  std::runtime_error If the Trait is invalid.
+ * @param t The Trait to translate.
+ * @return The control sequence parameter int as string.
+ * @throws std::runtime_error If the Trait is invalid.
  */
 auto trait_to_int_sequence(esc::Trait t) -> std::string
 {
@@ -49,8 +48,7 @@ auto trait_to_int_sequence(esc::Trait t) -> std::string
 
 /**
  * Turn a mask of traits into a string control sequence of parameter integers.
- *
- * @param  traits The traits to translate.
+ * @param traits The traits to translate.
  * @return The control sequence parameter integers as a string.
  * @throws std::logic_error If a Trait is invalid.
  */
@@ -78,8 +76,7 @@ namespace esc {
 
 auto escape(Cursor p) -> std::string
 {
-    return "\033[" + std::to_string(p.y + 1) + ';' + std::to_string(p.x + 1) +
-           'H';
+    return "\033[" + std::to_string(p.y + 1) + ';' + std::to_string(p.x + 1) + 'H';
 }
 
 auto escape(BlankRow) -> std::string
@@ -182,8 +179,7 @@ auto foreground_color() -> Color { return ::current_foreground; }
 
 auto escape(Brush b) -> std::string
 {
-    return escape(bg(b.background)) + escape(fg(b.foreground)) +
-           escape(b.traits);
+    return escape(bg(b.background)) + escape(fg(b.foreground)) + escape(b.traits);
 }
 
 }  // namespace esc

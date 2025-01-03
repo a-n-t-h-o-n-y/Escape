@@ -12,12 +12,11 @@
 
 #include <esc/detail/console_file.hpp>
 #include <esc/detail/is_urxvt.hpp>
+#include <esc/detail/signals.hpp>
+#include <esc/detail/tty_file.hpp>
 #include <esc/io.hpp>
 #include <esc/mouse.hpp>
 #include <esc/terminfo.hpp>
-
-#include "detail/tty_file.hpp"
-#include "esc/detail/signals.hpp"
 
 namespace {
 
@@ -68,8 +67,8 @@ void set(InputBuffer x)
 
 void set(Signals x)
 {
-    // ctrl-c, ctrl-z, ctrl-s, ctrl-q, ctrl-v all send their ctrl byte value
-    // rather than changing the terminal's behaviour.
+    // ctrl-c, ctrl-z, ctrl-s, ctrl-q, ctrl-v all send their ctrl byte value rather than
+    // changing the terminal's behaviour.
     auto const [lflags, iflags] = [x] {
         auto const lflags = ISIG | IEXTEN;
         auto const iflags = IXON;
@@ -105,12 +104,11 @@ void set(KeyMode x)
 
     // from linux/kd.h
     constexpr auto k_xlate = 0x01;
-    constexpr auto k_raw   = 0x00;
+    constexpr auto k_raw = 0x00;
     switch (x) {
         case KeyMode::Normal:
             if (detail::tty_file_descriptor.has_value()) {
-                detail::set_keyboard_mode(*detail::tty_file_descriptor,
-                                          k_xlate);
+                detail::set_keyboard_mode(*detail::tty_file_descriptor, k_xlate);
             }
             break;
         case KeyMode::Raw:
@@ -183,8 +181,7 @@ void initialize_terminal(ScreenBuffer screen_buffer,
     write(turn_off_auto_wrap());
 
     try {
-        set(echo, input_buffer, signals, screen_buffer, mouse_mode, cursor,
-            key_mode);
+        set(echo, input_buffer, signals, screen_buffer, mouse_mode, cursor, key_mode);
     }
     catch (std::runtime_error const& e) {
         uninitialize_terminal();
@@ -197,8 +194,7 @@ void initialize_terminal(ScreenBuffer screen_buffer,
 void initialize_normal_terminal()
 {
     initialize_terminal(ScreenBuffer::Normal, MouseMode::Off, CursorMode::Show,
-                        Echo::On, InputBuffer::Canonical, Signals::On,
-                        KeyMode::Normal);
+                        Echo::On, InputBuffer::Canonical, Signals::On, KeyMode::Normal);
 }
 
 void initialize_interactive_terminal(MouseMode mouse_mode,
@@ -211,11 +207,10 @@ void initialize_interactive_terminal(MouseMode mouse_mode,
 
 void uninitialize_terminal()
 {
-    // TODO take settings parameter and use that to reset the terminal to
-    // settings before.
+    // TODO take settings parameter and use that to reset the terminal to settings
+    // before.
     write(turn_on_auto_wrap());
-    set(ScreenBuffer::Normal, MouseMode::Off, CursorMode::Show,
-        KeyMode::Normal);
+    set(ScreenBuffer::Normal, MouseMode::Off, CursorMode::Show, KeyMode::Normal);
     flush();
     ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &original_termios);
     if (detail::tty_file_descriptor.has_value()) {
@@ -225,7 +220,7 @@ void uninitialize_terminal()
 
 auto terminal_width() -> int
 {
-    auto w            = ::winsize{};
+    auto w = ::winsize{};
     auto const result = ::ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
     if (result == -1) {
         throw std::runtime_error{
@@ -236,7 +231,7 @@ auto terminal_width() -> int
 
 auto terminal_height() -> int
 {
-    auto w            = ::winsize{};
+    auto w = ::winsize{};
     auto const result = ::ioctl(STDIN_FILENO, TIOCGWINSZ, &w);
     if (result == -1) {
         throw std::runtime_error{
@@ -248,7 +243,7 @@ auto terminal_height() -> int
 auto terminal_area() -> Area
 {
     return {
-        .width  = terminal_width(),
+        .width = terminal_width(),
         .height = terminal_height(),
     };
 }

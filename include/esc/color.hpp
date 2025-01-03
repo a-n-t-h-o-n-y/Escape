@@ -6,22 +6,22 @@
 
 namespace esc {
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------
 
 /**
- * Represents a color index for XTerm like palette [0 - 255].
- *
- * @details The color index is a value from 0 to 255, where 0 to 7 are the
- *          classic XTerm system colors, 8 to 15 are the bright versions of the
- *          classic colors, and 16 to 230 are the 216 non-system colors and
- *          231-255 are the grayscale colors. The actual color values are
- *          defined by your terminal.
+ * Represents a color index for XTerm like palette.
+ * @details The color index is a value from 0 to 255.
+ *     [0, 7] ----- Classic XTerm system colors.
+ *     [8, 15] ---- 'Bright' versions of the classic colors.
+ *     [16, 230] -- 216 non-system colors.
+ *     [231, 255] - Grayscale colors.
+ * The actual color values are defined by your terminal.
  * @details This provides the first 16 colors of the XTerm palette by name.
  * @see https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit
  * @see https://www.ditig.com/publications/256-colors-cheat-sheet
  */
 struct XColor {
-    std::uint16_t value;
+    std::uint16_t value;  // Need extra value for 'default' color value.
 
     static XColor const Default;
     static XColor const Black;
@@ -46,29 +46,28 @@ struct XColor {
 };
 
 // Yes, defining constexpr with const declaration is legal here.
-constexpr XColor XColor::Default       = XColor{256};
-constexpr XColor XColor::Black         = XColor{0};
-constexpr XColor XColor::Red           = XColor{1};
-constexpr XColor XColor::Green         = XColor{2};
-constexpr XColor XColor::Yellow        = XColor{3};
-constexpr XColor XColor::Blue          = XColor{4};
-constexpr XColor XColor::Magenta       = XColor{5};
-constexpr XColor XColor::Cyan          = XColor{6};
-constexpr XColor XColor::White         = XColor{7};
-constexpr XColor XColor::BrightBlack   = XColor{8};
-constexpr XColor XColor::BrightRed     = XColor{9};
-constexpr XColor XColor::BrightGreen   = XColor{10};
-constexpr XColor XColor::BrightYellow  = XColor{11};
-constexpr XColor XColor::BrightBlue    = XColor{12};
+constexpr XColor XColor::Default = XColor{256};
+constexpr XColor XColor::Black = XColor{0};
+constexpr XColor XColor::Red = XColor{1};
+constexpr XColor XColor::Green = XColor{2};
+constexpr XColor XColor::Yellow = XColor{3};
+constexpr XColor XColor::Blue = XColor{4};
+constexpr XColor XColor::Magenta = XColor{5};
+constexpr XColor XColor::Cyan = XColor{6};
+constexpr XColor XColor::White = XColor{7};
+constexpr XColor XColor::BrightBlack = XColor{8};
+constexpr XColor XColor::BrightRed = XColor{9};
+constexpr XColor XColor::BrightGreen = XColor{10};
+constexpr XColor XColor::BrightYellow = XColor{11};
+constexpr XColor XColor::BrightBlue = XColor{12};
 constexpr XColor XColor::BrightMagenta = XColor{13};
-constexpr XColor XColor::BrightCyan    = XColor{14};
-constexpr XColor XColor::BrightWhite   = XColor{15};
+constexpr XColor XColor::BrightCyan = XColor{14};
+constexpr XColor XColor::BrightWhite = XColor{15};
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------
 
 /**
- * Red, Green, and Blue values; valid range of [0-255] for each color.
- *
+ * Red, Green, and Blue values; valid range of [0, 255] for each color.
  * @details For use with TrueColor.
  */
 struct RGB {
@@ -80,7 +79,6 @@ struct RGB {
    public:
     /**
      * Direct construction with red, green and blue values.
-     *
      * @param r The red value.
      * @param g The green value.
      * @param b The blue value.
@@ -91,7 +89,6 @@ struct RGB {
 
     /**
      * Takes a (hex) value and pulls out 8 byte segments for RGB.
-     *
      * @details RGB{0x7f9860} 0x7f is red, 0x98 is green, 0x60 is blue.
      * @param hex The hex value to use.
      */
@@ -104,10 +101,9 @@ struct RGB {
 
 /**
  * Hue, Saturation, Lightness values of a color.
- *
  * @details For use with TrueColor.
- * @details Hue is in degrees [0, 359], Saturation is in percent [0, 100],
- *          Lightness is in percent [0, 100].
+ * @details Hue is in degrees [0, 359], Saturation is in percent [0, 100], Lightness is
+ * in percent [0, 100].
  */
 struct HSL {
     std::uint16_t hue;
@@ -144,16 +140,15 @@ auto constexpr fmod(const T x, const T y) -> T
 
 /**
  * Convert HSL to RGB.
- *
  * @param v The HSL value to convert.
  * @return The RGB value.
  */
 auto constexpr hsl_to_rgb(HSL v) -> RGB
 {
-    double const lightness  = v.lightness / 100.;
+    double const lightness = v.lightness / 100.;
     double const saturation = v.saturation / 100.;
 
-    auto const c         = (1 - detail::abs((2 * lightness) - 1.)) * saturation;
+    auto const c = (1 - detail::abs((2 * lightness) - 1.)) * saturation;
     double const h_prime = v.hue / 60.;
     double const x = c * (1. - detail::abs(detail::fmod(h_prime, 2.) - 1.));
     double const m = lightness - (c / 2.);
@@ -185,7 +180,6 @@ auto constexpr hsl_to_rgb(HSL v) -> RGB
 
 /**
  * Convert RGB to HSL.
- *
  * @param v The RGB value to convert.
  * @return The HSL value.
  */
@@ -199,7 +193,7 @@ auto constexpr rgb_to_hsl(RGB v) -> HSL
     double const c_min = std::min({r_prime, g_prime, b_prime});
     double const delta = c_max - c_min;
 
-    double const lightness  = (c_max + c_min) / 2.;
+    double const lightness = (c_max + c_min) / 2.;
     double const saturation = [&] {
         if (delta == 0.) {
             return 0.;
@@ -229,9 +223,8 @@ auto constexpr rgb_to_hsl(RGB v) -> HSL
 
 /**
  * Represents a true color for the terminal display.
- *
- * @details True colors can be used to set an exact color to the terminal
- *          screen via the escape(Color) function.
+ * @details True colors can be used to set an exact color to the terminal screen via the
+ * escape(Color) function.
  */
 struct TrueColor {
    public:
@@ -262,16 +255,15 @@ struct TrueColor {
  */
 using TColor = TrueColor;
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------
 
 /**
  * Variant holding any of the color types that can be used.
- *
  * @details escape(Color) will generate an escape sequence for the color.
  */
 using Color = std::variant<XColor, TrueColor>;
 
-// -----------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------
 
 /**
  * Represents a foreground color for the terminal display.
@@ -289,7 +281,6 @@ struct ColorBG {
 
 /**
  * Return a background tag type to use with escape(...) function.
- *
  * @param c The color to use as the background.
  * @return A background tag type to use with escape(...) function.
  */
@@ -297,7 +288,6 @@ struct ColorBG {
 
 /**
  * Return a background tag type to use with escape(...) function.
- *
  * @param c The color to use as the background.
  * @return A background tag type to use with escape(...) function.
  */
@@ -305,7 +295,6 @@ struct ColorBG {
 
 /**
  * Return a foreground tag type to use with escape(...) function.
- *
  * @param c The color to use as the foreground.
  * @return A foreground tag type to use with escape(...) function.
  */
@@ -313,7 +302,6 @@ struct ColorBG {
 
 /**
  * Return a foreground tag type to use with escape(...) function.
- *
  * @param c The color to use as the foreground.
  * @return A foreground tag type to use with escape(...) function.
  */

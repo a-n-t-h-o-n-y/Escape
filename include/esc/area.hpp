@@ -3,7 +3,7 @@
 namespace esc {
 
 /**
- * Represents a rectangular area with a width and height.
+ * Holds height/width for a 2D rectangle.
  */
 struct Area {
     int width;

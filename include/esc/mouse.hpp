@@ -51,7 +51,6 @@ struct Mouse {
 
 /**
  * Return a string display of the given Mouse::Button enum.
- *
  * @param b The Mouse::Button to convert to a string.
  * @return A string representation of the given Mouse::Button.
  * @throws std::runtime_error if the given Mouse::Button is not a valid enum.
@@ -60,7 +59,6 @@ struct Mouse {
 
 /**
  * Input modes for the Mouse.
- *
  * @details Off: No Mouse Events are generated.
  * @details Basic: Mouse Press & Release Events for all Buttons + Scroll Wheel.
  * @details Drag: Basic, plus Move Events while a Button is pressed.
@@ -70,7 +68,6 @@ enum class MouseMode { Off, Basic, Drag, Move };
 
 /**
  * Return a string display of the given MouseMode enum.
- *
  * @param mm The MouseMode to convert to a string.
  * @return A string representation of the given MouseMode.
  * @throws std::runtime_error if the given MouseMode is not a valid enum.

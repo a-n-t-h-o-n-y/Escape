@@ -33,9 +33,8 @@ TEST_CASE("Constructor", "[Glyph]")
     }
 }
 
-TEST_CASE(
-    "Operator|(Character, ColorBG) works with all character literal types",
-    "[Glyph]")
+TEST_CASE("Operator|(Character, ColorBG) works with all character literal types",
+          "[Glyph]")
 {
     SECTION("char")
     {
@@ -74,9 +73,8 @@ TEST_CASE(
     }
 }
 
-TEST_CASE(
-    "Operator|(Character, ColorFG) works with all character literal types",
-    "[Glyph]")
+TEST_CASE("Operator|(Character, ColorFG) works with all character literal types",
+          "[Glyph]")
 {
     SECTION("char")
     {
@@ -165,9 +163,8 @@ auto test_glyphstring_pipe_ops_lval() -> void
         glyphs | bg(XColor::Green);
 
         for (auto const& glyph : glyphs) {
-            REQUIRE(glyph == Glyph{U'a',
-                                   {.background = XColor::Green,
-                                    .traits     = Trait::Bold}});
+            REQUIRE(glyph ==
+                    Glyph{U'a', {.background = XColor::Green, .traits = Trait::Bold}});
         }
     }
 
@@ -176,9 +173,8 @@ auto test_glyphstring_pipe_ops_lval() -> void
         glyphs | fg(XColor::Green);
 
         for (auto const& glyph : glyphs) {
-            REQUIRE(glyph == Glyph{U'a',
-                                   {.foreground = XColor::Green,
-                                    .traits     = Trait::Bold}});
+            REQUIRE(glyph ==
+                    Glyph{U'a', {.foreground = XColor::Green, .traits = Trait::Bold}});
         }
     }
 
@@ -187,8 +183,7 @@ auto test_glyphstring_pipe_ops_lval() -> void
         glyphs | Trait::Italic;
 
         for (auto const& glyph : glyphs) {
-            REQUIRE(glyph ==
-                    Glyph{U'a', {.traits = Trait::Bold | Trait::Italic}});
+            REQUIRE(glyph == Glyph{U'a', {.traits = Trait::Bold | Trait::Italic}});
         }
     }
 
@@ -209,7 +204,7 @@ auto test_glyphstring_pipe_ops_lval() -> void
             REQUIRE(glyph == Glyph{U'a',
                                    {.background = XColor::Green,
                                     .foreground = XColor::Red,
-                                    .traits     = Trait::Bold | Trait::Dim}});
+                                    .traits = Trait::Bold | Trait::Dim}});
         }
     }
 }
@@ -223,9 +218,8 @@ auto test_glyphstring_pipe_ops_rval() -> void
             Container(5, {U'a', {.traits = Trait::Bold}}) | bg(XColor::Green);
 
         for (auto const& glyph : glyphs) {
-            REQUIRE(glyph == Glyph{U'a',
-                                   {.background = XColor::Green,
-                                    .traits     = Trait::Bold}});
+            REQUIRE(glyph ==
+                    Glyph{U'a', {.background = XColor::Green, .traits = Trait::Bold}});
         }
     }
 
@@ -235,9 +229,8 @@ auto test_glyphstring_pipe_ops_rval() -> void
             Container(5, {U'a', {.traits = Trait::Bold}}) | fg(XColor::Green);
 
         for (auto const& glyph : glyphs) {
-            REQUIRE(glyph == Glyph{U'a',
-                                   {.foreground = XColor::Green,
-                                    .traits     = Trait::Bold}});
+            REQUIRE(glyph ==
+                    Glyph{U'a', {.foreground = XColor::Green, .traits = Trait::Bold}});
         }
     }
 
@@ -247,8 +240,7 @@ auto test_glyphstring_pipe_ops_rval() -> void
             Container(5, {U'a', {.traits = Trait::Bold}}) | Trait::Italic;
 
         for (auto const& glyph : glyphs) {
-            REQUIRE(glyph ==
-                    Glyph{U'a', {.traits = Trait::Bold | Trait::Italic}});
+            REQUIRE(glyph == Glyph{U'a', {.traits = Trait::Bold | Trait::Italic}});
         }
     }
 
@@ -271,7 +263,7 @@ auto test_glyphstring_pipe_ops_rval() -> void
             REQUIRE(glyph == Glyph{U'a',
                                    {.background = XColor::Green,
                                     .foreground = XColor::Red,
-                                    .traits     = Trait::Bold | Trait::Dim}});
+                                    .traits = Trait::Bold | Trait::Dim}});
         }
     }
 }
@@ -342,7 +334,7 @@ auto test_string_pipe_ops(StringType abc) -> void
         REQUIRE(gs.size() == 3);
         auto const brush = Brush{.background = XColor::Green,
                                  .foreground = XColor::Red,
-                                 .traits     = Trait::Dim};
+                                 .traits = Trait::Dim};
         REQUIRE(gs[0] == Glyph{U'a', brush});
         REQUIRE(gs[1] == Glyph{U'b', brush});
         REQUIRE(gs[2] == Glyph{U'c', brush});
@@ -423,32 +415,32 @@ TEST_CASE("Chained pipe ops")
 {
     SECTION("Glyph")
     {
-        auto const g = Glyph{U'a'} | bg(XColor::Green) | fg(XColor::Red) |
-                       Trait::Bold | Trait::Italic | remove_trait(Trait::Bold);
+        auto const g = Glyph{U'a'} | bg(XColor::Green) | fg(XColor::Red) | Trait::Bold |
+                       Trait::Italic | remove_trait(Trait::Bold);
         REQUIRE(g == Glyph{.symbol = U'a',
-                           .brush  = {.background = XColor::Green,
-                                      .foreground = XColor::Red,
-                                      .traits     = Trait::Italic}});
+                           .brush = {.background = XColor::Green,
+                                     .foreground = XColor::Red,
+                                     .traits = Trait::Italic}});
     }
 
     SECTION("GlyphString")
     {
-        auto const gs = "abc" | bg(XColor::Green) | fg(XColor::Red) |
-                        Trait::Bold | Trait::Italic | remove_trait(Trait::Bold);
+        auto const gs = "abc" | bg(XColor::Green) | fg(XColor::Red) | Trait::Bold |
+                        Trait::Italic | remove_trait(Trait::Bold);
 
         REQUIRE(gs.size() == 3);
         REQUIRE(gs[0] == Glyph{.symbol = U'a',
-                               .brush  = {.background = XColor::Green,
-                                          .foreground = XColor::Red,
-                                          .traits     = Trait::Italic}});
+                               .brush = {.background = XColor::Green,
+                                         .foreground = XColor::Red,
+                                         .traits = Trait::Italic}});
         REQUIRE(gs[1] == Glyph{.symbol = U'b',
-                               .brush  = {.background = XColor::Green,
-                                          .foreground = XColor::Red,
-                                          .traits     = Trait::Italic}});
+                               .brush = {.background = XColor::Green,
+                                         .foreground = XColor::Red,
+                                         .traits = Trait::Italic}});
         REQUIRE(gs[2] == Glyph{.symbol = U'c',
-                               .brush  = {.background = XColor::Green,
-                                          .foreground = XColor::Red,
-                                          .traits     = Trait::Italic}});
+                               .brush = {.background = XColor::Green,
+                                         .foreground = XColor::Red,
+                                         .traits = Trait::Italic}});
     }
 }
 
@@ -746,8 +738,7 @@ TEST_CASE("operator+(..., ...)", "[Glyph]")
 
     SECTION("GlyphString + GlyphString")
     {
-        auto const gs =
-            ("abc" | bg(XColor::Green)) + ("d😀f" | bg(XColor::Red));
+        auto const gs = ("abc" | bg(XColor::Green)) + ("d😀f" | bg(XColor::Red));
         REQUIRE(gs.size() == 6);
         REQUIRE(gs[0] == Glyph{U'a', {.background = XColor::Green}});
         REQUIRE(gs[1] == Glyph{U'b', {.background = XColor::Green}});

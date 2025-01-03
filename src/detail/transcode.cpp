@@ -11,17 +11,14 @@ namespace esc::detail {
 auto u32_to_u8(char32_t c) -> std::string
 {
     auto result = std::string{};
-
     icu::UnicodeString{static_cast<UChar32>(c)}.toUTF8String(result);
-
     return result;
 }
 
 auto u32_to_u8(std::u32string_view s) -> std::string
 {
     auto result = std::string{};
-    icu::UnicodeString::fromUTF32(reinterpret_cast<const UChar32*>(s.data()),
-                                  s.size())
+    icu::UnicodeString::fromUTF32(reinterpret_cast<UChar32 const*>(s.data()), s.size())
         .toUTF8String(result);
     return result;
 }
@@ -32,7 +29,6 @@ auto u8_to_u32(std::array<char, 4> bytes) -> char32_t
         bytes.data(),
         bytes.size(),
     });
-
     return u_str.char32At(0);
 }
 

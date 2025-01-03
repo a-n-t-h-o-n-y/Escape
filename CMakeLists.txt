@@ -24,6 +24,7 @@ add_library(escape STATIC
     include/esc/detail/mask.hpp
     include/esc/detail/signals.hpp
     include/esc/detail/transcode.hpp
+    include/esc/detail/tty_file.hpp
 
     src/io.cpp
     src/terminfo.cpp
