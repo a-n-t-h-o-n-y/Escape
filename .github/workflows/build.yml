@@ -5,9 +5,22 @@ on:
         branches: [main, v2-develop]
 
 jobs:
-    # Ubuntu-22 GCC
-    build-ubuntu22-gcc13:
-        runs-on: ubuntu-22.04
+    # Ubuntu-24 GCC
+    build-ubuntu24-gcc14:
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  submodules: recursive
+            - env:
+                  CC: gcc-14
+                  CXX: g++-14
+              run: |
+                  sudo apt-get update
+                  mkdir build && cd build
+                  cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+    build-ubuntu24-gcc13:
+        runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v4
               with:
@@ -19,6 +32,62 @@ jobs:
                   sudo apt-get update
                   mkdir build && cd build
                   cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+    build-ubuntu24-gcc12:
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  submodules: recursive
+            - env:
+                  CC: gcc-12
+                  CXX: g++-12
+              run: |
+                  sudo apt-get update
+                  mkdir build && cd build
+                  cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+
+    # Ubuntu-24 Clang
+    build-ubuntu24-clang18:
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  submodules: recursive
+            - env:
+                  CC: clang-18
+                  CXX: clang++-18
+              run: |
+                  sudo apt-get update
+                  mkdir build && cd build
+                  cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+    build-ubuntu24-clang17:
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  submodules: recursive
+            - env:
+                  CC: clang-17
+                  CXX: clang++-17
+              run: |
+                  sudo apt-get update
+                  mkdir build && cd build
+                  cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+    build-ubuntu24-clang16:
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  submodules: recursive
+            - env:
+                  CC: clang-16
+                  CXX: clang++-16
+              run: |
+                  sudo apt-get update
+                  mkdir build && cd build
+                  cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+
+    # Ubuntu-22 GCC
     build-ubuntu22-gcc12:
         runs-on: ubuntu-22.04
         steps:
@@ -69,6 +138,32 @@ jobs:
             - env:
                   CC: clang-15
                   CXX: clang++-15
+              run: |
+                  sudo apt-get update
+                  mkdir build && cd build
+                  cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+    build-ubuntu22-clang14:
+        runs-on: ubuntu-22.04
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  submodules: recursive
+            - env:
+                  CC: clang-14
+                  CXX: clang++-14
+              run: |
+                  sudo apt-get update
+                  mkdir build && cd build
+                  cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+    build-ubuntu22-clang13:
+        runs-on: ubuntu-22.04
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  submodules: recursive
+            - env:
+                  CC: clang-13
+                  CXX: clang++-13
               run: |
                   sudo apt-get update
                   mkdir build && cd build
@@ -130,9 +225,23 @@ jobs:
                   mkdir build && cd build
                   cmake .. && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
 
-    # MacOS-12 GCC
-    build-MacOS12-gcc13:
-        runs-on: macos-12
+    # MacOS-14 GCC
+    build-MacOS14-gcc14:
+        runs-on: macos-14
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  submodules: recursive
+            - name: Install ICU
+              run: brew install icu4c
+            - env:
+                  CC: gcc-14
+                  CXX: g++-14
+              run: |
+                  mkdir build && cd build
+                  cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+    build-MacOS14-gcc13:
+        runs-on: macos-14
         steps:
             - uses: actions/checkout@v4
               with:
@@ -145,8 +254,8 @@ jobs:
               run: |
                   mkdir build && cd build
                   cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
-    build-MacOS12-gcc12:
-        runs-on: macos-12
+    build-MacOS14-gcc12:
+        runs-on: macos-14
         steps:
             - uses: actions/checkout@v4
               with:
@@ -159,8 +268,10 @@ jobs:
               run: |
                   mkdir build && cd build
                   cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
-    build-MacOS12-gcc11:
-        runs-on: macos-12
+
+    # MacOS-14 Clang
+    build-MacOS14-clang15:
+        runs-on: macos-14
         steps:
             - uses: actions/checkout@v4
               with:
@@ -168,8 +279,68 @@ jobs:
             - name: Install ICU
               run: brew install icu4c
             - env:
-                  CC: gcc-11
-                  CXX: g++-11
+                  CC: clang-15
+                  CXX: clang++-15
+              run: |
+                  mkdir build && cd build
+                  cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+
+    # MacOS-13 GCC
+    build-MacOS13-gcc14:
+        runs-on: macos-13
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  submodules: recursive
+            - name: Install ICU
+              run: brew install icu4c
+            - env:
+                  CC: gcc-14
+                  CXX: g++-14
+              run: |
+                  mkdir build && cd build
+                  cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+    build-MacOS13-gcc13:
+        runs-on: macos-13
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  submodules: recursive
+            - name: Install ICU
+              run: brew install icu4c
+            - env:
+                  CC: gcc-13
+                  CXX: g++-13
+              run: |
+                  mkdir build && cd build
+                  cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+    build-MacOS13-gcc12:
+        runs-on: macos-13
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  submodules: recursive
+            - name: Install ICU
+              run: brew install icu4c
+            - env:
+                  CC: gcc-12
+                  CXX: g++-12
+              run: |
+                  mkdir build && cd build
+                  cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
+
+    # MacOS-13 Clang
+    build-MacOS13-clang14:
+        runs-on: macos-13
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  submodules: recursive
+            - name: Install ICU
+              run: brew install icu4c
+            - env:
+                  CC: clang-14
+                  CXX: clang++-14
               run: |
                   mkdir build && cd build
                   cmake .. -DICU_ROOT=/usr/local/opt/icu4c && make termcaps && make escape.tests.unit && ./tests/escape.tests.unit
