@@ -1,5 +1,20 @@
 cmake_minimum_required(VERSION 3.16)
-project(escape LANGUAGES CXX)
+project(Escape LANGUAGES CXX)
+
+# UTF Support
+find_package(ICU REQUIRED COMPONENTS dt uc i18n)
+if(NOT ICU_FOUND)
+    message(FATAL_ERROR "ICU not found")
+endif()
+
+# Utility Library Dependency
+include(FetchContent)
+FetchContent_Declare(
+    zzz
+    GIT_REPOSITORY https://github.com/a-n-t-h-o-n-y/zzz.git
+    GIT_TAG 3df70f6fc683b2b03dc732ab63346d5c59891870
+)
+FetchContent_MakeAvailable(zzz)
 
 # Escape Library
 add_library(escape STATIC
@@ -35,15 +50,17 @@ add_library(escape STATIC
     src/detail/signals.cpp
 )
 
-# UTF Support
-find_package(ICU REQUIRED COMPONENTS dt uc i18n)
-if(ICU_FOUND)
-    target_link_libraries(escape ICU::dt ICU::uc ICU::i18n)
-endif()
-
 target_include_directories(escape
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_link_libraries(escape
+    PUBLIC
+        zzz
+        ICU::dt
+        ICU::uc
+        ICU::i18n
 )
 
 target_compile_features(escape
@@ -51,33 +68,6 @@ target_compile_features(escape
         cxx_std_20
 )
 
-target_compile_options(escape
-    PRIVATE
-        -Wall
-        -Wextra
-        -Wpedantic
-)
-
-# TermCaps Executable
-add_executable(termcaps EXCLUDE_FROM_ALL
-    tools/termcaps.cpp
-)
-
-target_link_libraries(termcaps
-    PRIVATE
-        escape
-)
-
-target_compile_options(termcaps
-    PRIVATE
-        -Wall
-        -Wextra
-        -Wpedantic
-)
-
-if (NOT TARGET Catch2)
-    add_subdirectory(external/Catch2)
-endif()
-
+add_subdirectory(tools)
 add_subdirectory(examples)
 add_subdirectory(tests)

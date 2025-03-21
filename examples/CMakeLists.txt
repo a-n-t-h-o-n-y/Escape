@@ -1,3 +1,4 @@
+# Pong Example
 add_executable(escape.examples.pong EXCLUDE_FROM_ALL
     pong.cpp
 )
