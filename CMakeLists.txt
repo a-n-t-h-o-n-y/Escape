@@ -12,7 +12,7 @@ include(FetchContent)
 FetchContent_Declare(
     zzz
     GIT_REPOSITORY https://github.com/a-n-t-h-o-n-y/zzz.git
-    GIT_TAG dc1e741a89ce7af745f8abecad51a2dd492ed70f
+    GIT_TAG dcf3a15309e9919246e525a0a5c12108b6876380
 )
 FetchContent_MakeAvailable(zzz)
 
