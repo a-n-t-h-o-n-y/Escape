@@ -1,10 +1,16 @@
 #include <esc/detail/transcode.hpp>
 
 #include <array>
+#include <cstdint>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 
 #include <unicode/stringpiece.h>
+#include <unicode/uchar.h>
 #include <unicode/unistr.h>
+
+#include <zzz/coro.hpp>
 
 namespace esc::detail {
 
@@ -30,6 +36,19 @@ auto u8_to_u32(std::array<char, 4> bytes) -> char32_t
         bytes.size(),
     });
     return u_str.char32At(0);
+}
+
+auto u8_string_to_u32(std::string_view sv) -> zzz::Generator<char32_t>
+{
+    auto i = std::int32_t{0};  // Index in the UTF-8 string
+    auto const length = static_cast<std::int32_t>(sv.length());
+
+    while (i < length) {
+        UChar32 ch;
+        U8_NEXT(sv.data(), i, length, ch);
+        if (ch < 0) { throw std::runtime_error{"Invalid UTF-8 sequence"}; }
+        co_yield static_cast<char32_t>(ch);
+    }
 }
 
 }  // namespace esc::detail
