@@ -4,7 +4,7 @@ __Terminal Escape Sequence Library__
 
 `Escape` provides support for generating and interpreting terminal escape sequences.
 These can be written to the terminal to control cursor movement, text formatting, and
-colors. It also includes a `read()` function to produce keyboard, mouse input, and
+colors. It also includes a `read()` function to produce keyboard input, mouse input, and
 window resize events.
 
 ```cpp
@@ -44,12 +44,16 @@ based library that uses `Escape` under the hood.
 
 ## Dependencies
 
-- [ICU Library](https://icu.unicode.org/): For Unicode support.
+- [ICU Library](https://icu.unicode.org/)
+    - For Unicode support.
+    - Must be installed on your system.
+- [zzz Library](https://github.com/a-n-t-h-o-n-y/zzz)
+    - Utilities and Tests.
+    - CMake fetches this on configure.
 
 ## Build Instructions
 
     git clone https://github.com/a-n-t-h-o-n-y/Escape.git
-    git submodule update --init --recursive     # Pull in Dependencies
     mkdir Escape/build && cd Escape/build
     cmake ..
     make escape                                 # Build Library
