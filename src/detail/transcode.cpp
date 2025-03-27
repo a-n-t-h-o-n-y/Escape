@@ -58,6 +58,7 @@ auto u8_string_to_u32_string(std::string_view sv) -> std::u32string
     auto const length = static_cast<std::int32_t>(sv.length());
 
     auto result = std::u32string{};
+    result.reserve(sv.length());
     while (i < length) {
         UChar32 ch;
         U8_NEXT(sv.data(), i, length, ch);
