@@ -32,7 +32,6 @@ auto u32_to_u8(std::u32string_view sv) -> std::string;
  * @param s The char32_t string to convert.
  * @param out The string to write out the utf8 bytes to, it will be `clear()`ed.
  */
-[[nodiscard]]
 void u32_to_u8(std::u32string_view sv, std::string& out);
 
 /**
@@ -64,7 +63,6 @@ auto u8_string_to_u32_string(std::string_view sv) -> std::u32string;
  * @param sv The UTF8 string to convert.
  * @param out The u32string to write out the utf32 bytes to, it will be `clear()`ed.
  */
-[[nodiscard]]
 void u8_string_to_u32_string(std::string_view sv, std::u32string& out);
 
 }  // namespace esc::detail
