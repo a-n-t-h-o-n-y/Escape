@@ -51,4 +51,20 @@ auto u8_string_to_u32(std::string_view sv) -> zzz::Generator<char32_t>
     }
 }
 
+[[nodiscard]]
+auto u8_string_to_u32_string(std::string_view sv) -> std::u32string
+{
+    auto i = std::int32_t{0};  // Index in the UTF-8 string
+    auto const length = static_cast<std::int32_t>(sv.length());
+
+    auto result = std::u32string{};
+    while (i < length) {
+        UChar32 ch;
+        U8_NEXT(sv.data(), i, length, ch);
+        if (ch < 0) { throw std::runtime_error{"Invalid UTF-8 sequence"}; }
+        result.push_back(static_cast<char32_t>(ch));
+    }
+    return result;
+}
+
 }  // namespace esc::detail

@@ -40,4 +40,12 @@ auto u8_to_u32(std::array<char, 4> bytes) -> char32_t;
 [[nodiscard]]
 auto u8_string_to_u32(std::string_view sv) -> zzz::Generator<char32_t>;
 
+/**
+ * Convert a UTF8 string to a UTF32 string
+ * @param sv The UTF8 string to convert.
+ * @return A UTF32 std::u32string.
+ */
+[[nodiscard]]
+auto u8_string_to_u32_string(std::string_view sv) -> std::u32string;
+
 }  // namespace esc::detail
