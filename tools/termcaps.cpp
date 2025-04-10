@@ -251,7 +251,7 @@ using namespace esc;
             }, bg(XColor{static_cast<std::uint8_t>(i)})));
         result.push_back(' ');
     }
-    return result.append(escape(bg(XColor::Default)));
+    return result.append(escape(bg(TermColor::Default)));
 }
 
 [[nodiscard]] auto hue_increment_row(int width, HSL start) -> std::string
@@ -306,7 +306,7 @@ using namespace esc;
         saturation_increment_row(width, init) +
         escape(Cursor{offset.x, offset.y + 3}) +
         lightness_increment_row(width, init) +
-        escape(bg(XColor::Default)
+        escape(bg(TermColor::Default)
     );
 }
 
@@ -391,9 +391,7 @@ auto process(MouseMove m) -> EventResponse
 
 auto process(KeyPress k) -> EventResponse
 {
-    if (k.key == Key::q) {
-        return std::nullopt;
-    }
+    if (k.key == Key::q) { return std::nullopt; }
     return key_press_display(offset.key_display, k.key);
 }
 
@@ -418,9 +416,7 @@ auto main() -> int
         while (true) {
             auto const r =
                 std::visit([](auto event) { return process(event); }, esc::read());
-            if (!r) {
-                break;
-            }
+            if (!r) { break; }
             write(*r);
             flush();
         }

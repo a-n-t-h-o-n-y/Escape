@@ -15,8 +15,8 @@ namespace {
 
 // Mutable, currently set Traits & Colors. Yes, they are global to this TU.
 auto current_traits = esc::Traits{esc::Trait::None};
-auto current_background = esc::Color{esc::XColor::Default};
-auto current_foreground = esc::Color{esc::XColor::Default};
+auto current_background = esc::Color{esc::TermColor::Default};
+auto current_foreground = esc::Color{esc::TermColor::Default};
 
 /**
  * Translate a single Trait into its control sequence parameter integer.
@@ -125,15 +125,9 @@ auto escape(ColorBG c) -> std::string
 auto escape_bg(XColor c) -> std::string
 {
     ::current_background = c;
-    if (c == XColor::Default) {
-        return "\033["
-               "49m";
-    }
-    else {
-        return "\033["
-               "48;5;" +
-               std::to_string(c.value) + 'm';
-    }
+    return "\033["
+           "48;5;" +
+           std::to_string(c.value) + 'm';
 }
 
 auto escape_bg(TrueColor c) -> std::string
@@ -143,6 +137,13 @@ auto escape_bg(TrueColor c) -> std::string
            "48;2;" +
            std::to_string(c.red) + ';' + std::to_string(c.green) + ';' +
            std::to_string(c.blue) + 'm';
+}
+
+auto escape_bg(TermColor c) -> std::string
+{
+    ::current_background = c;
+    return "\033["
+           "49m";
 }
 
 auto background_color() -> Color { return ::current_background; }
@@ -155,15 +156,9 @@ auto escape(ColorFG c) -> std::string
 auto escape_fg(XColor c) -> std::string
 {
     ::current_foreground = c;
-    if (c == XColor::Default) {
-        return "\033["
-               "39m";
-    }
-    else {
-        return "\033["
-               "38;5;" +
-               std::to_string(c.value) + 'm';
-    }
+    return "\033["
+           "38;5;" +
+           std::to_string(c.value) + 'm';
 }
 
 auto escape_fg(TrueColor c) -> std::string
@@ -173,6 +168,13 @@ auto escape_fg(TrueColor c) -> std::string
            "38;2;" +
            std::to_string(c.red) + ';' + std::to_string(c.green) + ';' +
            std::to_string(c.blue) + 'm';
+}
+
+auto escape_fg(TermColor c) -> std::string
+{
+    ::current_foreground = c;
+    return "\033["
+           "39m";
 }
 
 auto foreground_color() -> Color { return ::current_foreground; }

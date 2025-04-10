@@ -9,6 +9,15 @@ namespace esc {
 // -------------------------------------------------------------------------------------
 
 /**
+ * The default (foreground or background) color set by the terminal application.
+ * @details Foreground/Background is determined by the escape(...) function overload set
+ * depending on if ColorFG or ColorBG is used.
+ */
+enum class TermColor : bool { Default };
+
+// -------------------------------------------------------------------------------------
+
+/**
  * Represents a color index for XTerm like palette.
  * @details The color index is a value from 0 to 255.
  *     [0, 7] ----- Classic XTerm system colors.
@@ -21,9 +30,8 @@ namespace esc {
  * @see https://www.ditig.com/publications/256-colors-cheat-sheet
  */
 struct XColor {
-    std::uint16_t value;  // Need extra value for 'default' color value.
+    std::uint8_t value;
 
-    static XColor const Default;
     static XColor const Black;
     static XColor const Red;
     static XColor const Green;
@@ -46,7 +54,6 @@ struct XColor {
 };
 
 // Yes, defining constexpr with const declaration is legal here.
-constexpr XColor XColor::Default = XColor{256};
 constexpr XColor XColor::Black = XColor{0};
 constexpr XColor XColor::Red = XColor{1};
 constexpr XColor XColor::Green = XColor{2};
@@ -157,24 +164,12 @@ auto constexpr hsl_to_rgb(HSL v) -> RGB
     auto const x_ = static_cast<std::uint8_t>((x + m) * 255);
     auto const m_ = static_cast<std::uint8_t>(m * 255);
 
-    if (v.hue < 60.) {
-        return {c_, x_, m_};
-    }
-    if (v.hue < 120.) {
-        return {x_, c_, m_};
-    }
-    if (v.hue < 180.) {
-        return {m_, c_, x_};
-    }
-    if (v.hue < 240.) {
-        return {m_, x_, c_};
-    }
-    if (v.hue < 300.) {
-        return {x_, m_, c_};
-    }
-    if (v.hue < 360.) {
-        return {c_, m_, x_};
-    }
+    if (v.hue < 60.) { return {c_, x_, m_}; }
+    if (v.hue < 120.) { return {x_, c_, m_}; }
+    if (v.hue < 180.) { return {m_, c_, x_}; }
+    if (v.hue < 240.) { return {m_, x_, c_}; }
+    if (v.hue < 300.) { return {x_, m_, c_}; }
+    if (v.hue < 360.) { return {c_, m_, x_}; }
     return {0, 0, 0};
 }
 
@@ -195,25 +190,17 @@ auto constexpr rgb_to_hsl(RGB v) -> HSL
 
     double const lightness = (c_max + c_min) / 2.;
     double const saturation = [&] {
-        if (delta == 0.) {
-            return 0.;
-        }
+        if (delta == 0.) { return 0.; }
         double const den = 1. - detail::abs(2. * lightness - 1.);
         return delta / den;
     }();
     double const hue = [&] {
-        if (delta == 0.) {
-            return 0.;
-        }
+        if (delta == 0.) { return 0.; }
         if (c_max == r_prime) {
             return 60. * detail::fmod((g_prime - b_prime) / delta, 6.);
         }
-        if (c_max == g_prime) {
-            return 60. * (((b_prime - r_prime) / delta) + 2.);
-        }
-        if (c_max == b_prime) {
-            return 60. * (((r_prime - g_prime) / delta) + 4.);
-        }
+        if (c_max == g_prime) { return 60. * (((b_prime - r_prime) / delta) + 2.); }
+        if (c_max == b_prime) { return 60. * (((r_prime - g_prime) / delta) + 4.); }
         return 0.;
     }();
     return {static_cast<std::uint16_t>(hue),
@@ -261,7 +248,7 @@ using TColor = TrueColor;
  * Variant holding any of the color types that can be used.
  * @details escape(Color) will generate an escape sequence for the color.
  */
-using Color = std::variant<XColor, TrueColor>;
+using Color = std::variant<XColor, TrueColor, TermColor>;
 
 // -------------------------------------------------------------------------------------
 
