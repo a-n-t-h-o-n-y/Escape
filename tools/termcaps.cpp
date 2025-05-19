@@ -56,8 +56,8 @@ using namespace esc;
         case Trait::Blink: return "Blink";
         case Trait::Inverse: return "Inverse";
         case Trait::Invisible: return "Invisible";
-        case Trait::Crossed_out: return "Crossed_out";
-        case Trait::Double_underline: return "Double_underline";
+        case Trait::CrossedOut: return "CrossedOut";
+        case Trait::DoubleUnderline: return "DoubleUnderline";
         default: break;
     }
     throw std::runtime_error{"to_string(Trait): Invalid Trait."};
@@ -153,9 +153,9 @@ using namespace esc;
         escape(Cursor{offset.x, offset.y + 3}) + std::string(21, ' ') +
         escape(Trait::Invisible) + "Invisible " + escape(Trait::None) + "<-- Invisible" +
         escape(Cursor{offset.x, offset.y + 4}) + std::string(21, ' ') +
-        escape(Trait::Crossed_out) + "Crossed_out " + escape(Trait::None) +
+        escape(Trait::CrossedOut) + "CrossedOut " + escape(Trait::None) +
         escape(Cursor{offset.x, offset.y + 5}) + std::string(21, ' ') +
-        escape(Trait::Double_underline) + "Double_underline";
+        escape(Trait::DoubleUnderline) + "DoubleUnderline";
 }
 
 [[nodiscard]] auto key_modifiers_display(Key k) -> std::string

@@ -40,8 +40,8 @@ auto trait_to_int_sequence(esc::Trait t) -> std::string
         case Trait::Blink: return "5";
         case Trait::Inverse: return "7";
         case Trait::Invisible: return "8";
-        case Trait::Crossed_out: return "9";
-        case Trait::Double_underline: return "21";
+        case Trait::CrossedOut: return "9";
+        case Trait::DoubleUnderline: return "21";
     }
     throw std::runtime_error{"traits_to_int_sequence: Invalid Trait Value"};
 }

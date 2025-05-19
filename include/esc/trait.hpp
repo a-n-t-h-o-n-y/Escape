@@ -20,8 +20,8 @@ enum class Trait : std::uint16_t {
     Blink = 1 << 5,
     Inverse = 1 << 6,
     Invisible = 1 << 7,
-    Crossed_out = 1 << 8,
-    Double_underline = 1 << 9,
+    CrossedOut = 1 << 8,
+    DoubleUnderline = 1 << 9,
 };
 
 /**
