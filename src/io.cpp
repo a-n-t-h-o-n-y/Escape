@@ -1035,7 +1035,7 @@ void write(std::u32string_view sv)
     }
 }
 
-void flush() { std::fflush(::stdout); }
+void flush() { std::fflush(stdout); }
 
 auto read() -> Event
 {
