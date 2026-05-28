@@ -241,12 +241,8 @@ constexpr auto escape_keymap = std::array<esc::Key, 56>{Key::KeypadEnter,
         }
         throw std::runtime_error{"io.cpp is_file_readable(): Poll Error"};
     }
-    if (result == timeout) {
-        return true;
-    }
-    if (result > 0 && static_cast<bool>(file.revents & POLLIN)) {
-        return false;
-    }
+    if (result == timeout) { return true; }
+    if (result > 0 && static_cast<bool>(file.revents & POLLIN)) { return false; }
     throw std::logic_error{"io.cpp is_file_readable(): logic_error."};
 }
 
@@ -287,9 +283,7 @@ auto read_byte(int fd) -> unsigned char
  */
 auto read_byte(int fd, int timeout_ms) -> std::optional<char>
 {
-    if (!is_stdin_empty(timeout_ms)) {
-        return read_byte(fd);
-    }
+    if (!is_stdin_empty(timeout_ms)) { return read_byte(fd); }
     return std::nullopt;
 }
 
@@ -421,8 +415,7 @@ auto parse_mouse(ControlSequence cs) -> esc::Event
 
     // Move Event
     auto constexpr move_event = 0b00100000;
-    if (btn & move_event)
-        return esc::MouseMove{mouse};
+    if (btn & move_event) return esc::MouseMove{mouse};
 
     // Scroll Event
     if (mouse.button == Mouse::Button::ScrollUp ||
@@ -431,9 +424,7 @@ auto parse_mouse(ControlSequence cs) -> esc::Event
     }
 
     // Release Event
-    if (cs.final_byte == 'm') {
-        return esc::MouseRelease{mouse};
-    }
+    if (cs.final_byte == 'm') { return esc::MouseRelease{mouse}; }
 
     // urxvt btn release does not mention the button that was released.
     if (!is_sgr && mouse.button == Mouse::Button::None) {
@@ -443,9 +434,7 @@ auto parse_mouse(ControlSequence cs) -> esc::Event
 
     // Press Event
     previous_mouse_btn = mouse.button;
-    if (cs.final_byte == 'M') {
-        return esc::MousePress{mouse};
-    }
+    if (cs.final_byte == 'M') { return esc::MousePress{mouse}; }
 
     throw std::runtime_error{"io.cpp::parse_mouse(): Bad Mouse Event Parse"};
 }
@@ -514,9 +503,7 @@ auto parse_key(ControlSequence cs) -> esc::Key
  */
 auto parse_key_modifiers(std::string parameter_bytes) -> esc::Mod
 {
-    if (parameter_count(parameter_bytes) < 2) {
-        return static_cast<esc::Mod>(0);
-    }
+    if (parameter_count(parameter_bytes) < 2) { return static_cast<esc::Mod>(0); }
     auto const mod = parameter<int, 1>(parameter_bytes);
     switch (mod) {
         using esc::Mod;
@@ -548,9 +535,7 @@ auto parse_key_modifiers(std::string parameter_bytes) -> esc::Mod
  */
 auto parse(ControlSequence const& cs) -> esc::Event
 {
-    if (cs.final_byte == 'M' || cs.final_byte == 'm') {
-        return parse_mouse(cs);
-    }
+    if (cs.final_byte == 'M' || cs.final_byte == 'm') { return parse_mouse(cs); }
     return esc::KeyPress{parse_key(cs) | parse_key_modifiers(cs.parameter_bytes)};
 }
 
@@ -625,9 +610,7 @@ auto next_state(Initial) -> Lexer
             return Final{Window{}};
         }
         if (auto const b = read_byte(STDIN_FILENO, timeout); b.has_value()) {
-            if (*b == escape) {
-                return Escape{};
-            }
+            if (*b == escape) { return Escape{}; }
             else {
                 return UTF8{{*b}};
             }
@@ -639,9 +622,7 @@ auto next_state(Final f) -> Lexer { return f; }
 
 auto next_state(Escape) -> Lexer
 {
-    if (is_stdin_empty(0)) {
-        return Final{UTF8{{escape}}};
-    }
+    if (is_stdin_empty(0)) { return Final{UTF8{{escape}}}; }
     else {
         return MaybeEscaped{};
     }
@@ -650,9 +631,7 @@ auto next_state(Escape) -> Lexer
 auto next_state(MaybeEscaped) -> Lexer
 {
     auto const c = read_byte(STDIN_FILENO);
-    if (c != '[' && c != 'O') {
-        return Final{Escaped{(char)c}};
-    }
+    if (c != '[' && c != 'O') { return Final{Escaped{(char)c}}; }
     else {
         return MaybeCSI{(char)c};
     }
@@ -660,9 +639,7 @@ auto next_state(MaybeEscaped) -> Lexer
 
 auto next_state(MaybeCSI state) -> Lexer
 {
-    if (is_stdin_empty(0)) {
-        return Final{Escaped{state.c}};
-    }
+    if (is_stdin_empty(0)) { return Final{Escaped{state.c}}; }
     else {
         return CSI{""};
     }
@@ -836,9 +813,7 @@ auto read_single_token() -> Token
                     }
                 }
             }
-            if (key_byte > 0x53) {
-                return std::nullopt;
-            }
+            if (key_byte > 0x53) { return std::nullopt; }
             return is_release(byte2) ? Event{KeyRelease{escape_keymap[key_byte - 0x1C]}}
                                      : Event{KeyPress{escape_keymap[key_byte - 0x1C]}};
         }
@@ -883,15 +858,9 @@ auto read_single_token() -> Token
         }
         throw std::runtime_error{"timeout_wait_for_reads(): Poll Error"};
     }
-    if (result == timeout) {
-        return -1;
-    }
-    if (result > 0 && static_cast<bool>(files[0].revents & POLLIN)) {
-        return fd_a;
-    }
-    if (result > 0 && static_cast<bool>(files[1].revents & POLLIN)) {
-        return fd_b;
-    }
+    if (result == timeout) { return -1; }
+    if (result > 0 && static_cast<bool>(files[0].revents & POLLIN)) { return fd_a; }
+    if (result > 0 && static_cast<bool>(files[1].revents & POLLIN)) { return fd_b; }
     throw std::logic_error{"timeout_wait_for_reads(): logic_error."};
 }
 
@@ -920,9 +889,7 @@ auto read_single_token() -> Token
         blocking_wait_for_reads(STDIN_FILENO, *esc::detail::tty_file_descriptor);
     if (file == STDIN_FILENO) {
         auto const event = do_blocking_read();
-        if (std::holds_alternative<esc::KeyPress>(event)) {
-            return std::nullopt;
-        }
+        if (std::holds_alternative<esc::KeyPress>(event)) { return std::nullopt; }
         else {
             return event;
         }
@@ -947,9 +914,7 @@ auto read_single_token() -> Token
             blocking_wait_for_reads(STDIN_FILENO, *esc::detail::tty_file_descriptor);
         if (window_resize_sig == 1 || file == STDIN_FILENO) {
             auto const event = do_blocking_read();
-            if (std::holds_alternative<esc::KeyPress>(event)) {
-                continue;
-            }
+            if (std::holds_alternative<esc::KeyPress>(event)) { continue; }
             else {
                 return event;
             }
@@ -957,9 +922,7 @@ auto read_single_token() -> Token
         else if (file == *esc::detail::tty_file_descriptor) {
             auto const event =
                 read_and_parse_scancode(*esc::detail::tty_file_descriptor);
-            if (event.has_value()) {
-                return *event;
-            }
+            if (event.has_value()) { return *event; }
             else {
                 continue;
             }
@@ -975,9 +938,7 @@ auto read_single_token() -> Token
  */
 [[nodiscard]] auto do_timeout_read(int timeout_ms) -> std::optional<esc::Event>
 {
-    if (window_resize_sig == 1 || !is_stdin_empty(timeout_ms)) {
-        return esc::read();
-    }
+    if (window_resize_sig == 1 || !is_stdin_empty(timeout_ms)) { return esc::read(); }
     return std::nullopt;
 }
 
@@ -996,9 +957,7 @@ auto read_single_token() -> Token
         STDIN_FILENO, *esc::detail::tty_file_descriptor, timeout_ms);
     if (file == STDIN_FILENO) {
         auto const result = do_blocking_read();
-        if (std::holds_alternative<esc::KeyPress>(result)) {
-            return std::nullopt;
-        }
+        if (std::holds_alternative<esc::KeyPress>(result)) { return std::nullopt; }
         else {
             return result;
         }
@@ -1035,13 +994,19 @@ void write(std::u32string_view sv)
     }
 }
 
-void flush() { std::fflush(::stdout); }
+void flush()
+{
+// Workaround for illumos/Solaris where 'stdout' is a macro
+#if defined(__sun) || defined(__illumos__)
+    std::fflush(stdout);
+#else
+    std::fflush(::stdout);
+#endif
+}
 
 auto read() -> Event
 {
-    if (detail::tty_file_descriptor.has_value()) {
-        return do_alt_blocking_read();
-    }
+    if (detail::tty_file_descriptor.has_value()) { return do_alt_blocking_read(); }
     else {
         return do_blocking_read();
     }
