@@ -23,7 +23,8 @@ class Zoom {
     void scroll(int steps)
     { adjust(-static_cast<long double>(steps) * std::log(1.2L)); }
 
-    void step(double follow) { current += (target - current) * follow; }
+    void step(double follow)
+    { current = std::lerp(current, target, static_cast<long double>(follow)); }
 
     auto logarithm() const -> long double { return current; }
 

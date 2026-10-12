@@ -171,6 +171,7 @@ TEST(LUMEN_extreme_zoom_stays_finite_and_can_zoom_back_out)
     }
     zoom.scroll(std::numeric_limits<int>::max());
     zoom.step(1);
+    CHECK(zoom.logarithm() == std::log(0.3L));
     CHECK(std::abs(zoom.pixel_scale(100) - 3.4L / 100 / 0.3L) < 1e-15L);
 }
 
