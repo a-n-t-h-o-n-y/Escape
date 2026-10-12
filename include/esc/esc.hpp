@@ -13,6 +13,7 @@
 #include <esc/sequence.hpp>
 #include <esc/terminal.hpp>
 #include <esc/text.hpp>
+#include <esc/layout.hpp>
 #include <esc/trait.hpp>
 
 #include <esc/query.hpp>

@@ -1,6 +1,7 @@
 #pragma once
 #include <chrono>
 #include <concepts>
+#include <cstdint>
 #include <cstdio>
 #include <esc/detail/unicode.hpp>
 #include <esc/parser.hpp>
@@ -54,6 +55,27 @@ class Output {
     void write_one(std::u32string_view text);
     void write_one(char const* text) { write_one(std::string_view{text}); }
 };
+namespace detail {
+void send_encoded(Output&, WindowTitle const&);
+void send_encoded(Output&, BeginHyperlink const&);
+template <class Command>
+void send_encoded(Output& stream, Command const& command)
+{
+    std::array<char, 256> bytes;
+    SequenceWriter measure;
+    encode(measure, command);
+    if (measure.size() > bytes.size())
+        throw std::length_error{"Terminal: numeric command exceeds encoder bound"};
+    SequenceWriter writer{bytes.data()};
+    encode(writer, command);
+    stream.write(std::string_view{bytes.data(), writer.size()});
+}
+template <class Command>
+void send_encoded(Output& stream, std::optional<Command> const& command)
+{
+    if (command) send_encoded(stream, *command);
+}
+}  // namespace detail
 template <Writable... Values>
 void write(Values const&... values)
 { Output{}.write(values...); }
@@ -63,6 +85,16 @@ enum class ReadStatus { Event, Timeout, EndOfInput };
 struct ReadResult {
     ReadStatus status;
     std::optional<Event> event;
+};
+enum class WaitSourceKind { None, FileDescriptor, WindowsHandle };
+struct WaitSource {
+    WaitSourceKind kind = WaitSourceKind::None;
+    std::intptr_t value = 0;  // borrowed; never close it or read it directly
+};
+struct WaitState {
+    WaitSource source;
+    bool ready = false;  // event/EOF is held, or input can progress without waiting
+    std::optional<std::chrono::steady_clock::time_point> deadline;
 };
 class Reader {
    public:
@@ -77,6 +109,7 @@ class Reader {
     auto read() -> ReadResult;
     auto read(std::chrono::milliseconds timeout) -> ReadResult;
     void configure(InputProtocols protocols);
+    auto wait_state() -> WaitState;
 
    private:
     friend class Terminal;

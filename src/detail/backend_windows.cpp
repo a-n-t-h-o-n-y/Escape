@@ -418,6 +418,8 @@ auto session_profile(int, int output) -> ProfileReport
     if (env.no_color)
         result.decisions[1] = {Feature::Colors, EvidenceSource::Environment,
                                "NO_COLOR disables colors"};
+    for (auto feature : {Feature::CursorStyle, Feature::CursorSaveRestore, Feature::Scrolling, Feature::Editing, Feature::WindowTitle, Feature::Hyperlinks, Feature::SynchronizedOutput})
+        result.decisions.push_back({feature, EvidenceSource::Default, "Extension support requires an explicit profile or explicit probe"});
     return result;
 }
 auto get_attributes(int input, int output, Attributes* settings) -> int
@@ -683,3 +685,16 @@ auto read_bytes(Input& input, void* buffer, std::size_t count) -> std::ptrdiff_t
     return read;
 }
 }  // namespace esc::detail
+
+namespace esc::detail {
+auto wait_source(Input& input) -> WaitSource
+{
+    if(input.console_read)
+        return {WaitSourceKind::WindowsHandle, reinterpret_cast<std::intptr_t>(input.console_read->ready)};
+    auto source=handle(input.descriptor);
+    if(source==INVALID_HANDLE_VALUE) throw std::system_error{EBADF,std::generic_category(),"Reader: wait source"};
+    if(input.terminal) return {WaitSourceKind::WindowsHandle,reinterpret_cast<std::intptr_t>(source)};
+    // Synchronous pipe handles do not expose waitable byte availability.
+    return {};
+}
+}

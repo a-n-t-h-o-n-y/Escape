@@ -69,6 +69,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--termcaps", required=True)
     parser.add_argument("--pong", required=True)
+    parser.add_argument("--event-loop", required=True)
     args = parser.parse_args()
     run(args.termcaps, b"q")
     run(args.pong, b"\r\x1b[B\x1b[B\r")
+
+    run(args.event_loop, b"q")

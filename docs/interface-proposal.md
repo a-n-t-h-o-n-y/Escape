@@ -1,9 +1,21 @@
+> Scoped frames, drawing controls, titles/hyperlinks, and input readiness are
+> implemented in [the terminal extensions](terminal-extensions.md).
+
+> Grapheme segmentation and policy-based cell measurement are implemented in
+> [the text layout extension](text-layout.md), superseding their deferrals below.
+
+> Explicit queries, capability observations, and negotiated Kitty keyboard input
+> are implemented in [the query/keyboard extension](queries-and-keyboard.md),
+> superseding their deferrals below.
+
 # Escape interface proposal
 
-Status: proposed contract for the `refactor/terminal-api` branch. This document
-describes the intended interface, not the interface currently implemented. It is
-the starting point for review and behavior tests. No implementation or benchmark
-results are implied by the signatures below.
+Status: baseline contract for the `refactor/terminal-api` branch. The core
+interface is implemented; the linked extension contracts specify subsequent
+additions and supersede the original deferrals below. The signatures here describe
+the baseline rather than an exhaustive current header listing. Implementation,
+benchmark, and platform validation evidence is recorded separately in the README,
+implementation review, and contract tests.
 
 ## 1. Design goals and boundaries
 
@@ -512,7 +524,8 @@ including NO_COLOR; that is a deliberate application choice. The library never
 looks through SSH or a multiplexer to assume support greater than the immediate
 connection reports. Explicit probing and Kitty keyboard input are specified in
 [the query/keyboard extension](queries-and-keyboard.md), which supersedes the
-legacy-only input and query deferrals below. Runtime terminfo expansion is deferred.
+legacy-only input and query deferrals below. Terminfo support is outside the
+project's scope; profiles and explicit observations provide capability selection.
 There is no hidden probe on construction, and unknown terminals remain usable
 through an explicit profile. A later probe API must define deadlines, reply
 demultiplexing, and preservation of ordinary input before it is added.
@@ -1193,10 +1206,11 @@ The architecture leaves room for adapters without forcing terminfo, probes, or
 an emulator dependency on ordinary byte generation.
 
 Deferred additions require their own reviewed contracts:
-terminfo-backed arbitrary terminals, synchronized
-output, hyperlinks/titles/clipboard, graphics, event-loop or
-nonblocking output adapters, and style diff rendering. They must not be smuggled
+clipboard, graphics, nonblocking output
+adapters, and style diff rendering. Scoped synchronized output, titles/hyperlinks,
+and input event-loop integration are specified in [terminal extensions](terminal-extensions.md). They must not be smuggled
 into current functions through hidden environment behavior or magic flags.
+Terminfo-backed adapters are outside the project's scope.
 
 ## 13. Build and dependency interface
 
@@ -1339,8 +1353,8 @@ Changing one means updating the contract and its tests before implementation.
   from a timed read with no event.
 - Use scoped sessions without automatic signal-handler installation; distinguish
   captured OS state from assumed protocol state.
-- Defer enhanced keyboard protocols, active probes, terminfo adapters, and layout
-  without hiding their absence.
+- Keep enhanced keyboard protocols, active probes, and text layout in explicit
+  extension contracts; terminfo adapters remain outside the project's scope.
 
 The primary tradeoffs are explicit: strong append/span guarantees require a size/
 validation pass; pure lvalue styling can copy; conservative profiles may require

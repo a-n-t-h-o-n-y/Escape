@@ -123,3 +123,8 @@ auto get_size(int fd) -> Area
     return {size.ws_col, size.ws_row};
 }
 }  // namespace esc::detail
+
+namespace esc::detail {
+auto wait_source(Input& input) -> WaitSource
+{ return {WaitSourceKind::FileDescriptor, input.descriptor}; }
+}

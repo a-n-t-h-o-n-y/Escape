@@ -49,6 +49,7 @@ auto is_terminal(int fd) -> bool;
 auto terminal_identity(int input, int output) -> std::uint64_t;
 auto read_bytes(Input& input, void* buffer, std::size_t count) -> std::ptrdiff_t;
 auto poll_input(Input& input, int timeout) -> int;
+auto wait_source(Input& input) -> WaitSource;
 auto write_bytes(std::FILE* stream, char const* bytes, std::size_t count)
     -> std::size_t;
 auto flush_stream(std::FILE* stream) -> int;

@@ -1,6 +1,7 @@
 #include <array>
 #include <cerrno>
 #include <esc/terminal.hpp>
+#include <limits>
 #include <mutex>
 #include <set>
 #include "detail/backend.hpp"
@@ -28,6 +29,9 @@ void valid_optional(std::optional<T> value, T first, T second)
 }
 void validate_options(TerminalOptions const& options)
 {
+    if (options.restore_modes.synchronized_output != SynchronizedOutput::Off &&
+        options.restore_modes.synchronized_output != SynchronizedOutput::On)
+        throw std::invalid_argument{"Terminal: invalid synchronization baseline"};
     valid_optional(options.echo, Echo::On, Echo::Off);
     valid_optional(options.input_buffer, InputBuffer::Canonical,
                    InputBuffer::Immediate);
@@ -116,17 +120,82 @@ void merge_os(TerminalOptions& current, TerminalOptions const& patch)
 auto explicit_report(TerminalProfile profile) -> ProfileReport
 {
     ProfileReport result{profile, {}};
-    constexpr Feature features[] = {
-        Feature::Control,         Feature::Colors,           Feature::Traits,
-        Feature::AlternateScreen, Feature::CursorVisibility, Feature::Mouse,
-        Feature::Focus,           Feature::BracketedPaste};
-    result.decisions.reserve(8);
+    constexpr Feature features[] = {Feature::Control,
+                                    Feature::Colors,
+                                    Feature::Traits,
+                                    Feature::AlternateScreen,
+                                    Feature::CursorVisibility,
+                                    Feature::Mouse,
+                                    Feature::Focus,
+                                    Feature::BracketedPaste,
+                                    Feature::CursorStyle,
+                                    Feature::CursorSaveRestore,
+                                    Feature::Scrolling,
+                                    Feature::Editing,
+                                    Feature::WindowTitle,
+                                    Feature::Hyperlinks,
+                                    Feature::SynchronizedOutput};
+    result.decisions.reserve(std::size(features));
     for (auto feature : features)
         result.decisions.push_back(
             {feature, EvidenceSource::Explicit, "Caller-supplied terminal profile"});
     return result;
 }
 }  // namespace
+struct Frame::State {
+    Output* output = nullptr;
+    bool* usable = nullptr;
+    bool open = true, baseline = false, touched = false, synchronized = false;
+    unsigned depth = 0;
+    std::optional<bool> confirmed;
+    void command(SynchronizedOutput mode)
+    {
+        detail::send_encoded(*output, mode);
+        output->flush();
+    }
+};
+Frame::Frame(std::shared_ptr<State> const& state, bool synchronized) noexcept
+    : state_{state}, synchronized_{synchronized}
+{}
+Frame::Frame(Frame&& other) noexcept
+    : state_{std::move(other.state_)},
+      active_{other.active_},
+      synchronized_{other.synchronized_}
+{ other.active_ = false; }
+Frame::~Frame() noexcept
+{
+    try {
+        close();
+    }
+    catch (...) {
+    }
+}
+auto Frame::synchronized() const noexcept -> bool
+{
+    auto state = state_.lock();
+    return active_ && state && state->open && synchronized_;
+}
+void Frame::close()
+{
+    if (!active_) return;
+    active_ = false;
+    auto state = state_.lock();
+    if (!state || !state->open) return;
+    if (--state->depth) return;
+    try {
+        if (state->touched) {
+            state->command(SynchronizedOutput::Off);
+            state->touched = false;
+        }
+        else
+            state->output->flush();
+    }
+    catch (...) {
+        *state->usable = false;
+        throw;
+    }
+}
+
 struct Terminal::Impl {
     Streams streams;
     int input_fd, output_fd;
@@ -178,6 +247,7 @@ struct Terminal::Impl {
         output.flush();
     }
     bool leased = false, open = false, usable = true, os_touched = false;
+    std::shared_ptr<Frame::State> frames = std::make_shared<Frame::State>();
     Impl(Streams s,
          int input,
          int out,
@@ -286,6 +356,9 @@ struct Terminal::Impl {
         bool os = patch.echo.has_value() || patch.input_buffer.has_value() ||
                   patch.signals.has_value() || detail::transport_setup_required();
         auto changed = changed_modes(modes, next);
+        if (frames->depth && changed[0])
+            throw std::logic_error{
+                "Terminal: close frames before changing screen buffer"};
         if (keyboard_touched && changed[0])
             throw std::logic_error{
                 "Terminal: disable keyboard before changing screen buffer"};
@@ -333,6 +406,13 @@ struct Terminal::Impl {
     {
         std::error_code error;
         attempt(error, [&] { output.flush(); });
+        if (frames->touched)
+            attempt(error, [&] {
+                frames->command(SynchronizedOutput::Off);
+                frames->touched = false;
+            });
+        frames->open = false;
+        frames->depth = 0;
         if (keyboard_touched)
             attempt(error, [&] { keyboard_command(saved_keyboard_flags); });
         for (std::size_t i = 5; i > 0; --i)
@@ -459,6 +539,89 @@ void Terminal::close()
     if (!is_open()) return;
     auto error = impl_->cleanup();
     if (error) throw std::system_error{error, "Terminal: cleanup"};
+}
+auto Terminal::frame() -> Frame
+{
+    require_open();
+    auto& state = *impl_->frames;
+    if (state.depth == (std::numeric_limits<unsigned>::max)())
+        throw std::length_error{"Frame: nesting overflow"};
+    if (!state.depth) {
+        state.output = &impl_->output;
+        state.usable = &impl_->usable;
+        state.synchronized =
+            state.confirmed.value_or(impl_->report.profile.synchronized_output);
+        if (!state.synchronized &&
+            impl_->report.profile.fallback == FallbackPolicy::Strict)
+            throw UnsupportedFeature{Feature::SynchronizedOutput};
+        if (!state.confirmed)
+            state.baseline =
+                impl_->restore.synchronized_output == SynchronizedOutput::On;
+        impl_->output.flush();
+        if (state.synchronized && !state.baseline) {
+            state.touched = true;
+            try {
+                state.command(SynchronizedOutput::On);
+            }
+            catch (std::system_error const& primary) {
+                std::error_code rollback;
+                Impl::attempt(rollback, [&] {
+                    state.command(SynchronizedOutput::Off);
+                    state.touched = false;
+                });
+                impl_->usable = false;
+                throw SessionError{primary.code(), rollback};
+            }
+            catch (...) {
+                std::error_code rollback;
+                Impl::attempt(rollback, [&] {
+                    state.command(SynchronizedOutput::Off);
+                    state.touched = false;
+                });
+                impl_->usable = false;
+                throw;
+            }
+        }
+    }
+    ++state.depth;
+    return Frame{impl_->frames, state.synchronized};
+}
+auto Terminal::confirm_synchronized_output(std::chrono::milliseconds timeout)
+    -> QueryResult
+{
+    require_open();
+    if (impl_->frames->depth)
+        throw std::logic_error{"Terminal: cannot probe synchronization inside a frame"};
+    auto result = query(ModeQuery{2026}, timeout);
+    if (result.status == QueryStatus::Reply) {
+        auto mode = std::get<ModeReply>(*result.reply).status;
+        bool supported = mode == ModeStatus::Set || mode == ModeStatus::Reset;
+        impl_->frames->confirmed = supported;
+        impl_->frames->baseline = mode == ModeStatus::Set;
+        if (!supported) result.status = QueryStatus::Rejected;
+    }
+    return result;
+}
+auto Terminal::wait_state() -> WaitState
+{
+    require_open();
+    if (impl_->deferred_count) return {{}, true, {}};
+    auto state = impl_->reader.wait_state();
+    if (!impl_->options.resize_interval) return state;
+    auto now = detail::Clock::now();
+    if (!state.ready && now >= impl_->next_resize) {
+        auto size = area();
+        impl_->next_resize =
+            detail::deadline_after(now, *impl_->options.resize_interval);
+        if (size != impl_->last_size) {
+            impl_->last_size = size;
+            impl_->enqueue(Resize{size});
+            state.ready = true;
+        }
+    }
+    if (!state.deadline || impl_->next_resize < *state.deadline)
+        state.deadline = impl_->next_resize;
+    return state;
 }
 auto Terminal::read() -> ReadResult { return read_until({}); }
 auto Terminal::read(std::chrono::milliseconds timeout) -> ReadResult

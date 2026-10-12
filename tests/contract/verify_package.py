@@ -18,6 +18,15 @@ int main() {
     auto options=esc::TerminalOptions::interactive();
     if(options.echo != std::optional{esc::Echo::Off}) return 4;
     esc::Output{}.write(std::string_view{});
+    if (esc::escape(esc::CursorStyle::SteadyBar, esc::ScrollUp{2}) != "\x1b[6 q\x1b[2S") return 5;
+    if (esc::escape(esc::WindowTitle{"title"}, esc::BeginHyperlink{"https://example.org", "a"}, esc::EndHyperlink{}) != "\x1b]2;title\x1b\\\x1b]8;id=a;https://example.org\x1b\\\x1b]8;;\x1b\\") return 6;
+    auto* input=std::tmpfile();
+    if (!input) return 7;
+    {
+        esc::Reader reader{input};
+        if (!reader.wait_state().ready || reader.read(std::chrono::milliseconds{0}).status != esc::ReadStatus::EndOfInput) return 8;
+    }
+    std::fclose(input);
     return 0;
 }
 '''

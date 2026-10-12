@@ -13,6 +13,10 @@ cmake --build build --config Release --parallel
 ctest --test-dir build -C Release --output-on-failure
 ```
 
+The header check discovers every public `include/esc/*.hpp` entry point and
+compiles it independently. On macOS it uses CMake's selected SDK path, matching
+the library build rather than relying on the compiler's default SDK lookup.
+
 Build tests default on for a top-level project and off for subproject consumers.
 `ESCAPE_BUILD_CONTRACT_TESTS=ON` still enables them explicitly. The standalone
 runner fails when a filter matches no tests:
@@ -43,7 +47,7 @@ stream borrowing, ownership, mode/code-page/CRT restoration, and injected failur
 | OUT | output, failures |
 | IO | reader, failures |
 | SES | session, failures |
-| WIN | windows.test.cpp (40 native platform cases) |
+| WIN | windows.test.cpp (44 native platform cases) |
 | PKG | verify_headers.py, verify_package.py |
 | LIVE | Manual [acceptance matrix](live-terminals.md), still untested |
 
@@ -75,16 +79,16 @@ allocation contracts. Owned paste/unknown events may allocate.
 
 ## Verification status
 
-The macOS suite contains 222 behavior tests, plus independent header/package
-checks and PTY smoke tests for Pong and termcaps. It passes locally with Apple
+The macOS suite contains 266 behavior tests, plus independent header/package
+checks and PTY smoke tests for Pong, termcaps, and event-loop. It passes locally with Apple
 Clang 15 in release and ASan/UBSan builds after the backend split. Public headers
 stand alone without platform headers; Windows tests also include windows.h
 before esc.hpp and preserve the host RGB macro. Subproject and installed static
 and shared consumers compile, link, and run through Escape::escape on macOS.
 
-The library, both examples, portable contracts, and platform contract executables
+The library, all three executables (Pong, termcaps, and event-loop), portable contracts, and platform contract executables
 also cross-compile and link for x86_64 Linux and Windows with Zig 0.15.2's Clang
-20.1.2 toolchain. Cross-compilation does not execute behavior tests. The 40 native
+20.1.2 toolchain. Cross-compilation does not execute behavior tests. The 44 native
 Windows cases are compiled but have not run on this laptop. Native Linux,
 Windows/MSVC, and real emulator results are pending. GitHub Actions is configured
 for ubuntu-latest, macos-latest, windows-latest/MSVC, and Linux sanitizers; no
@@ -104,3 +108,21 @@ mappings, text identity, protocol snapshots, and allocation contracts.
 late replies, shared probe deadlines, negotiation, rejection, timeout rollback,
 flag restoration, and partial write failures. Five Windows cases cover explicit
 VT transport setup/restoration, cancellation/handle lifetime, typed replies, setup rollback, and pending native UTF-16 preservation. See [the extension contract](../../docs/queries-and-keyboard.md).
+
+## Text layout
+
+Thirteen layout cases run all 766 official Unicode 17 grapheme vectors through
+UTF-8 and UTF-32, plus independent width/policy goldens, strict decoding, borrowed
+ranges, font overrides, and allocation-free long combining contexts.
+See [the text layout contract](../../docs/text-layout.md). Width tests establish
+the declared policies; real terminal rendering still needs separate validation.
+
+## Terminal extensions
+
+`extensions.test.cpp` adds eleven core cases for controls, OSC validation,
+capability evidence, spans, destination aliasing, and allocation guarantees.
+`integration.test.cpp` adds twenty POSIX cases for scoped frames and failures,
+explicit synchronization confirmation, long OSC streaming, readiness caches,
+absolute deadlines, resize, partial paste, and host shutdown-source integration.
+Four Windows cases cover native/VT wait handles, synchronous pipe polling,
+and frame cleanup. See [the contract](../../docs/terminal-extensions.md).

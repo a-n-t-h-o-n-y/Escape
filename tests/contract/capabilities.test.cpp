@@ -205,7 +205,7 @@ TEST(CAP_03_reports_have_one_ordered_decision_per_feature)
     auto report=resolve_profile(Environment{.term="xterm-256color"},true);
     Feature const features[] = {Feature::Control,Feature::Colors,Feature::Traits,
         Feature::AlternateScreen,Feature::CursorVisibility,Feature::Mouse,Feature::Focus,Feature::BracketedPaste};
-    CHECK(report.decisions.size() == std::size(features));
+    CHECK(report.decisions.size() == std::size(features) + 7);
     for (std::size_t i=0;i<std::size(features);++i) {
         CHECK(report.decisions[i].feature == features[i]);
         CHECK(report.decisions[i].source == EvidenceSource::KnownTerminal);

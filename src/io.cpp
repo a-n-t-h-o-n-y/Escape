@@ -77,6 +77,7 @@ struct Reader::Impl {
     std::array<char, 4096> bytes{};
     std::size_t begin = 0, end = 0;
     bool eof = false, terminal = false;
+    std::optional<ReadResult> ready;
     std::optional<PendingTimeout> pending;
     std::optional<detail::Clock::time_point> origin, deadline;
     Impl(std::FILE* input, ParserOptions opts, InputProtocols protocols)
@@ -169,12 +170,46 @@ auto Reader::operator=(Reader&&) noexcept -> Reader& = default;
 auto Reader::read() -> ReadResult
 {
     if (!impl_) throw std::logic_error{"Reader: moved from"};
+    if (impl_->ready) {
+        auto result = std::move(*impl_->ready);
+        impl_->ready.reset();
+        return result;
+    }
     return impl_->read({});
 }
 auto Reader::read(std::chrono::milliseconds timeout) -> ReadResult
 {
     if (!impl_) throw std::logic_error{"Reader: moved from"};
+    if (timeout.count() < 0) throw std::invalid_argument{"Reader: negative timeout"};
+    if (impl_->ready) {
+        auto result = std::move(*impl_->ready);
+        impl_->ready.reset();
+        return result;
+    }
     return impl_->read(timeout);
+}
+auto Reader::wait_state() -> WaitState
+{
+    if (!impl_) throw std::logic_error{"Reader: moved from"};
+    if (!impl_->ready) {
+        auto result = impl_->read(std::chrono::milliseconds{0});
+        if (result.status != ReadStatus::Timeout) impl_->ready = std::move(result);
+    }
+    bool ready = impl_->ready.has_value();
+    if (!ready) {
+        auto result = detail::poll_input(impl_->input, 0);
+        if (result < 0 && errno != EINTR) io_error("Reader: wait readiness");
+        // Partial units can consume a whole read-ahead block without producing
+        // an event. Keep the host running while more bytes remain readable.
+        ready = result != 0;
+    }
+    WaitState state{detail::wait_source(impl_->input), ready, impl_->deadline};
+    if (state.source.kind == WaitSourceKind::None && !state.ready) {
+        auto fallback =
+            detail::deadline_after(detail::Clock::now(), std::chrono::milliseconds{2});
+        if (!state.deadline || fallback < *state.deadline) state.deadline = fallback;
+    }
+    return state;
 }
 void Reader::configure(InputProtocols protocols)
 {
@@ -212,3 +247,14 @@ void Reader::configure_session(InputProtocols protocols,
 #endif
 }
 }  // namespace esc
+
+namespace esc::detail {
+void send_encoded(Output& stream, WindowTitle const& value)
+{ stream.write("\x1b]2;", value.text, "\x1b\\"); }
+void send_encoded(Output& stream, BeginHyperlink const& value)
+{
+    stream.write("\x1b]8;");
+    if (!value.id.empty()) stream.write("id=", value.id);
+    stream.write(";", value.uri, "\x1b\\");
+}
+}  // namespace esc::detail

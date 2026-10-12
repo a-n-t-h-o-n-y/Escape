@@ -17,6 +17,13 @@ auto unsupported_message(Feature feature) -> char const*
         case Feature::Mouse: return "Terminal profile does not support the requested mouse reporting";
         case Feature::Focus: return "Terminal profile does not support focus reporting";
         case Feature::BracketedPaste: return "Terminal profile does not support bracketed paste";
+        case Feature::CursorStyle: return "Terminal profile does not support cursor style";
+        case Feature::CursorSaveRestore: return "Terminal profile does not support cursor save/restore";
+        case Feature::Scrolling: return "Terminal profile does not support scrolling";
+        case Feature::Editing: return "Terminal profile does not support line/character editing";
+        case Feature::WindowTitle: return "Terminal profile does not support window titles";
+        case Feature::Hyperlinks: return "Terminal profile does not support hyperlinks";
+        case Feature::SynchronizedOutput: return "Terminal profile does not support synchronized output";
     }
     throw std::invalid_argument{"UnsupportedFeature: invalid feature"};
 }
@@ -96,12 +103,14 @@ auto resolve_profile(Environment const& environment, bool output_is_terminal) ->
     }
     constexpr Feature features[] = {Feature::Control,Feature::Colors,Feature::Traits,
         Feature::AlternateScreen,Feature::CursorVisibility,Feature::Mouse,Feature::Focus,Feature::BracketedPaste};
-    report.decisions.reserve(std::size(features));
+    report.decisions.reserve(std::size(features) + 7);
     for (auto feature : features) {
         bool const color = feature == Feature::Colors;
         report.decisions.push_back({feature, color ? color_source : source,
                                    color ? color_explanation : explanation});
     }
+    for (auto feature : {Feature::CursorStyle, Feature::CursorSaveRestore, Feature::Scrolling, Feature::Editing, Feature::WindowTitle, Feature::Hyperlinks, Feature::SynchronizedOutput})
+        report.decisions.push_back({feature, EvidenceSource::Default, "Extension support requires an explicit profile or a supported explicit probe"});
     return report;
 }
 } // namespace esc
@@ -189,7 +198,7 @@ void validate_profile(TerminalProfile const& profile)
         throw std::invalid_argument{"TerminalProfile: mouse protocol and tracking limit are inconsistent"};
     if (!profile.control && (profile.colors != ColorSupport::None || profile.traits.data() ||
         profile.alternate_screen || profile.cursor_visibility || profile.mouse_protocol != MouseProtocol::None ||
-        profile.focus_reporting || profile.bracketed_paste))
+        profile.focus_reporting || profile.bracketed_paste || profile.cursor_style || profile.cursor_save_restore || profile.scrolling || profile.editing || profile.window_title || profile.hyperlinks || profile.synchronized_output))
         throw std::invalid_argument{"TerminalProfile: plain output cannot have control features"};
 }
 void encode(SequenceWriter& output, PreparedBrush const& brush)

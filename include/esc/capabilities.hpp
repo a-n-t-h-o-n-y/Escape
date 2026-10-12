@@ -9,7 +9,7 @@
 
 namespace esc {
 
-enum class Feature { Control, Colors, Traits, AlternateScreen, CursorVisibility, Mouse, Focus, BracketedPaste };
+enum class Feature { Control, Colors, Traits, AlternateScreen, CursorVisibility, Mouse, Focus, BracketedPaste, CursorStyle, CursorSaveRestore, Scrolling, Editing, WindowTitle, Hyperlinks, SynchronizedOutput };
 class UnsupportedFeature : public std::runtime_error {
 public:
     explicit UnsupportedFeature(Feature feature);
@@ -42,6 +42,13 @@ struct TerminalProfile {
     bool bracketed_paste = false;
     FallbackPolicy fallback = FallbackPolicy::BestEffort;
     std::array<RGB, 16> system_palette = conventional_system_palette();
+    bool cursor_style = false;
+    bool cursor_save_restore = false;
+    bool scrolling = false;
+    bool editing = false;
+    bool window_title = false;
+    bool hyperlinks = false;
+    bool synchronized_output = false;
 };
 
 struct Environment {

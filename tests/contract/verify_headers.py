@@ -10,15 +10,18 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--compiler", required=True)
     parser.add_argument("--include", required=True)
+    parser.add_argument("--compiler-arg", action="append", default=[])
     args = parser.parse_args()
     msvc = pathlib.Path(args.compiler).name.lower() in ("cl", "cl.exe", "clang-cl", "clang-cl.exe")
     flags = (["/nologo", "/std:c++20", "/utf-8", "/Zs", "/I" + args.include]
              if msvc else ["-std=c++20", "-fsyntax-only", "-I", args.include])
+    flags.extend(args.compiler_arg)
     trace = ["/showIncludes"] if msvc else ["-H"]
-    headers = (
-        "color", "trait", "brush", "point", "area", "sequence", "text", "glyph",
-        "capabilities", "event", "parser", "io", "terminal", "esc",
-    )
+    # Check every public header, including new API slices. Private detail headers
+    # are implementation helpers rather than standalone consumer entry points.
+    headers = sorted(path.stem for path in (pathlib.Path(args.include) / "esc").glob("*.hpp"))
+    if not headers:
+        parser.error("--include must contain Escape's public esc headers")
     forbidden = ("/zzz/", "/unicode/", "/termios.h", "/sys/ioctl.h", "/linux/kd.h")
     failures = []
     with tempfile.TemporaryDirectory(prefix="escape-headers-") as folder:
@@ -48,6 +51,7 @@ def main():
                 "isolated UTF8 unit": "char8_t{'a'} | esc::Trait::Bold",
                 "isolated UTF16 unit": "char16_t{'a'} | esc::Trait::Bold",
                 "mode command through send": "terminal.send(esc::ScreenBuffer::Alternate)",
+                "synchronization ownership bypass": "terminal.send(esc::SynchronizedOutput::On)",
             }
             for name, expression in invalid_calls.items():
                 source.write_text(

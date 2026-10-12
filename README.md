@@ -79,6 +79,12 @@ apply only to new sequence beginnings. Unknown input stays owned and bounded;
 paste preserves original bytes. Ordinary keys and mouse events allocate nothing
 after parser construction.
 
+Scoped frames, cursor styles, scrolling/editing controls, validated titles and
+hyperlinks, and host event-loop readiness are implemented. Extensions require
+explicit capability selection or an explicit synchronization probe. See
+[their contract and usage](docs/terminal-extensions.md) and the compiling
+[event-loop example](examples/event-loop.cpp).
+
 ## Unicode and glyphs
 
 ```cpp
@@ -91,14 +97,17 @@ esc::style_in_place(text, esc::Trait::Bold);
 Conversions are strict. `UnicodeError::offset()` identifies invalid input.
 `GlyphString` is a vector of styled Unicode scalars; a glyph does not promise
 one screen cell. Pipes return values; named append and mutation APIs support
-reusable storage. Grapheme layout and terminal cell width remain outside the API.
+reusable storage. Borrowed grapheme views and explicit cell-width policies are available through
+`graphemes`, `cell_width`, and `grapheme_width`; see [text layout](docs/text-layout.md).
 
 ## Build and install
 
 Requires a C++20 compiler and CMake 3.16+. Session backends target Linux, macOS,
 and Windows 10/11 consoles with VT output support. Windows builds support MSVC;
 the public headers contain no platform console types.
-No third-party library is fetched or required. Python 3 enables package/header
+Terminfo is not supported. Capability selection uses profiles, environment
+heuristics, and explicit queries. No third-party library is fetched or required.
+Python 3 enables package/header
 verification tests.
 
 ```sh
@@ -128,7 +137,7 @@ See [contract tests](tests/contract/README.md) for verification and
 validation. Synthetic fixtures and PTYs check library behavior, not emulator
 rendering or every terminal's advertised capabilities. CI builds and runs behavior
 tests on Linux, macOS, and Windows; a configured CI job is not a recorded passing
-run. Width calculation and further benchmark-driven optimization remain future work.
+run. Terminal-specific width validation and further benchmark-driven optimization remain future work.
 Explicit queries, capability observations, and negotiated Kitty keyboard input are
 implemented; see [their interface and usage](docs/queries-and-keyboard.md).
 

@@ -41,6 +41,10 @@ nanoseconds per unit and byte throughput, using steady_clock.
   reset happens once per stream. Paste is a 4 KiB payload in 64-byte fragments;
   a unit is the complete paste. Parser construction and fixture collection are
   excluded from timing; owned paste chunks remain part of the timed workload.
+- Text layout measures a 256-byte ASCII string and mixed accented Latin, CJK,
+  emoji ZWJ, flag, and Indic text. Width and borrowed grapheme iteration are
+  separate cases; a unit is a whole string. Data conversion is outside timing.
+  Use `--filter layout/` to run these workloads.
 - Reader measures ASCII events from a cached 1 MiB temporary file with read-ahead
   and zero-timeout calls. One unit is an event. Construction and rewind happen
   once per batch (and when wrapping the file), so their cost is amortized.
@@ -97,3 +101,21 @@ measured optimization: bounded bulk paste parsing. A same-laptop before/after
 comparison reduced the 4 KiB / 64-byte-fragment case from 34,016 to 2,148 ns,
 about 15.8 times faster. Three alternating pairs confirmed the improvement.
 Raw runs and the remaining platform-validation limits are linked in the review.
+
+## Text layout local baseline
+
+Unicode 17 layout, macOS 13.7.8 x86_64, Apple Clang 15, Release, tests disabled.
+Recorded 2026-10-11 using `--filter layout/ --milliseconds 100 --samples 7`.
+These are per complete string, without allocation, and not emulator timings.
+The mixed input is 34 UTF-8 bytes / five clusters / eight estimated cells.
+
+| Workload | Median ns/string | Min–max ns/string | MiB/s |
+| --- | ---: | ---: | ---: |
+| Width, 256-byte ASCII | 256.23 | 252.62–312.44 | 952.81 |
+| Graphemes, 256-byte ASCII | 932.32 | 927.74–950.13 | 261.86 |
+| Width, mixed text | 332.07 | 324.26–336.33 | 97.65 |
+| Graphemes, mixed text | 330.23 | 327.08–334.19 | 98.19 |
+
+Printable ASCII uses a measured optimization that preserves the last scalar
+for possible combining/emoji lookahead. These figures are a baseline for future
+changes; scheduling, CPU frequency, and background activity remain uncontrolled.

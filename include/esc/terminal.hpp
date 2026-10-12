@@ -21,6 +21,7 @@ struct ProtocolState {
     MouseReporting mouse = {MouseMode::Off, MouseProtocol::None};
     FocusReporting focus = FocusReporting::Off;
     BracketedPaste paste = BracketedPaste::Off;
+    SynchronizedOutput synchronized_output = SynchronizedOutput::Off;
 };
 struct TerminalOptions {
     std::optional<Echo> echo;
@@ -68,6 +69,24 @@ struct ProbeReport {
     std::vector<ProbeObservation> observations;
 };
 
+class Frame {
+   public:
+    Frame(Frame&&) noexcept;
+    auto operator=(Frame&&) -> Frame& = delete;
+    Frame(Frame const&) = delete;
+    auto operator=(Frame const&) -> Frame& = delete;
+    ~Frame() noexcept;
+    void close();
+    auto synchronized() const noexcept -> bool;
+
+   private:
+    friend class Terminal;
+    struct State;
+    std::weak_ptr<State> state_;
+    bool active_ = true, synchronized_ = false;
+    Frame(std::shared_ptr<State> const& state, bool synchronized) noexcept;
+};
+
 class Terminal {
    public:
     static auto open(TerminalOptions options = {}) -> Terminal;
@@ -87,25 +106,20 @@ class Terminal {
     void send(Commands const&... commands)
     {
         auto const prepared = detail::prepare_pack(profile(), commands...);
+        detail::SequenceWriter validate;
+        detail::encode_pack(validate, prepared);
         auto& stream = output();
         std::apply(
             [&](auto const&... command) {
-                auto emit = [&](auto const& value) {
-                    std::array<char, 256> bytes;
-                    detail::SequenceWriter measure;
-                    detail::encode(measure, value);
-                    if (measure.size() > bytes.size())
-                        throw std::length_error{
-                            "Terminal: command exceeds encoder bound"};
-                    detail::SequenceWriter writer{bytes.data()};
-                    detail::encode(writer, value);
-                    stream.write(std::string_view{bytes.data(), writer.size()});
-                };
-                (emit(command), ...);
+                (detail::send_encoded(stream, command), ...);
             },
             prepared);
     }
     void flush();
+    auto frame() -> Frame;
+    auto confirm_synchronized_output(std::chrono::milliseconds timeout =
+                                         std::chrono::milliseconds{250}) -> QueryResult;
+    auto wait_state() -> WaitState;
     // Request sends and flushes only; replies arrive through read().
     void request(Query const& query);
     void request(std::span<Query const> queries);

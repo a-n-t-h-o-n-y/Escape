@@ -155,7 +155,47 @@ int main(int argc, char** argv)
         esc::append_escape(reused, esc::Cursor{123, 45}, esc::fg(esc::RGB{0x38a9df}),
                            esc::Trait::Bold, esc::BlankRow{});
         require(reused == expected);
+        std::array<std::string, 2> layout_inputs = {
+            std::string(256, 'a'),
+            esc::utf32_to_utf8(U"e\u0301中\U0001f469\u200d\U0001f4bb\U0001f1fa"
+                               U"\U0001f1f8\u0915\u094d\u0937")};
+        require(esc::cell_width(layout_inputs[0]) == 256);
+        require(esc::cell_width(layout_inputs[1]) == 8);
         std::vector<Case> cases;
+        for (std::size_t index = 0; index < layout_inputs.size(); ++index) {
+            auto const name = index == 0 ? "ascii" : "mixed";
+            auto const expected_clusters = index == 0 ? 256u : 5u;
+            std::size_t preflight_clusters = 0;
+            for (auto cluster :
+                 esc::graphemes(std::string_view{layout_inputs[index]})) {
+                require(!cluster.empty());
+                ++preflight_clusters;
+            }
+            require(preflight_clusters == expected_clusters);
+            cases.push_back({std::string{"layout/width/"} + name,
+                             layout_inputs[index].size(), 1, [&, index](std::size_t n) {
+                                 std::uint64_t total = 0;
+                                 for (std::size_t i = 0; i < n; ++i) {
+                                     auto const& input = layout_inputs[index];
+                                     observe(input.data(), input.size());
+                                     auto cells = esc::cell_width(input);
+                                     total += *cells;
+                                 }
+                                 return total;
+                             }});
+            cases.push_back({std::string{"layout/graphemes/"} + name,
+                             layout_inputs[index].size(), 1, [&, index](std::size_t n) {
+                                 std::uint64_t total = 0;
+                                 for (std::size_t i = 0; i < n; ++i) {
+                                     auto const& input = layout_inputs[index];
+                                     observe(input.data(), input.size());
+                                     for (auto cluster :
+                                          esc::graphemes(std::string_view{input}))
+                                         total += cluster.size();
+                                 }
+                                 return total;
+                             }});
+        }
         cases.push_back({"encode/string", expected.size(), 1, [&](std::size_t n) {
                              std::uint64_t total = 0;
                              while (n--) {

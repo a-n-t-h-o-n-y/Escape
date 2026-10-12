@@ -14,7 +14,7 @@ target_link_libraries(escape.tests.contract.text PRIVATE escape)
 # Core expectations are independent of POSIX session behavior.
 add_executable(escape.tests.contract
     main.cpp sequence.test.cpp values.test.cpp capabilities.test.cpp
-    text.test.cpp parser.test.cpp protocols.test.cpp allocation.test.cpp capability-allocation.test.cpp text-allocation.test.cpp encoding-allocation.test.cpp support/allocations.cpp)
+    text.test.cpp layout.test.cpp extensions.test.cpp parser.test.cpp protocols.test.cpp allocation.test.cpp capability-allocation.test.cpp text-allocation.test.cpp encoding-allocation.test.cpp support/allocations.cpp)
 target_link_libraries(escape.tests.contract PRIVATE escape)
 target_compile_features(escape.tests.contract PRIVATE cxx_std_20)
 target_compile_options(escape.tests.contract PRIVATE ${ESCAPE_WARNINGS})
@@ -26,7 +26,7 @@ endforeach()
 
 if(UNIX)
     add_executable(escape.tests.contract.posix
-        main.cpp output.test.cpp reader.test.cpp session.test.cpp failures.test.cpp queries.test.cpp support/allocations.cpp)
+        main.cpp output.test.cpp reader.test.cpp session.test.cpp failures.test.cpp queries.test.cpp integration.test.cpp support/allocations.cpp)
     target_link_libraries(escape.tests.contract.posix PRIVATE escape)
     target_compile_features(escape.tests.contract.posix PRIVATE cxx_std_20)
     target_compile_options(escape.tests.contract.posix PRIVATE ${ESCAPE_WARNINGS})
@@ -54,9 +54,15 @@ endif()
 
 find_package(Python3 QUIET COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
+    set(ESCAPE_HEADER_COMPILER_ARGS)
+    if(APPLE AND CMAKE_OSX_SYSROOT)
+        list(APPEND ESCAPE_HEADER_COMPILER_ARGS
+            "--compiler-arg=-isysroot" "--compiler-arg=${CMAKE_OSX_SYSROOT}")
+    endif()
     add_test(NAME escape.contract.PKG.headers
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/verify_headers.py"
-                --compiler "${CMAKE_CXX_COMPILER}" --include "${PROJECT_SOURCE_DIR}/include")
+                --compiler "${CMAKE_CXX_COMPILER}" --include "${PROJECT_SOURCE_DIR}/include"
+                ${ESCAPE_HEADER_COMPILER_ARGS})
     add_test(NAME escape.contract.PKG.consumers
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/verify_package.py"
                 --source "${PROJECT_SOURCE_DIR}" --cmake "${CMAKE_COMMAND}"

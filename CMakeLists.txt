@@ -19,7 +19,7 @@ else()
 endif()
 
 add_library(escape
-    src/text.cpp src/glyph.cpp src/sequence.cpp src/capabilities.cpp
+    src/text.cpp src/layout.cpp src/glyph.cpp src/sequence.cpp src/extensions.cpp src/capabilities.cpp
     src/parser.cpp src/query.cpp src/keyboard.cpp src/io.cpp src/terminal.cpp src/detail/backend_common.cpp)
 if(WIN32)
     target_sources(escape PRIVATE src/detail/backend_windows.cpp)
@@ -65,3 +65,5 @@ write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/EscapeConfigVersion
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/EscapeConfig.cmake
               ${CMAKE_CURRENT_BINARY_DIR}/EscapeConfigVersion.cmake
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Escape)
+
+install(FILES LICENSE.unicode DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/Escape)

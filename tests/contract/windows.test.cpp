@@ -709,3 +709,79 @@ TEST(WIN_QUERY_partial_native_surrogate_is_preserved_before_transport_switch)
     terminal.request(esc::KeyboardQuery{});
     CHECK(fixture.input_mode() & ENABLE_VIRTUAL_TERMINAL_INPUT);
 }
+
+TEST(WIN_WAIT_native_console_handle_and_buffered_event_are_preserved)
+{
+    Fixture fixture;
+    auto terminal = immediate(fixture);
+    auto idle = terminal.wait_state();
+    CHECK(!idle.ready);
+    CHECK(idle.source.kind == esc::WaitSourceKind::WindowsHandle);
+    CHECK(reinterpret_cast<HANDLE>(idle.source.value) == fixture.input.handle());
+    fixture.key(L'x');
+    CHECK(::WaitForSingleObject(reinterpret_cast<HANDLE>(idle.source.value), 500) ==
+          WAIT_OBJECT_0);
+    CHECK(terminal.wait_state().ready);
+    CHECK(terminal.wait_state().ready);
+    CHECK(terminal.read(0ms).event == std::optional<esc::Event>{esc::KeyPress{U'x'}});
+}
+TEST(WIN_WAIT_vt_transport_exposes_completion_event)
+{
+    Fixture fixture;
+    auto terminal = immediate(fixture);
+    terminal.request(esc::KeyboardQuery{});
+    auto idle = terminal.wait_state();
+    CHECK(!idle.ready && idle.source.kind == esc::WaitSourceKind::WindowsHandle);
+    CHECK(reinterpret_cast<HANDLE>(idle.source.value) != fixture.input.handle());
+    fixture.key(L'z');
+    CHECK(::WaitForSingleObject(reinterpret_cast<HANDLE>(idle.source.value), 500) ==
+          WAIT_OBJECT_0);
+    CHECK(terminal.wait_state().ready);
+    CHECK(terminal.read(0ms).event == std::optional<esc::Event>{esc::KeyPress{U'z'}});
+    terminal.close();  // completion source is borrowed, closed by Escape.
+}
+TEST(WIN_WAIT_synchronous_pipe_has_timer_fallback_and_reports_eof)
+{
+    HANDLE input = nullptr, output = nullptr;
+    CHECK(::CreatePipe(&input, &output, nullptr, 0));
+    File reader_file{input, _O_RDONLY};
+    File writer_file{output, _O_WRONLY};
+    esc::Reader reader{reader_file.stream};
+    auto idle = reader.wait_state();
+    CHECK(!idle.ready && idle.source.kind == esc::WaitSourceKind::None &&
+          idle.deadline);
+    CHECK(*idle.deadline <= std::chrono::steady_clock::now() + 2ms);
+    esc::Output stream{writer_file.stream};
+    stream.write("a");
+    stream.flush();
+    CHECK(reader.wait_state().ready);
+    CHECK(reader.read(0ms).event == std::optional<esc::Event>{esc::KeyPress{U'a'}});
+    CHECK(std::fclose(writer_file.stream) == 0);
+    writer_file.stream = nullptr;
+    CHECK(reader.wait_state().ready);
+    CHECK(reader.read(0ms).status == esc::ReadStatus::EndOfInput);
+}
+TEST(WIN_FRAME_scopes_preserve_console_modes_and_cleanup_after_move)
+{
+    Fixture fixture;
+    auto input_mode = fixture.input_mode();
+    auto output_mode = fixture.output_mode();
+    esc::TerminalOptions options;
+    options.echo = esc::Echo::Off;
+    options.input_buffer = esc::InputBuffer::Immediate;
+    options.profile = esc::TerminalProfile{};
+    options.profile->control = true;
+    options.profile->synchronized_output = true;
+    auto terminal = esc::Terminal::open(fixture.streams(), options);
+    {
+        auto outer = terminal.frame();
+        auto inner = terminal.frame();
+        CHECK(outer.synchronized() && inner.synchronized());
+        auto moved = std::move(terminal);
+        moved.write("abc");
+        outer.close();
+        inner.close();
+        moved.close();
+    }
+    CHECK(fixture.input_mode() == input_mode && fixture.output_mode() == output_mode);
+}
