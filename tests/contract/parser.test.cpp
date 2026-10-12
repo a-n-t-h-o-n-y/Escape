@@ -53,6 +53,13 @@ TEST(PAR_01_ss3_keypad_is_distinct_from_printable_text)
     for (auto c : cases) parses_at_every_split(std::string{"\x1bO"}+c.final,{KeyPress{c.key}});
     parses_at_every_split("0",{KeyPress{U'0'}});
 }
+TEST(PAR_01_native_function_identifiers_are_not_portable_protocol_claims)
+{
+    for (auto identifier : {42, 43, 44, 45}) {
+        auto bytes = "\x1b[" + std::to_string(identifier) + "~";
+        parses_at_every_split(bytes, {UnknownInput{bytes, InputProblem::Unsupported, true}});
+    }
+}
 TEST(PAR_01_every_modifier_combination_is_a_separate_value)
 {
     for (int parameter=1;parameter<=16;++parameter) {
@@ -372,6 +379,34 @@ TEST(PAR_05_partial_and_false_paste_delimiters_preserve_every_byte)
             joined+=event.bytes;
         }
         CHECK(joined==payload);
+    }
+}
+TEST(PAR_05_bulk_paste_preserves_payload_and_following_input)
+{
+    std::string payload(257, 'p');
+    payload += "\x1b[20x\x1b[201X\x1b\x1b[201";
+    payload += std::string(257, '\0');
+    auto input = "\x1b[200~" + payload + "\x1b[201~z";
+    for (auto chunk : {1u, 4u, 64u, 256u, 4096u}) {
+        for (auto fragment : {1u, 5u, 6u, 63u, 64u, 257u, 1024u}) {
+            Parser parser{{.paste_chunk_size = chunk}, {.bracketed_paste = true}};
+            std::vector<Event> events;
+            for (std::size_t offset = 0; offset < input.size(); offset += fragment)
+                contract::feed(parser, std::string_view{input}.substr(offset, fragment), events);
+            CHECK(events.back() == Event{KeyPress{U'z'}});
+            events.pop_back();
+            std::string joined;
+            for (std::size_t i = 0; i < events.size(); ++i) {
+                auto const& paste = std::get<PasteChunk>(events[i]);
+                CHECK(paste.bytes.size() <= chunk);
+                CHECK(paste.first == (i == 0));
+                CHECK(paste.last == (i + 1 == events.size()));
+                CHECK(!paste.aborted);
+                joined += paste.bytes;
+            }
+            CHECK(joined == payload);
+            CHECK(!parser.finish());
+        }
     }
 }
 TEST(PAR_04_overflow_then_expiry_or_eof_closes_the_same_opaque_unit)

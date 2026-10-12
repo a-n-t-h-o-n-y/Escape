@@ -36,6 +36,9 @@ class Parser {
     void reset() noexcept;
 
    private:
+    friend class Reader;
+    // Private transport grammar: never enabled for arbitrary terminal bytes.
+    bool native_function_keys_ = false;
     enum class State {
         Ground,
         Escape,

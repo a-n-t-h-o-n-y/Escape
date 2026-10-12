@@ -293,10 +293,36 @@ TEST(WIN_INPUT_function_keys)
     Fixture fixture;
     auto terminal = immediate(fixture);
     esc::Reader reader{fixture.input.stream};
-    fixture.key(0, VK_F1);
-    fixture.key(0, VK_F24);
-    key(reader, esc::KeyCode::F1);
-    key(reader, esc::KeyCode::F24);
+    for (WORD code = VK_F1; code <= VK_F24; ++code) {
+        fixture.key(0, code, SHIFT_PRESSED | LEFT_CTRL_PRESSED);
+        key(reader, static_cast<esc::KeyCode>(
+                        static_cast<unsigned>(esc::KeyCode::F1) + code - VK_F1),
+            {.shift = true, .ctrl = true});
+    }
+}
+TEST(WIN_INPUT_canonical_echo_uses_session_buffer_without_leaking_handles)
+{
+    Fixture fixture;
+    esc::TerminalOptions options;
+    options.echo = esc::Echo::On;
+    options.input_buffer = esc::InputBuffer::Canonical;
+    options.profile = esc::TerminalProfile{.control = true};
+    auto terminal = esc::Terminal::open(fixture.streams(), options);
+    CHECK(::SetConsoleCursorPosition(fixture.output.handle(), {0, 0}));
+    DWORD before = 0, after = 0;
+    CHECK(::GetProcessHandleCount(::GetCurrentProcess(), &before));
+    for (int i = 0; i < 32; ++i) {
+        fixture.key(L'x');
+        CHECK(terminal.read(0ms).status == esc::ReadStatus::Timeout);
+    }
+    CHECK(::GetProcessHandleCount(::GetCurrentProcess(), &after));
+    CHECK(after == before);
+    std::array<wchar_t, 32> text{};
+    DWORD count = 0;
+    CHECK(::ReadConsoleOutputCharacterW(fixture.output.handle(), text.data(),
+                                        static_cast<DWORD>(text.size()), {0, 0}, &count));
+    CHECK(count == text.size());
+    for (auto character : text) CHECK(character == L'x');
 }
 TEST(WIN_INPUT_repeats_do_not_require_more_os_records)
 {

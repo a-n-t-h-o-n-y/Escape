@@ -1129,11 +1129,14 @@ interactive preset already selects Echo::Off. Native console-record reading
 avoids a blocking ReadConsole call after readiness for a non-character record.
 Reader maintains bounded canonical editing storage (4096 UTF-8 bytes), handles
 Backspace and Enter, and delivers a completed line through the same parser.
-Overflow reports system_error(value_too_large). Echo uses the attached console's
-active output buffer. It does not implement shell line editing/history.
+Overflow reports system_error(value_too_large). Session echo uses the borrowed
+session output buffer; standalone Reader echo opens and closes the attached
+console's active output buffer. It does not implement shell line editing/history.
 
 KEY_EVENT records normalize Unicode (including UTF-16 surrogate pairs), repeats,
 Alt text, AltGr text, arrows/navigation, and F1..F24 into the shared byte parser.
+F21..F24 use a private transport grammar enabled only for native console Readers;
+ordinary Parser instances and redirected byte input keep those keys reserved.
 Key releases and unrelated native records do not become key presses or extend a
 read deadline. Malformed native UTF-16 units become replacement scalars. Mouse
 records normalize to the configured SGR, legacy, or urxvt grammar; focus records
@@ -1197,10 +1200,9 @@ into current functions through hidden environment behavior or magic flags.
 
 Retain the local CMake target `escape` and add an exported `Escape::escape` target.
 The installed public headers require C++20. Public includes do not expose zzz
-coroutines, ICU types, termios, or platform console headers. ICU/zzz may remain
-implementation/test dependencies initially; the installed CMake target supplies
-required linkage for static consumers without making users manually discover
-transitive libraries. Dependency removal is a separate measured decision.
+coroutines, ICU types, termios, or platform console headers. The implementation
+requires no third-party library; the installed CMake target supplies required
+platform linkage for static consumers.
 
 Provide `ESCAPE_BUILD_TESTS` and `ESCAPE_BUILD_EXAMPLES`, enabled when building
 Escape as the top-level project and disabled by default for add_subdirectory
@@ -1209,8 +1211,8 @@ dependency tests as a side effect of linking Escape. Installation exports header
 the library, version metadata, and a package configuration supporting
 `find_package(Escape CONFIG REQUIRED)`.
 
-Benchmarks are deferred. The interface already specifies useful allocation
-contracts, which can be checked directly without choosing benchmark machinery.
+An opt-in standalone benchmark suite measures encoding, reused buffers, parsing,
+and I/O. Allocation contracts are checked separately by behavior tests.
 Compiler warning/sanitizer checks remain part of development verification, not
 flags forcibly imposed on downstream consumers.
 

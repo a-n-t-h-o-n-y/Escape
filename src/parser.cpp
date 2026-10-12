@@ -103,8 +103,16 @@ auto named_key(char final, bool keypad) -> std::optional<KeyCode>
     }
     return {};
 }
-auto tilde_key(std::uint64_t number) -> std::optional<KeyCode>
+auto tilde_key(std::uint64_t number, bool native_functions) -> std::optional<KeyCode>
 {
+    if (native_functions) {
+        switch (number) {
+            case 42: return KeyCode::F21;
+            case 43: return KeyCode::F22;
+            case 44: return KeyCode::F23;
+            case 45: return KeyCode::F24;
+        }
+    }
     switch (number) {
         case 1:
         case 7: return KeyCode::Home;
@@ -276,7 +284,7 @@ auto Parser::complete_sequence() -> Event
     if (!ss3 && final == 'Z' && p.size == 0)
         return succeed(KeyPress{KeyCode::Tab, Modifiers{.shift = true}});
     auto key =
-        final == '~' && !ss3 && p.size ? tilde_key(p.values[0]) : named_key(final, ss3);
+        final == '~' && !ss3 && p.size ? tilde_key(p.values[0], native_function_keys_) : named_key(final, ss3);
     if (!key) return unknown(InputProblem::Unsupported);
     bool valid =
         p.size <= 2 && (final == '~' ? p.size >= 1 : (p.size == 0 || p.values[0] == 1));
@@ -389,6 +397,22 @@ auto Parser::next(std::span<char const> input) -> ParseResult
             continue;
         }
         if (state_ == State::Paste) {
+            // Copy ordinary runs in bulk. A possible delimiter prefix in the
+            // trailing five bytes still uses the byte path below, so terminators
+            // spanning calls or chunk boundaries retain exactly the same meaning.
+            auto tail = std::string_view{buffer_}.substr(
+                buffer_.size() > 5 ? buffer_.size() - 5 : 0);
+            if (byte != 27 && input.size() - consumed >= 8 &&
+                tail.find('\x1b') == tail.npos) {
+                auto remaining = std::string_view{input.data() + consumed,
+                                                  input.size() - consumed};
+                auto stop = remaining.find('\x1b');
+                auto count = std::min(stop == remaining.npos ? remaining.size() : stop,
+                                      options_.paste_chunk_size + end_paste.size() - buffer_.size());
+                buffer_.append(remaining.data(), count);
+                consumed += count;
+                continue;
+            }
             buffer_ += static_cast<char>(byte);
             ++consumed;
             if (buffer_.ends_with(end_paste)) {

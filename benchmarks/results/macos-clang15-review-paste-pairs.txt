@@ -1,0 +1,41 @@
+Paired run 1: before
+Escape benchmarks: steady_clock; median and min/max; 7 samples; target 100 ms/sample
+Build: optimized (NDEBUG)
+case,iterations/sample,median_ns/unit,min_ns/unit,max_ns/unit,MiB/s
+parse/paste-4KiB-fragments,2872,34767.60,34248.92,36276.67,112.68
+checksum=2872
+
+Paired run 1: after
+Escape benchmarks: steady_clock; median and min/max; 7 samples; target 100 ms/sample
+Build: optimized (NDEBUG)
+case,iterations/sample,median_ns/unit,min_ns/unit,max_ns/unit,MiB/s
+parse/paste-4KiB-fragments,45251,2282.06,2152.38,2508.02,1716.74
+checksum=45251
+
+Paired run 2: before
+Escape benchmarks: steady_clock; median and min/max; 7 samples; target 100 ms/sample
+Build: optimized (NDEBUG)
+case,iterations/sample,median_ns/unit,min_ns/unit,max_ns/unit,MiB/s
+parse/paste-4KiB-fragments,2821,35047.15,34222.40,38309.35,111.78
+checksum=2821
+
+Paired run 2: after
+Escape benchmarks: steady_clock; median and min/max; 7 samples; target 100 ms/sample
+Build: optimized (NDEBUG)
+case,iterations/sample,median_ns/unit,min_ns/unit,max_ns/unit,MiB/s
+parse/paste-4KiB-fragments,45600,2150.73,2146.38,2188.21,1821.57
+checksum=45600
+
+Paired run 3: before
+Escape benchmarks: steady_clock; median and min/max; 7 samples; target 100 ms/sample
+Build: optimized (NDEBUG)
+case,iterations/sample,median_ns/unit,min_ns/unit,max_ns/unit,MiB/s
+parse/paste-4KiB-fragments,2861,34154.07,33980.27,34426.65,114.71
+checksum=2861
+
+Paired run 3: after
+Escape benchmarks: steady_clock; median and min/max; 7 samples; target 100 ms/sample
+Build: optimized (NDEBUG)
+case,iterations/sample,median_ns/unit,min_ns/unit,max_ns/unit,MiB/s
+parse/paste-4KiB-fragments,41727,2141.85,2135.48,2165.40,1829.12
+checksum=41727

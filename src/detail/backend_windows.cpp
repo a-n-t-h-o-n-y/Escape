@@ -196,18 +196,31 @@ void echo(Input const& input, std::string_view bytes)
             wide += static_cast<wchar_t>(0xdc00 + ((scalar - 0x10000) & 1023));
         }
     }
-    auto output =
-        ::CreateFileW(L"CONOUT$", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                      nullptr, OPEN_EXISTING, 0, nullptr);
+    bool borrowed = input.output_descriptor >= 0;
+    auto output = borrowed ? handle(input.output_descriptor)
+                           : ::CreateFileW(L"CONOUT$", GENERIC_WRITE,
+                                           FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                           nullptr, OPEN_EXISTING, 0, nullptr);
     if (output == INVALID_HANDLE_VALUE) check(FALSE, "Reader: open echo output");
-    DWORD written = 0;
-    auto ok = ::WriteConsoleW(output, wide.data(), static_cast<DWORD>(wide.size()),
-                              &written, nullptr);
-    auto error = ::GetLastError();
-    if (input.output_descriptor < 0) ::CloseHandle(output);
-    if (!ok)
-        throw std::system_error{static_cast<int>(error), std::system_category(),
-                                "Reader: echo"};
+    DWORD error = 0;
+    std::size_t offset = 0;
+    while (offset < wide.size()) {
+        DWORD written = 0;
+        if (!::WriteConsoleW(output, wide.data() + offset,
+                             static_cast<DWORD>(wide.size() - offset), &written,
+                             nullptr)) {
+            error = ::GetLastError();
+            break;
+        }
+        if (!written) {
+            error = ERROR_WRITE_FAULT;
+            break;
+        }
+        offset += written;
+    }
+    if (!borrowed) ::CloseHandle(output);
+    if (error)
+        throw std::system_error{static_cast<int>(error), std::system_category(), "Reader: echo"};
 }
 void accept(Input& input, std::string const& bytes, DWORD mode)
 {

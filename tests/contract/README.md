@@ -43,7 +43,7 @@ stream borrowing, ownership, mode/code-page/CRT restoration, and injected failur
 | OUT | output, failures |
 | IO | reader, failures |
 | SES | session, failures |
-| WIN | windows.test.cpp (34 native platform cases) |
+| WIN | windows.test.cpp (35 native platform cases) |
 | PKG | verify_headers.py, verify_package.py |
 | LIVE | Manual [acceptance matrix](live-terminals.md), still untested |
 
@@ -75,7 +75,7 @@ allocation contracts. Owned paste/unknown events may allocate.
 
 ## Verification status
 
-The macOS suite contains 196 behavior tests, plus independent header/package
+The macOS suite contains 198 behavior tests, plus independent header/package
 checks and PTY smoke tests for Pong and termcaps. It passes locally with Apple
 Clang 15 in release and ASan/UBSan builds after the backend split. Public headers
 stand alone without platform headers; Windows tests also include windows.h
@@ -84,7 +84,7 @@ and shared consumers compile, link, and run through Escape::escape on macOS.
 
 The library, both examples, portable contracts, and platform contract executables
 also cross-compile and link for x86_64 Linux and Windows with Zig 0.15.2's Clang
-20.1.2 toolchain. Cross-compilation does not execute behavior tests. The 34 native
+20.1.2 toolchain. Cross-compilation does not execute behavior tests. The 35 native
 Windows cases are compiled but have not run on this laptop. Native Linux,
 Windows/MSVC, and real emulator results are pending. GitHub Actions is configured
 for ubuntu-latest, macos-latest, windows-latest/MSVC, and Linux sanitizers; no

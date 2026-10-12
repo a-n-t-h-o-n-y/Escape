@@ -89,3 +89,11 @@ return and span encoding about 37% less time. Buffered 32-byte writes took about
 8.5 times less time at this null sink. These results support using the existing
 reusable-buffer APIs and batching output; they do not justify changing the
 ordinary string-return interface by themselves.
+
+## Review optimization
+
+The [implementation review](../docs/implementation-review.md) records the first
+measured optimization: bounded bulk paste parsing. A same-laptop before/after
+comparison reduced the 4 KiB / 64-byte-fragment case from 34,016 to 2,148 ns,
+about 15.8 times faster. Three alternating pairs confirmed the improvement.
+Raw runs and the remaining platform-validation limits are linked in the review.

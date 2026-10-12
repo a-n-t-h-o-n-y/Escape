@@ -87,6 +87,7 @@ struct Reader::Impl {
         terminal = this->input.terminal;
 #ifdef _WIN32
         this->input.protocols = protocols;
+        parser.native_function_keys_ = terminal;
 #endif
     }
     void update_deadline()
