@@ -1,8 +1,11 @@
 #include "../../examples/lumen_canvas.hpp"
+#include "../../examples/lumen_zoom.hpp"
 #include "support/test.hpp"
 
 #include <array>
 #include <atomic>
+#include <cmath>
+#include <limits>
 #include <vector>
 
 using namespace esc;
@@ -129,4 +132,44 @@ TEST(LUMEN_worker_errors_propagate_and_pool_can_be_reused)
         workers.run(100, [&](int row) { ++counts[row]; });
     for (auto const& count : counts)
         CHECK(count == 20);
+}
+
+TEST(LUMEN_scroll_up_zooms_in_and_down_reverses_it)
+{
+    lumen::Zoom zoom;
+    auto initial = zoom.pixel_scale(100);
+    zoom.scroll(-1);
+    zoom.step(1);
+    CHECK(std::abs(zoom.pixel_scale(100) * 1.2L - initial) < 1e-15L);
+    zoom.scroll(1);
+    zoom.step(1);
+    CHECK(std::abs(zoom.pixel_scale(100) - initial) < 1e-15L);
+}
+
+TEST(LUMEN_wheel_and_click_zoom_continue_beyond_thirty_times)
+{
+    lumen::Zoom zoom;
+    zoom.scroll(-100);
+    zoom.step(1);
+    CHECK(std::exp(zoom.logarithm()) > 1e7L);
+    auto before = zoom.pixel_scale(100);
+    zoom.magnify();
+    zoom.step(1);
+    CHECK(std::abs(zoom.pixel_scale(100) * 1.4L / before - 1) < 1e-12L);
+}
+
+TEST(LUMEN_extreme_zoom_stays_finite_and_can_zoom_back_out)
+{
+    lumen::Zoom zoom;
+    for (unsigned i = 0; i < 10; ++i) {
+        zoom.scroll(std::numeric_limits<int>::min());
+        zoom.magnify();
+        zoom.step(0.5);
+        CHECK(std::isfinite(zoom.logarithm()));
+        CHECK(std::isfinite(zoom.pixel_scale(0)));
+        CHECK(zoom.pixel_scale(0) >= 0);
+    }
+    zoom.scroll(std::numeric_limits<int>::max());
+    zoom.step(1);
+    CHECK(std::abs(zoom.pixel_scale(100) - 3.4L / 100 / 0.3L) < 1e-15L);
 }

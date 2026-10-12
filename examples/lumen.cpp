@@ -1,4 +1,5 @@
 #include "lumen_canvas.hpp"
+#include "lumen_zoom.hpp"
 
 #include <algorithm>
 #include <array>
@@ -392,10 +393,13 @@ class Warp {
 
 class Julia {
     int width = 0, height = 0;
-    Vec parameter{-0.745, 0.186}, target = parameter, center;
-    double time = 0, zoom = 1, target_zoom = 1;
-    double scale = 1;
-    Vec origin;
+    Vec parameter{-0.745, 0.186}, target = parameter;
+    long double center_x = 0, center_y = 0;
+    double time = 0;
+    lumen::Zoom zoom;
+    long double scale = 1;
+    unsigned iterations = 40;
+    bool extended = false;
     bool following = false;
 
    public:
@@ -414,14 +418,20 @@ class Julia {
 
     void splash(Point at)
     {
-        double scale = 3.4 / (std::max(1, height) * zoom);
-        center.x += (at.x - width * 0.5) * scale;
-        center.y += ((at.y - 1) * 2 - height * 0.5) * scale;
-        target_zoom = std::min(target_zoom * 1.4, 30.0);
+        auto pixel_scale = zoom.pixel_scale(height);
+        center_x += (at.x - width * 0.5L) * pixel_scale;
+        center_y += ((at.y - 1) * 2 - height * 0.5L) * pixel_scale;
+        zoom.magnify();
+        target = parameter;
+        following = true;
     }
 
     void shift(int steps)
-    { target_zoom = std::clamp(target_zoom * std::pow(1.2, steps), 0.3, 30.0); }
+    {
+        zoom.scroll(steps);
+        target = parameter;
+        following = true;
+    }
 
     void step(double elapsed)
     {
@@ -433,32 +443,46 @@ class Julia {
         double follow = 1 - std::exp(-dt * 4);
         parameter.x += (target.x - parameter.x) * follow;
         parameter.y += (target.y - parameter.y) * follow;
-        zoom += (target_zoom - zoom) * follow;
+        zoom.step(follow);
     }
 
     void prepare()
     {
-        scale = 3.4 / (std::max(1, height) * zoom);
-        origin = {center.x - width * 0.5 * scale, center.y - height * 0.5 * scale};
+        scale = zoom.pixel_scale(height);
+        extended = zoom.logarithm() > std::log(1e6L);
+        auto depth = std::max(0.0L, zoom.logarithm()) / std::log(2.0L);
+        iterations = 40 + static_cast<unsigned>(std::min(depth * 8, 984.0L));
     }
 
-    auto sample(double x, double y) const -> RGB
+   private:
+    template <class Number>
+    auto sample_at(double x, double y) const -> RGB
     {
-        double zx = origin.x + x * scale;
-        double zy = origin.y + y * scale;
+        Number zx = static_cast<Number>(center_x) +
+                    static_cast<Number>(x - width * 0.5) * static_cast<Number>(scale);
+        Number zy = static_cast<Number>(center_y) +
+                    static_cast<Number>(y - height * 0.5) * static_cast<Number>(scale);
         unsigned iteration = 0;
-        double magnitude = 0;
-        while (iteration < 40 && (magnitude = zx * zx + zy * zy) < 256) {
-            double next_x = zx * zx - zy * zy + parameter.x;
+        Number magnitude = 0;
+        while (iteration < iterations && (magnitude = zx * zx + zy * zy) < 256) {
+            Number next_x = zx * zx - zy * zy + parameter.x;
             zy = 2 * zx * zy + parameter.y;
             zx = next_x;
             ++iteration;
         }
-        if (iteration == 40) return RGB{0x08091C};
-        double smooth =
-            iteration + 1 - std::log2(std::log2(std::max(magnitude, 1.001)));
+        if (iteration == iterations) return RGB{0x08091C};
+        double smooth = iteration + 1 -
+                        static_cast<double>(
+                            std::log2(std::log2(std::max(magnitude, Number{1.001}))));
         double glow = std::clamp(smooth / 12, 0.05, 1.0);
         return rgb(palette(smooth * 0.045 + time * 0.015 + 0.6) * glow);
+    }
+
+   public:
+    auto sample(double x, double y) const -> RGB
+    {
+        if (extended) return sample_at<long double>(x, y);
+        return sample_at<double>(x, y);
     }
 };
 
