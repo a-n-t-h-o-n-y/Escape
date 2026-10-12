@@ -185,3 +185,30 @@ TEST(CAP_EXT_report_lists_each_new_feature_without_environment_guesses)
     CHECK(!report.profile.window_title && !report.profile.hyperlinks &&
           !report.profile.synchronized_output);
 }
+
+TEST(ENC_EXT_ascii_payload_scanning_preserves_validation_at_every_word_offset)
+{
+    for (std::size_t offset = 0; offset < 16; ++offset) {
+        std::string payload(40, 't');
+        for (unsigned byte = 0; byte < 256; ++byte) {
+            payload[offset + 8] = static_cast<char>(byte);
+            if (byte >= 128) {
+                try {
+                    static_cast<void>(escape(WindowTitle{payload}));
+                    CHECK(false);
+                }
+                catch (UnicodeError const& error) { CHECK(error.offset() == offset + 8); }
+            }
+            else if (byte < 32 || byte == 127)
+                CHECK_THROWS(std::invalid_argument, escape(WindowTitle{payload}));
+            else
+                CHECK(escape(WindowTitle{payload}) == "\x1b]2;" + payload + "\x1b\\");
+        }
+        payload = std::string(offset, 't') + "界\xf0\x9f\x91\xbd";
+        CHECK(escape(WindowTitle{payload}) == "\x1b]2;" + payload + "\x1b\\");
+        payload += "\xc2\x9f";
+        std::string destination = "prefix";
+        CHECK_THROWS(std::invalid_argument, append_escape(destination, WindowTitle{payload}));
+        CHECK(destination == "prefix");
+    }
+}

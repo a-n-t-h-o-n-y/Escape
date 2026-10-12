@@ -45,6 +45,12 @@ nanoseconds per unit and byte throughput, using steady_clock.
   emoji ZWJ, flag, and Indic text. Width and borrowed grapheme iteration are
   separate cases; a unit is a whole string. Data conversion is outside timing.
   Use `--filter layout/` to run these workloads.
+- Reserved UTF-32-to-UTF-8 conversion measures 1,664 mixed scalars producing
+  3,072 bytes. The destination capacity is reused; validation remains timed.
+- OSC title encoding measures a 4 KiB printable ASCII payload with reserved
+  output. The 256-color cases measure RGB approximation for one fixed color
+  and eight varied colors spanning the system palette, cube, and grayscale.
+  A varied-case unit is one color, with all eight encoded per iteration.
 - Reader measures ASCII events from a cached 1 MiB temporary file with read-ahead
   and zero-timeout calls. One unit is an event. Construction and rewind happen
   once per batch (and when wrapping the file), so their cost is amortized.
@@ -119,3 +125,12 @@ The mixed input is 34 UTF-8 bytes / five clusters / eight estimated cells.
 Printable ASCII uses a measured optimization that preserves the last scalar
 for possible combining/emoji lookahead. These figures are a baseline for future
 changes; scheduling, CPU frequency, and background activity remain uncontrolled.
+
+## Subsequent performance review
+
+The [2026-10-12 performance review](../docs/performance-review.md) records
+optimizations to decimal serialization, exact palette selection, validated
+Unicode encoding, ASCII scanning, property lookup, and polling readers.
+Its three alternating before/after runs use commit `4ccc7b4` as the baseline
+with the same expanded runner on both sides. The full raw results include
+unchanged workloads as well as the optimized paths.

@@ -37,6 +37,32 @@ constexpr void validate_scalar(char32_t scalar, std::size_t offset)
     if (scalar > 0x10FFFF || (scalar >= 0xD800 && scalar <= 0xDFFF))
         throw UnicodeError{offset};
 }
+// Encode a previously validated scalar into at least four writable bytes (or
+// its known encoded length). Internal callers validate the complete input before
+// any mutation/I/O, so this pass needs neither another check nor a temporary.
+constexpr auto encode_utf8_to(char* bytes, char32_t scalar) noexcept -> std::uint8_t
+{
+    if (scalar < 0x80) {
+        bytes[0] = static_cast<char>(scalar);
+        return 1;
+    }
+    if (scalar < 0x800) {
+        bytes[0] = static_cast<char>(0xC0 | (scalar >> 6));
+        bytes[1] = static_cast<char>(0x80 | (scalar & 0x3F));
+        return 2;
+    }
+    if (scalar < 0x10000) {
+        bytes[0] = static_cast<char>(0xE0 | (scalar >> 12));
+        bytes[1] = static_cast<char>(0x80 | ((scalar >> 6) & 0x3F));
+        bytes[2] = static_cast<char>(0x80 | (scalar & 0x3F));
+        return 3;
+    }
+    bytes[0] = static_cast<char>(0xF0 | (scalar >> 18));
+    bytes[1] = static_cast<char>(0x80 | ((scalar >> 12) & 0x3F));
+    bytes[2] = static_cast<char>(0x80 | ((scalar >> 6) & 0x3F));
+    bytes[3] = static_cast<char>(0x80 | (scalar & 0x3F));
+    return 4;
+}
 } // namespace detail
 
 // One owned scalar encoding; unused bytes are zero and no allocation occurs.
@@ -44,24 +70,7 @@ constexpr void validate_scalar(char32_t scalar, std::size_t offset)
 {
     detail::validate_scalar(scalar, 0);
     Utf8CodePoint result;
-    if (scalar < 0x80) {
-        result.bytes[0] = static_cast<char>(scalar);
-    } else if (scalar < 0x800) {
-        result.size = 2;
-        result.bytes[0] = static_cast<char>(0xC0 | (scalar >> 6));
-        result.bytes[1] = static_cast<char>(0x80 | (scalar & 0x3F));
-    } else if (scalar < 0x10000) {
-        result.size = 3;
-        result.bytes[0] = static_cast<char>(0xE0 | (scalar >> 12));
-        result.bytes[1] = static_cast<char>(0x80 | ((scalar >> 6) & 0x3F));
-        result.bytes[2] = static_cast<char>(0x80 | (scalar & 0x3F));
-    } else {
-        result.size = 4;
-        result.bytes[0] = static_cast<char>(0xF0 | (scalar >> 18));
-        result.bytes[1] = static_cast<char>(0x80 | ((scalar >> 12) & 0x3F));
-        result.bytes[2] = static_cast<char>(0x80 | ((scalar >> 6) & 0x3F));
-        result.bytes[3] = static_cast<char>(0x80 | (scalar & 0x3F));
-    }
+    result.size = detail::encode_utf8_to(result.bytes.data(), scalar);
     return result;
 }
 } // namespace esc

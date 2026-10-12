@@ -15,10 +15,13 @@ void counted(SequenceWriter& out, unsigned count, std::string_view final)
 }
 void osc_text(std::string_view input)
 {
-    for_each_scalar(input, [](char32_t cp) {
+    for (std::size_t offset = 0; offset < input.size();) {
+        offset += printable_ascii_prefix(input.substr(offset));
+        if (offset == input.size()) break;
+        auto cp = decode_utf8(input, offset);
         if (cp < 32 || (cp >= 0x7f && cp <= 0x9f))
             throw std::invalid_argument{"OSC: control character in payload"};
-    });
+    }
 }
 void validate(WindowTitle const& value) { osc_text(value.text); }
 void validate(BeginHyperlink const& value)
@@ -98,14 +101,14 @@ void encode(SequenceWriter& out, InsertLines value) { counted(out, value.count, 
 void encode(SequenceWriter& out, DeleteLines value) { counted(out, value.count, "M"); }
 void encode(SequenceWriter& out, WindowTitle value)
 {
-    validate(value);
+    if (out.measuring()) validate(value);
     out.text("\x1b]2;");
     out.text(value.text);
     out.text("\x1b\\");
 }
 void encode(SequenceWriter& out, BeginHyperlink value)
 {
-    validate(value);
+    if (out.measuring()) validate(value);
     out.text("\x1b]8;");
     if (!value.id.empty()) {
         out.text("id=");

@@ -137,14 +137,17 @@ struct EncodeResult {
 namespace detail {
 // A null destination measures only. Both passes share the canonical serializer.
 // Command validation occurs during measurement, before caller storage is changed.
+// A writing pass requires the same commands to have been measured first.
 class SequenceWriter {
    public:
     explicit SequenceWriter(char* output = nullptr) : output_{output} {}
     void text(std::string_view bytes);
     void number(std::uint64_t value);
     [[nodiscard]] auto size() const noexcept -> std::size_t { return size_; }
+    [[nodiscard]] auto measuring() const noexcept -> bool { return !output_; }
 
    private:
+    void add_size(std::size_t count);
     char* output_;
     std::size_t size_ = 0;
 };

@@ -76,6 +76,62 @@ TEST(CAP_01_indexed_quantization_has_fixed_expected_candidates)
     encodes("\x1b[31m",profile,fg(XColor::Red));
     encodes("\x1b[38;5;196m",profile,fg(XColor{196})); // Preserve slot even if RGB matches slot 9.
 }
+TEST(CAP_01_palette_approximation_matches_exhaustive_distance_search)
+{
+    // Independent oracle: enumerate the complete declared palette, preserving
+    // the lowest index for equal distances. Include custom system colors.
+    auto profile = contract::full_profile();
+    auto check = [&](RGB input) {
+        auto palette = profile.system_palette;
+        unsigned best = 0, distance = 3 * 255 * 255 + 1;
+        unsigned count = profile.colors == ColorSupport::Basic8 ? 8
+                         : profile.colors == ColorSupport::Basic16 ? 16 : 256;
+        for (unsigned i = 0; i < count; ++i) {
+            RGB candidate{0, 0, 0};
+            if (i < 16) candidate = palette[i];
+            else if (i < 232) {
+                constexpr std::uint8_t values[] = {0, 95, 135, 175, 215, 255};
+                auto cube = i - 16;
+                candidate = {values[cube / 36], values[cube / 6 % 6], values[cube % 6]};
+            }
+            else {
+                auto gray = static_cast<std::uint8_t>(8 + 10 * (i - 232));
+                candidate = {gray, gray, gray};
+            }
+            int r = int(input.red) - candidate.red;
+            int g = int(input.green) - candidate.green;
+            int b = int(input.blue) - candidate.blue;
+            unsigned score = r * r + g * g + b * b;
+            if (score < distance) { best = i; distance = score; }
+        }
+        CHECK(escape(profile, fg(TrueColor{input})) == escape(fg(XColor{static_cast<std::uint8_t>(best)})));
+    };
+    for (auto support : {ColorSupport::Basic8, ColorSupport::Basic16, ColorSupport::Indexed256}) {
+        profile.colors = support;
+        for (bool custom : {false, true}) {
+            profile.system_palette = conventional_system_palette();
+            if (custom) {
+                for (unsigned i = 0; i < 16; ++i)
+                    profile.system_palette[i] = RGB{static_cast<std::uint8_t>(i * 13),
+                                                    static_cast<std::uint8_t>(255 - i * 7),
+                                                    static_cast<std::uint8_t>(i * 11)};
+            }
+            // Every channel value in gray and off-gray inputs, including all
+            // grayscale rounding transitions and ties between palette groups.
+            for (unsigned i = 0; i < 256; ++i) {
+                auto channel = static_cast<std::uint8_t>(i);
+                check({channel, channel, channel});
+                check({channel, static_cast<std::uint8_t>(255 - i), channel});
+            }
+            // All combinations immediately around the cube's decision planes.
+            constexpr std::uint8_t boundaries[] = {0, 47, 48, 114, 115, 116, 154, 155,
+                                                   156, 194, 195, 196, 234, 235, 236, 255};
+            for (auto r : boundaries)
+                for (auto g : boundaries)
+                    for (auto b : boundaries) check({r, g, b});
+        }
+    }
+}
 TEST(CAP_01_default_colors_remain_default_and_none_drops_only_colors)
 {
     auto profile=contract::full_profile();

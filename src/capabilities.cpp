@@ -1,5 +1,6 @@
 #include <esc/capabilities.hpp>
 
+#include <algorithm>
 #include <cstdlib>
 #include <limits>
 #include <string_view>
@@ -133,16 +134,32 @@ void require(bool supported, Feature feature)
 [[nodiscard]] auto nearest_color(TerminalProfile const& profile, RGB color) -> XColor
 {
     unsigned const candidates = profile.colors == ColorSupport::Basic8 ? 8 :
-                                profile.colors == ColorSupport::Basic16 ? 16 : 256;
+                                16;
     unsigned best = 0;
     unsigned distance = std::numeric_limits<unsigned>::max();
-    for (unsigned i = 0; i < candidates; ++i) {
-        auto const candidate = palette_color(profile, i);
+    auto consider = [&](unsigned index, RGB candidate) {
         int const red = int(color.red) - int(candidate.red);
         int const green = int(color.green) - int(candidate.green);
         int const blue = int(color.blue) - int(candidate.blue);
         unsigned const score = static_cast<unsigned>(red * red + green * green + blue * blue);
-        if (score < distance) { best = i; distance = score; }
+        if (score < distance) { best = index; distance = score; }
+    };
+    for (unsigned i = 0; i < candidates; ++i) consider(i, profile.system_palette[i]);
+    if (profile.colors == ColorSupport::Indexed256) {
+        // Squared RGB distance is separable on the xterm cube. The nearest
+        // channel in each axis gives the nearest of all 216 cube entries.
+        // Midpoint ties choose the lower channel/index.
+        auto channel = [](unsigned value) -> unsigned {
+            return value <= 47 ? 0 : value <= 115 ? 1 : value <= 155 ? 2
+                                 : value <= 195 ? 3 : value <= 235 ? 4 : 5;
+        };
+        auto cube = 16 + 36 * channel(color.red) + 6 * channel(color.green) + channel(color.blue);
+        consider(cube, palette_color(profile, cube));
+        // Gray minimizes the same metric at the mean of the three channels.
+        // Work with their sum to keep rounding exact; ties choose lower gray.
+        auto sum = unsigned(color.red) + color.green + color.blue;
+        auto gray = 232 + (sum <= 24 ? 0 : std::min(23u, (sum - 24 + 14) / 30));
+        consider(gray, palette_color(profile, gray));
     }
     return {static_cast<std::uint8_t>(best)};
 }

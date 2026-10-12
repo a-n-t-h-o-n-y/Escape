@@ -7,19 +7,29 @@
 
 namespace esc::detail {
 
+void SequenceWriter::add_size(std::size_t count)
+{
+    if (count > std::numeric_limits<std::size_t>::max() - size_)
+        throw std::length_error{"escape: encoded size overflow"};
+    size_ += count;
+}
 void SequenceWriter::text(std::string_view bytes)
 {
-    if (bytes.size() > std::numeric_limits<std::size_t>::max() - size_)
-        throw std::length_error{"escape: encoded size overflow"};
-    if (output_ && !bytes.empty()) std::memcpy(output_ + size_, bytes.data(), bytes.size());
-    size_ += bytes.size();
+    auto const offset = size_;
+    add_size(bytes.size());
+    if (output_ && !bytes.empty()) std::memcpy(output_ + offset, bytes.data(), bytes.size());
 }
 
 void SequenceWriter::number(std::uint64_t value)
 {
-    char digits[20]; // Enough for every uint64_t, including its maximum.
-    auto const result = std::to_chars(digits, digits + sizeof(digits), value);
-    text({digits, static_cast<std::size_t>(result.ptr - digits)});
+    // Most terminal parameters are one to three digits. Measurement needs only
+    // the length, and writing can target the caller's storage directly.
+    std::size_t width = value < 10 ? 1 : value < 100 ? 2 : 3;
+    if (value >= 1000)
+        for (auto remaining = value / 1000; remaining; remaining /= 10) ++width;
+    auto const offset = size_;
+    add_size(width);
+    if (output_) std::to_chars(output_ + offset, output_ + size_, value);
 }
 
 namespace {

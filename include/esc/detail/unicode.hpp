@@ -1,12 +1,39 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <functional>
 #include <limits>
 #include <string_view>
 #include <esc/text.hpp>
 
 namespace esc::detail {
+
+// Scan printable ASCII eight bytes at a time, without alignment requirements or
+// reads past the view. High bits detect non-ASCII; byte-wise subtraction/addition
+// detect values below space or at DEL. Carries can only reject a word containing
+// an out-of-range byte, which is then examined by the scalar tail.
+[[nodiscard]] inline auto printable_ascii_prefix(std::string_view input) noexcept
+    -> std::size_t
+{
+    constexpr std::uint64_t high_bits = 0x8080808080808080;
+    constexpr std::uint64_t spaces = 0x2020202020202020;
+    constexpr std::uint64_t ones = 0x0101010101010101;
+    std::size_t offset = 0;
+    while (input.size() - offset >= sizeof(std::uint64_t)) {
+        std::uint64_t word;
+        std::memcpy(&word, input.data() + offset, sizeof(word));
+        if (((word | (word - spaces) | (word + ones)) & high_bits) != 0) break;
+        offset += sizeof(word);
+    }
+    while (offset < input.size()) {
+        auto byte = static_cast<unsigned char>(input[offset]);
+        if (byte < 32 || byte >= 127) break;
+        ++offset;
+    }
+    return offset;
+}
 
 // Detect a borrowed input pointing into existing owned storage before growth.
 // std::less supplies a total ordering even for pointers to unrelated objects.

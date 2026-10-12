@@ -46,13 +46,11 @@ void Output::write_one(std::u32string_view text)
     std::array<char, 1024> bytes;
     std::size_t used = 0;
     for (auto scalar : text) {
-        auto code = encode_utf8(scalar);
-        if (used + code.size > bytes.size()) {
+        if (bytes.size() - used < 4) {
             write_one(std::string_view{bytes.data(), used});
             used = 0;
         }
-        std::copy_n(code.bytes.data(), code.size, bytes.data() + used);
-        used += code.size;
+        used += detail::encode_utf8_to(bytes.data() + used, scalar);
     }
     write_one(std::string_view{bytes.data(), used});
 }
@@ -112,8 +110,12 @@ struct Reader::Impl {
     {
         if (timeout && timeout->count() < 0)
             throw std::invalid_argument{"Reader: negative timeout"};
-        auto caller = timeout ? detail::deadline_after(detail::Clock::now(), *timeout)
-                              : detail::Clock::time_point::max();
+        // A zero-timeout call permits one readiness poll, not a timed wait.
+        // Buffered events need no clock read; parser deadlines still use theirs.
+        bool const polling = timeout && timeout->count() == 0;
+        auto caller = timeout && !polling
+                          ? detail::deadline_after(detail::Clock::now(), *timeout)
+                          : detail::Clock::time_point::max();
         bool attempted_poll = false;
         while (true) {
             if (eof) {
@@ -131,14 +133,15 @@ struct Reader::Impl {
                 update_deadline();
                 if (event) return {ReadStatus::Event, std::move(event)};
             }
-            auto now = detail::Clock::now();
-            if (attempted_poll && now >= caller) return {ReadStatus::Timeout, {}};
+            if (attempted_poll &&
+                (polling || (caller != detail::Clock::time_point::max() &&
+                             detail::Clock::now() >= caller)))
+                return {ReadStatus::Timeout, {}};
             auto until = deadline ? std::min(caller, *deadline) : caller;
             attempted_poll = true;
-            auto ready =
-                detail::poll_input(input, until == detail::Clock::time_point::max()
-                                              ? -1
-                                              : detail::poll_delay(until));
+            auto delay = polling ? 0 : until == detail::Clock::time_point::max()
+                                      ? -1 : detail::poll_delay(until);
+            auto ready = detail::poll_input(input, delay);
             if (ready < 0) {
                 if (errno == EINTR) continue;
                 io_error("Reader: poll");
@@ -147,7 +150,8 @@ struct Reader::Impl {
             std::ptrdiff_t count;
             do {
                 count = detail::read_bytes(input, bytes.data(), bytes.size());
-            } while (count < 0 && errno == EINTR && detail::Clock::now() < caller);
+            } while (count < 0 && errno == EINTR && !polling &&
+                     detail::Clock::now() < caller);
             if (count < 0) {
                 if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) continue;
                 io_error("Reader: read");

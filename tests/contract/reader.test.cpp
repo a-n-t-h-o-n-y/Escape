@@ -68,6 +68,20 @@ TEST(IO_01_expired_escape_is_delivered_before_caller_timeout)
     CHECK(result.status==ReadStatus::Event);
     CHECK(result.event==std::optional<Event>{KeyPress{KeyCode::Escape}});
 }
+TEST(IO_01_zero_timeout_services_parser_deadlines_and_buffered_events)
+{
+    contract::Pipe pipe;
+    Reader reader{pipe.reader.get(), ParserOptions{.escape_timeout = 0ms,
+                                                  .sequence_timeout = 0ms}};
+    pipe.write("ab\x1b");
+    CHECK(reader.read(0ms).event == std::optional<Event>{KeyPress{U'a'}});
+    CHECK(reader.read(0ms).event == std::optional<Event>{KeyPress{U'b'}});
+    CHECK(reader.read(0ms).event == std::optional<Event>{KeyPress{KeyCode::Escape}});
+    CHECK(reader.read(0ms).status == ReadStatus::Timeout);
+    pipe.write("\x1b[");
+    auto result = reader.read(0ms);
+    CHECK(result.event == std::optional<Event>{UnknownInput{"\x1b[", InputProblem::Truncated}});
+}
 TEST(IO_01_eof_drains_partial_input_before_end_status)
 {
     contract::Pipe pipe;

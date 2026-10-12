@@ -1,0 +1,24 @@
+Escape benchmarks: steady_clock; median and min/max; 7 samples; target 100 ms/sample
+Build: optimized (NDEBUG)
+case,iterations/sample,median_ns/unit,min_ns/unit,max_ns/unit,MiB/s
+text/reserved-utf32-to-utf8,6723,14549.77,14490.73,14688.16,201.36
+encode/title-4KiB,5309,19128.59,18840.32,21214.24,204.51
+layout/width/ascii,382549,257.89,255.61,260.29,946.67
+layout/graphemes/ascii,100000,940.15,924.87,1319.26,259.68
+layout/width/mixed,307160,320.27,316.46,329.32,101.24
+layout/graphemes/mixed,274364,331.56,331.00,334.11,97.79
+encode/string,472996,211.20,210.81,214.23,252.87
+encode/reserved-append,676579,148.74,147.87,151.00,359.05
+encode/span,764555,131.90,131.35,133.14,404.91
+encode/profile-truecolor,660014,150.52,149.74,151.67,354.82
+encode/profile-256-color,88076,1143.68,1138.63,1391.30,8.34
+encode/profile-256-varied,10000,1149.87,1145.80,1227.09,7.57
+encode/profile-16-color,2000000,72.91,72.67,73.80,65.40
+parse/mixed-whole,200000,74.60,74.20,74.99,62.10
+parse/mixed-byte-fragments,200000,108.54,108.29,119.14,42.68
+parse/paste-4KiB-fragments,46703,2181.77,2152.64,2232.96,1795.65
+reader/ready-file-ASCII,2000000,67.12,66.75,68.88,14.21
+output/buffered-32B,1000000,94.80,94.23,96.46,321.93
+output/unbuffered-32B,100000,815.55,815.12,822.85,37.42
+output/buffered-4KiB,200000,514.10,512.45,518.91,7598.20
+checksum=819200000

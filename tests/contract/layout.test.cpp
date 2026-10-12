@@ -5,6 +5,7 @@
 #include <ranges>
 #include <vector>
 #include "data/grapheme_break_cases.hpp"
+#include "../../src/detail/layout_data.hpp"
 #include "support/allocations.hpp"
 #include "support/test.hpp"
 using namespace esc;
@@ -236,4 +237,47 @@ TEST(TXT_LAYOUT_styled_glyphs_are_measured_without_copying_or_losing_brushes)
     CHECK(grapheme_width(first) == 1);
     CHECK(cell_width(std::span<Glyph const>{}) == 0);
     CHECK(scope.count() == 0);
+}
+
+TEST(TXT_LAYOUT_every_scalar_width_matches_the_pinned_properties)
+{
+    // Independent linear walk of the source intervals checks the complete
+    // scalar space, including gaps and every lookup-page crossing.
+    auto const& ranges = detail::layout_data::ranges;
+    std::size_t index = 0;
+    for (char32_t cp = 0; cp <= 0x10ffff; ++cp) {
+        if (cp >= 0xd800 && cp <= 0xdfff) continue;
+        while (index < std::size(ranges) && ranges[index].last < cp) ++index;
+        auto bits = index < std::size(ranges) && ranges[index].first <= cp
+                        ? ranges[index].properties : 0;
+        std::optional<std::size_t> expected;
+        if (!(bits & (1u << 13))) {
+            expected = bits & (1u << 8) ? 2
+                       : bits & ((1u << 11) | (1u << 14)) ? 0
+                       : ((bits >> 9) & 3) == 1 ? 2 : 1;
+        }
+        CHECK(cell_width(std::u32string_view{&cp, 1}) == expected);
+    }
+}
+TEST(TXT_LAYOUT_ascii_runs_preserve_controls_errors_and_joined_suffixes)
+{
+    for (std::size_t alignment = 0; alignment < 16; ++alignment) {
+        std::string bytes(64, 'a');
+        for (unsigned byte = 0; byte < 256; ++byte) {
+            bytes[alignment + 8] = static_cast<char>(byte);
+            if (byte >= 128)
+                CHECK_THROWS(UnicodeError, cell_width(bytes));
+            else if (byte < 32 || byte == 127)
+                CHECK(!cell_width(bytes));
+            else
+                CHECK(cell_width(bytes) == bytes.size());
+        }
+    }
+    for (std::size_t length = 0; length < 40; ++length) {
+        std::string prefix(length, 'a');
+        CHECK(cell_width(prefix + "1\xef\xb8\x8f\xe2\x83\xa3") == length + 2);
+        CHECK(cell_width(prefix + "e\xcc\x81") == length + 1);
+        CHECK(std::ranges::distance(graphemes(std::string_view{prefix})) ==
+              static_cast<std::ptrdiff_t>(length));
+    }
 }

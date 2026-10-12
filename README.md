@@ -137,12 +137,14 @@ See [contract tests](tests/contract/README.md) for verification and
 validation. Synthetic fixtures and PTYs check library behavior, not emulator
 rendering or every terminal's advertised capabilities. CI builds and runs behavior
 tests on Linux, macOS, and Windows; a configured CI job is not a recorded passing
-run. Terminal-specific width validation and further benchmark-driven optimization remain future work.
+run. Terminal-specific width validation remains future work.
 Explicit queries, capability observations, and negotiated Kitty keyboard input are
 implemented; see [their interface and usage](docs/queries-and-keyboard.md).
 
 See the [implementation review](docs/implementation-review.md) for corrected
 Windows input/echo behavior and the measured paste parsing optimization.
+See the [performance review](docs/performance-review.md) for subsequent encoding,
+palette, Unicode, layout, and reader optimizations and their measurements.
 
 [TermOx](https://github.com/a-n-t-h-o-n-y/TermOx) provides a higher-level widget
 library; its callers need migration to this revised interface.

@@ -79,7 +79,7 @@ allocation contracts. Owned paste/unknown events may allocate.
 
 ## Verification status
 
-The macOS suite contains 266 behavior tests, plus independent header/package
+The macOS suite contains 272 behavior tests, plus independent header/package
 checks and PTY smoke tests for Pong, termcaps, and event-loop. It passes locally with Apple
 Clang 15 in release and ASan/UBSan builds after the backend split. Public headers
 stand alone without platform headers; Windows tests also include windows.h
@@ -111,15 +111,17 @@ VT transport setup/restoration, cancellation/handle lifetime, typed replies, set
 
 ## Text layout
 
-Thirteen layout cases run all 766 official Unicode 17 grapheme vectors through
+Fifteen layout cases run all 766 official Unicode 17 grapheme vectors through
 UTF-8 and UTF-32, plus independent width/policy goldens, strict decoding, borrowed
-ranges, font overrides, and allocation-free long combining contexts.
+ranges, font overrides, and allocation-free long combining contexts. A linear
+oracle checks widths for every valid scalar against the pinned properties;
+ASCII scanning cases check all byte values at sixteen word offsets.
 See [the text layout contract](../../docs/text-layout.md). Width tests establish
 the declared policies; real terminal rendering still needs separate validation.
 
 ## Terminal extensions
 
-`extensions.test.cpp` adds eleven core cases for controls, OSC validation,
+`extensions.test.cpp` adds twelve core cases for controls, OSC validation,
 capability evidence, spans, destination aliasing, and allocation guarantees.
 `integration.test.cpp` adds twenty POSIX cases for scoped frames and failures,
 explicit synchronization confirmation, long OSC streaming, readiness caches,

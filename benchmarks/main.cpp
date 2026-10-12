@@ -162,6 +162,37 @@ int main(int argc, char** argv)
         require(esc::cell_width(layout_inputs[0]) == 256);
         require(esc::cell_width(layout_inputs[1]) == 8);
         std::vector<Case> cases;
+        std::u32string text_input = U"ASCII e\u0301中\U0001f469\u200d\U0001f4bb ";
+        while (text_input.size() < 1024) text_input += text_input;
+        auto text_bytes = esc::utf32_to_utf8(text_input);
+        std::string text_output;
+        text_output.reserve(text_bytes.size());
+        cases.push_back({"text/reserved-utf32-to-utf8", text_bytes.size(), 1,
+                         [&](std::size_t n) {
+                             std::uint64_t total = 0;
+                             while (n--) {
+                                 text_output.clear();
+                                 esc::append_utf8(text_output, text_input);
+                                 observe(text_output.data(), text_output.size());
+                                 total += text_output.size();
+                             }
+                             return total;
+                         }});
+        std::string title(4096, 't');
+        std::string title_output;
+        title_output.reserve(title.size() + 6);
+        require(esc::escape(esc::WindowTitle{title}) == "\x1b]2;" + title + "\x1b\\");
+        cases.push_back({"encode/title-4KiB", title.size() + 6, 1,
+                         [&](std::size_t n) {
+                             std::uint64_t total = 0;
+                             while (n--) {
+                                 title_output.clear();
+                                 esc::append_escape(title_output, esc::WindowTitle{title});
+                                 observe(title_output.data(), title_output.size());
+                                 total += title_output.size();
+                             }
+                             return total;
+                         }});
         for (std::size_t index = 0; index < layout_inputs.size(); ++index) {
             auto const name = index == 0 ? "ascii" : "mixed";
             auto const expected_clusters = index == 0 ? 256u : 5u;
@@ -247,6 +278,42 @@ int main(int argc, char** argv)
                  return total;
              }});
         auto basic = profile;
+        auto indexed = profile;
+        indexed.colors = esc::ColorSupport::Indexed256;
+        require(esc::escape(indexed, esc::fg(esc::RGB{0x38a9df})) == "\x1b[38;5;74m");
+        cases.push_back({"encode/profile-256-color", 10, 1, [&](std::size_t n) {
+                             std::uint64_t total = 0;
+                             while (n--) {
+                                 auto r = esc::escape_to(
+                                     storage, indexed, esc::fg(esc::RGB{0x38a9df}));
+                                 observe(storage.data(), r.written);
+                                 total += r.written;
+                             }
+                             return total;
+                         }});
+        std::array<esc::RGB, 8> varied_colors = {esc::RGB{0x38a9df}, esc::RGB{0x5f87af},
+                                                esc::RGB{0x080808}, esc::RGB{0x8a8a8a},
+                                                esc::RGB{0xff0000}, esc::RGB{0x00ffff},
+                                                esc::RGB{0xeeddcc}, esc::RGB{0x005500}};
+        std::array<std::string_view, 8> varied_expected = {
+            "\x1b[38;5;74m", "\x1b[38;5;67m", "\x1b[38;5;232m", "\x1b[38;5;245m",
+            "\x1b[91m", "\x1b[96m", "\x1b[38;5;224m", "\x1b[38;5;22m"};
+        std::size_t varied_bytes = 0;
+        for (std::size_t i = 0; i < varied_colors.size(); ++i) {
+            require(esc::escape(indexed, esc::fg(varied_colors[i])) == varied_expected[i]);
+            varied_bytes += varied_expected[i].size();
+        }
+        cases.push_back({"encode/profile-256-varied", varied_bytes, varied_colors.size(),
+                         [&](std::size_t n) {
+                             std::uint64_t total = 0;
+                             while (n--)
+                                 for (auto color : varied_colors) {
+                                     auto r = esc::escape_to(storage, indexed, esc::fg(color));
+                                     observe(storage.data(), r.written);
+                                     total += r.written;
+                                 }
+                             return total;
+                         }});
         basic.colors = esc::ColorSupport::Basic16;
         auto basic_bytes = esc::escape(basic, esc::fg(esc::RGB{0x38a9df}));
         cases.push_back(

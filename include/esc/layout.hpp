@@ -62,6 +62,15 @@ class GraphemeView : public std::ranges::view_interface<GraphemeView<Char>> {
         explicit Iterator(View input) : input_{input} { select(); }
         void select()
         {
+            // Two printable ASCII scalars always have a boundary between them.
+            // Keep non-ASCII lookahead on the full path: it may join the last
+            // ASCII scalar (combining mark, keycap, variation selector, ...).
+            if (input_.size() - offset_ > 1 &&
+                input_[offset_] >= 0x20 && input_[offset_] <= 0x7e &&
+                input_[offset_ + 1] >= 0x20 && input_[offset_ + 1] <= 0x7e) {
+                current_ = input_.substr(offset_, 1);
+                return;
+            }
             try {
                 current_ = next_grapheme(input_.substr(offset_));
             }

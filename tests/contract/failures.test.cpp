@@ -53,6 +53,22 @@ TEST(IO_01_repeated_poll_interruptions_do_not_restart_deadline)
     // CTest bounds the process: restarting the timeout would never finish.
     CHECK(reader.read(10ms).status==ReadStatus::Timeout);
 }
+TEST(IO_01_zero_timeout_interruptions_leave_ready_input_for_the_next_call)
+{
+    for (auto operation : {Operation::Poll, Operation::Read}) {
+        contract::Pipe pipe;
+        Reader reader{pipe.reader.get()};
+        pipe.write("x");
+        {
+            FaultScope faults{{.operation = operation,
+                               .error = error(std::errc::interrupted),
+                               .persistent = true}};
+            CHECK(reader.read(0ms).status == ReadStatus::Timeout);
+            CHECK(faults.calls(operation) == 1);
+        }
+        CHECK(reader.read(0ms).event == std::optional<Event>{KeyPress{U'x'}});
+    }
+}
 TEST(IO_01_read_failure_keeps_original_error_code)
 {
     contract::Pipe pipe;

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <esc/detail/unicode.hpp>
 #include <esc/glyph.hpp>
 #include <esc/layout.hpp>
@@ -36,6 +37,19 @@ struct Properties {
     auto assigned() const noexcept -> bool { return bits & (1u << 12); }
     auto control() const noexcept -> bool { return bits & (1u << 13); }
 };
+// Narrow each lookup to one 256-scalar page. The immutable index is derived at
+// compile time from the pinned intervals, including ranges crossing page edges.
+constexpr auto range_pages = [] {
+    auto const& ranges = detail::layout_data::ranges;
+    static_assert(std::size(ranges) < std::numeric_limits<std::uint16_t>::max());
+    std::array<std::uint16_t, 0x1100 + 1> pages{};
+    std::size_t index = 0;
+    for (std::size_t page = 0; page < pages.size(); ++page) {
+        while (index < std::size(ranges) && ranges[index].last < (page << 8)) ++index;
+        pages[page] = static_cast<std::uint16_t>(index);
+    }
+    return pages;
+}();
 auto properties(char32_t cp) noexcept -> Properties
 {
     // ASCII bypasses all table searches.
@@ -49,10 +63,14 @@ auto properties(char32_t cp) noexcept -> Properties
                 ((cp == '#' || cp == '*' || (cp >= '0' && cp <= '9')) ? 1u << 7 : 0u)};
     }
     auto const& ranges = detail::layout_data::ranges;
+    auto page = static_cast<std::size_t>(cp >> 8);
+    auto first = std::begin(ranges) + range_pages[page];
+    auto last = std::begin(ranges) +
+                std::min(std::size(ranges), std::size_t{range_pages[page + 1]} + 1);
     auto it = std::lower_bound(
-        std::begin(ranges), std::end(ranges), cp,
+        first, last, cp,
         [](auto const& range, char32_t value) { return range.last < value; });
-    unsigned bits = it != std::end(ranges) && cp >= it->first ? it->properties : 0;
+    unsigned bits = it != last && cp >= it->first ? it->properties : 0;
     if (cp >= 0xac00 && cp <= 0xd7a3)
         bits = (bits & ~15u) |
                static_cast<unsigned>((cp - 0xac00) % 28 ? Break::LVT : Break::LV);
@@ -256,10 +274,21 @@ auto measure(View input, WidthPolicy const& policy, bool single)
             // Consume proven single-cell ASCII clusters. Keep the last scalar
             // pending: a following mark or VS16 can still join and change it.
             if (policy.overrides.empty() && printable_ascii(next)) {
-                while (offset < input.size() && printable_ascii(input[offset])) {
-                    add(total, 1);
-                    ++count;
-                    next = static_cast<char32_t>(scalar_unit(input[offset++]));
+                if constexpr (std::same_as<View, std::string_view>) {
+                    auto run = detail::printable_ascii_prefix(input.substr(offset));
+                    if (run) {
+                        add(total, run);
+                        count += run;
+                        next = static_cast<unsigned char>(input[offset + run - 1]);
+                        offset += run;
+                    }
+                }
+                else {
+                    while (offset < input.size() && printable_ascii(input[offset])) {
+                        add(total, 1);
+                        ++count;
+                        next = static_cast<char32_t>(scalar_unit(input[offset++]));
+                    }
                 }
                 next_properties = properties(next);
             }

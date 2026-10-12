@@ -127,10 +127,14 @@ The algorithm uses constant-space forward context for Indic linking, emoji ZWJ,
 and regional indicators, avoiding backward rescans on long combining sequences.
 Width calculation segments and measures in one pass. Printable ASCII runs use
 a direct path while preserving the final scalar for Unicode lookahead. ASCII properties bypass
-lookup; non-ASCII uses one binary search of 2,138 coalesced property intervals
-per decoded scalar. Measurement and iteration allocate nothing, including first
+lookup; non-ASCII uses a compile-time page index to narrow a binary search within
+2,138 coalesced property intervals. The index adds about 8.5 KiB of immutable data.
+Printable ASCII width runs are scanned eight bytes at a time without reading
+outside the input view. Grapheme iteration selects interior ASCII clusters
+directly while retaining Unicode lookahead at the run boundary.
+Measurement and iteration allocate nothing, including first
 use; no lazy initialization or mutable global cache is involved. Range iteration
-also decodes the boundary lookahead on the next step. Policy table validation is
+also decodes Unicode boundary lookahead on the next step. Policy table validation is
 O(overrides); scalar searches are O(log overrides).
 
 `tools/unicode/generate.py` regenerates the checked-in tables and conformance

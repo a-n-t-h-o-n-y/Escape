@@ -1,8 +1,6 @@
 #include <esc/text.hpp>
 #include <esc/detail/unicode.hpp>
 
-#include <cstring>
-
 namespace esc {
 void append_utf32(std::u32string& output, std::string_view utf8)
 {
@@ -35,11 +33,8 @@ void append_utf8(std::string& output, std::u32string_view utf32)
     if (!count) return;
     output.resize(prefix + count);
     auto* destination = output.data() + prefix;
-    for (auto scalar : utf32) {
-        auto const encoded = encode_utf8(scalar);
-        std::memcpy(destination, encoded.bytes.data(), encoded.size);
-        destination += encoded.size;
-    }
+    for (auto scalar : utf32)
+        destination += detail::encode_utf8_to(destination, scalar);
 }
 auto utf32_to_utf8(std::u32string_view input) -> std::string
 {
