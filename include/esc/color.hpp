@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <stdexcept>
 #include <variant>
 
 namespace esc {
@@ -22,8 +23,8 @@ enum class TermColor : bool { Default };
  * @details The color index is a value from 0 to 255.
  *     [0, 7] ----- Classic XTerm system colors.
  *     [8, 15] ---- 'Bright' versions of the classic colors.
- *     [16, 230] -- 216 non-system colors.
- *     [231, 255] - Grayscale colors.
+ *     [16, 231] -- 216 non-system colors.
+ *     [232, 255] - Grayscale colors.
  * The actual color values are defined by your terminal.
  * @details This provides the first 16 colors of the XTerm palette by name.
  * @see https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit
@@ -95,15 +96,19 @@ struct RGB {
     {}
 
     /**
-     * Takes a (hex) value and pulls out 8 byte segments for RGB.
+     * Takes a checked 24-bit value and extracts its three byte channels.
      * @details RGB{0x7f9860} 0x7f is red, 0x98 is green, 0x60 is blue.
      * @param hex The hex value to use.
      */
-    constexpr RGB(std::uint32_t hex)
+    explicit constexpr RGB(std::uint32_t hex)
         : red{static_cast<std::uint8_t>(hex >> 16 & 0xFF)},
           green{static_cast<std::uint8_t>(hex >> 8 & 0xFF)},
           blue{static_cast<std::uint8_t>(hex & 0xFF)}
-    {}
+    {
+        if (hex > 0xFFFFFF) throw std::invalid_argument{"RGB: packed value exceeds 24 bits"};
+    }
+
+    [[nodiscard]] constexpr auto operator==(RGB const&) const -> bool = default;
 };
 
 /**
@@ -116,6 +121,8 @@ struct HSL {
     std::uint16_t hue;
     std::uint8_t saturation;
     std::uint8_t lightness;
+
+    [[nodiscard]] constexpr auto operator==(HSL const&) const -> bool = default;
 };
 
 namespace detail {
@@ -152,6 +159,8 @@ auto constexpr fmod(const T x, const T y) -> T
  */
 auto constexpr hsl_to_rgb(HSL v) -> RGB
 {
+    if (v.hue >= 360 || v.saturation > 100 || v.lightness > 100)
+        throw std::invalid_argument{"HSL: component outside its range"};
     double const lightness = v.lightness / 100.;
     double const saturation = v.saturation / 100.;
 
@@ -160,9 +169,9 @@ auto constexpr hsl_to_rgb(HSL v) -> RGB
     double const x = c * (1. - detail::abs(detail::fmod(h_prime, 2.) - 1.));
     double const m = lightness - (c / 2.);
 
-    auto const c_ = static_cast<std::uint8_t>((c + m) * 255);
-    auto const x_ = static_cast<std::uint8_t>((x + m) * 255);
-    auto const m_ = static_cast<std::uint8_t>(m * 255);
+    auto const c_ = static_cast<std::uint8_t>((c + m) * 255 + 0.5);
+    auto const x_ = static_cast<std::uint8_t>((x + m) * 255 + 0.5);
+    auto const m_ = static_cast<std::uint8_t>(m * 255 + 0.5);
 
     if (v.hue < 60.) { return {c_, x_, m_}; }
     if (v.hue < 120.) { return {x_, c_, m_}; }
@@ -203,9 +212,11 @@ auto constexpr rgb_to_hsl(RGB v) -> HSL
         if (c_max == b_prime) { return 60. * (((r_prime - g_prime) / delta) + 4.); }
         return 0.;
     }();
-    return {static_cast<std::uint16_t>(hue),
-            static_cast<std::uint8_t>(saturation * 100),
-            static_cast<std::uint8_t>(lightness * 100)};
+    auto const normalized = hue < 0 ? hue + 360. : hue;
+    auto const rounded_hue = static_cast<unsigned>(normalized + 0.5) % 360;
+    return {static_cast<std::uint16_t>(rounded_hue),
+            static_cast<std::uint8_t>(saturation * 100 + 0.5),
+            static_cast<std::uint8_t>(lightness * 100 + 0.5)};
 }
 
 /**
@@ -224,6 +235,8 @@ struct TrueColor {
      * Construct a true color with RGB values.
      * @param x The RGB value to use.
      */
+    explicit constexpr TrueColor(std::uint32_t hex) : TrueColor{RGB{hex}} {}
+
     constexpr TrueColor(RGB x) : red{x.red}, green{x.green}, blue{x.blue} {}
 
     /**
@@ -257,6 +270,7 @@ using Color = std::variant<XColor, TrueColor, TermColor>;
  */
 struct ColorFG {
     Color value;
+    [[nodiscard]] constexpr auto operator==(ColorFG const&) const -> bool = default;
 };
 
 /**
@@ -264,6 +278,7 @@ struct ColorFG {
  */
 struct ColorBG {
     Color value;
+    [[nodiscard]] constexpr auto operator==(ColorBG const&) const -> bool = default;
 };
 
 /**

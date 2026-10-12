@@ -1,199 +1,201 @@
 #pragma once
 
 #include <concepts>
+#include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <span>
+#include <tuple>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <type_traits>
-#include <variant>
 
 #include <esc/brush.hpp>
-#include <esc/color.hpp>
 #include <esc/detail/any_of.hpp>
 #include <esc/point.hpp>
-#include <esc/trait.hpp>
 
 namespace esc {
 
-// MOVE CURSOR -------------------------------------------------------------------------
+struct TerminalProfile;
 
-/**
- * Type alias to move the cursor to a Point.
- */
-using Cursor = Point;
+// Positions are zero-based; movement deltas are signed.
+struct Cursor { int x = 0; int y = 0; };
+struct MoveCursor { int dx = 0; int dy = 0; };
+[[nodiscard]] constexpr auto cursor(Point p) -> Cursor { return {p.x, p.y}; }
 
-/**
- * Get the control sequence to move the cursor to the specified Point.
- * @details Top-left cell of the terminal is Point{x:0, y:0}. x is horizontal and y is
- * vertical. The next string output to stdout will happen starting at \p p.
- * @param p The Point to move the cursor to.
- * @return The control sequence to move the cursor to the specified Point.
- */
-[[nodiscard]] auto escape(Cursor p) -> std::string;
+enum class Erase { ToEnd, ToBeginning, All };
+struct BlankRow { Erase extent = Erase::All; };
+struct BlankScreen { Erase extent = Erase::All; };
+struct ResetStyle {};
 
-// CLEAR -------------------------------------------------------------------------------
+enum class ScreenBuffer { Normal, Alternate };
+enum class CursorMode { Show, Hide };
+enum class MouseMode { Off, Basic, Drag, Move };
+enum class MouseProtocol { None, Legacy, Sgr, Urxvt };
+struct MouseReporting { MouseMode mode; MouseProtocol protocol; };
+enum class FocusReporting { Off, On };
+enum class BracketedPaste { Off, On };
 
-/**
- * Tag type to clear the row the cursor is currently at.
- */
-struct BlankRow {};
+template<class T>
+concept DrawingCommand = detail::AnyOf<std::remove_cvref_t<T>,
+    Cursor, MoveCursor, BlankRow, BlankScreen, ResetStyle,
+    Trait, Traits, ColorFG, ColorBG, Brush>;
 
-/**
- * Get the control sequence to clear the row the cursor is currently at.
- * @details Write escape(Cursor) result before to pick which line to clear.
- * @param BlankRow The tag type to clear the row the cursor is currently at.
- * @return The control sequence to clear the row the cursor is currently at.
- */
-[[nodiscard]] auto escape(BlankRow) -> std::string;
+template<class T>
+concept Escapable = DrawingCommand<T> || detail::AnyOf<std::remove_cvref_t<T>,
+    ScreenBuffer, CursorMode, MouseReporting, FocusReporting, BracketedPaste>;
 
-/**
- * Tag type to clear the entire screen.
- */
-struct BlankScreen {};
+struct EncodeResult { std::size_t written; std::size_t required; };
 
-/**
- * Get the control sequence to erase everything on the screen.
- * @param BlankScreen The tag type to clear the entire screen.
- * @return The control sequence to erase everything on the screen.
- */
-[[nodiscard]] auto escape(BlankScreen) -> std::string;
+namespace detail {
+// A null destination measures only. Both passes share the canonical serializer.
+// Command validation occurs during measurement, before caller storage is changed.
+class SequenceWriter {
+public:
+    explicit SequenceWriter(char* output = nullptr) : output_{output} {}
+    void text(std::string_view bytes);
+    void number(std::uint64_t value);
+    [[nodiscard]] auto size() const noexcept -> std::size_t { return size_; }
+private:
+    char* output_;
+    std::size_t size_ = 0;
+};
+void encode(SequenceWriter&, Cursor);
+void encode(SequenceWriter&, MoveCursor);
+void encode(SequenceWriter&, BlankRow);
+void encode(SequenceWriter&, BlankScreen);
+void encode(SequenceWriter&, ResetStyle);
+void encode(SequenceWriter&, Trait);
+void encode(SequenceWriter&, Traits);
+void encode(SequenceWriter&, ColorFG const&);
+void encode(SequenceWriter&, ColorBG const&);
+void encode(SequenceWriter&, Brush const&);
+void encode(SequenceWriter&, ScreenBuffer);
+void encode(SequenceWriter&, CursorMode);
+void encode(SequenceWriter&, MouseReporting);
+void encode(SequenceWriter&, FocusReporting);
+void encode(SequenceWriter&, BracketedPaste);
 
-// TRAITS ------------------------------------------------------------------------------
-
-/**
- * Get the control sequence to set any number of Traits, clears existing Traits.
- * @details These Traits will be applied to any text written to the screen after this
- * call, and before another call to escape(Traits). Traits can be built up into a Traits
- * object with operator|, and can be implicitly converted into Traits objects. A single
- * Trait::None will clear the set traits.
- * @param traits The Traits to set.
- * @return control sequence to set any number of Traits, clears existing
- */
-[[nodiscard]] auto escape(Traits traits) -> std::string;
-
-/**
- * Overload needed so variadic escape() does not infinite recurse.
- */
-[[nodiscard]] auto escape(Trait trait) -> std::string;
-
-/**
- * Get the control sequence to remove all Traits currently set.
- * @details Any text written after will have no Traits.
- * @return The control sequence to remove all Traits currently set.
- */
-[[nodiscard]] auto clear_traits() -> std::string;
-
-/**
- * Get the last Traits that were created with escape(Traits).
- * @details May not represent what is on the screen if the last call to escape(Traits)
- * was not written to stdout.
- * @return The last Traits that were created with escape(Traits).
- */
-[[nodiscard]] auto traits() -> Traits;
-
-// BACKGROUND COLOR --------------------------------------------------------------------
-
-/**
- * Get the control sequence to set the background to the specified Color.
- * @param c The Color to set the background to.
- * @return The control sequence to set the background to the specified Color.
- */
-[[nodiscard]] auto escape(ColorBG c) -> std::string;
-
-/**
- * Get the control sequence to set the background to the specified xterm palette index.
- * @param c The xterm palette index to set the background to.
- * @return The control sequence to set the background to the specified xterm palette
- * index.
- */
-[[nodiscard]] auto escape_bg(XColor c) -> std::string;
-
-/**
- * Get the control sequence to set the background to the specified terminal true color.
- * @param c The terminal true color to set the background to.
- * @return The control sequence to set the background to the specified terminal true
- * color.
- */
-[[nodiscard]] auto escape_bg(TrueColor c) -> std::string;
-
-/**
- * Get the control sequence to set the background to the terminal's default bg color.
- */
-[[nodiscard]] auto escape_bg(TermColor c) -> std::string;
-
-/**
- * Get the last Color that was created with escape(ColorBG).
- * @details May not represent what is on the screen if the last call to escape(ColorBG)
- * was not written to stdout.
- * @return The last Color that was created with escape(ColorBG).
- */
-[[nodiscard]] auto background_color() -> Color;
-
-// FOREGROUND COLOR --------------------------------------------------------------------
-
-/**
- * Get the control sequence to set the foreground to the specified Color.
- * @param c The Color to set the foreground to.
- * @return The control sequence to set the foreground to the specified Color.
- */
-[[nodiscard]] auto escape(ColorFG c) -> std::string;
-
-/**
- * Get the control sequence to set the foreground to the specified xterm palette index.
- * @param c The xterm palette index to set the foreground to.
- * @return The control sequence to set the foreground to the specified xterm
- */
-[[nodiscard]] auto escape_fg(XColor c) -> std::string;
-
-/**
- * Get the control sequence to set the foreground to the specified terminal true color.
- * @param c The terminal true color to set the foreground to.
- * @return The control sequence to set the foreground to the specified terminal true
- * color.
- */
-[[nodiscard]] auto escape_fg(TrueColor c) -> std::string;
-
-/**
- * Get the control sequence to set the foreground to the terminal's default fg color.
- */
-[[nodiscard]] auto escape_fg(TermColor c) -> std::string;
-
-/**
- * Get the last Color that was created with escape(ColorFG).
- * @details May not represent what is on the screen if the last call to escape(ColorFG)
- * was not written to stdout.
- * @return The last Color that was created with escape(ColorFG).
- */
-[[nodiscard]] auto foreground_color() -> Color;
-
-// BRUSH -------------------------------------------------------------------------------
-
-/**
- * Get the control sequence to set Brush Colors and Traits.
- * @param b The Brush to set.
- * @return The control sequence to set Brush Colors and Traits.
- */
-[[nodiscard]] auto escape(Brush b) -> std::string;
-
-// CONVENIENCE -------------------------------------------------------------------------
-
-/**
- * Types that can have a control sequence generated for them.
- */
-template <typename T>
-concept Escapable = detail::
-    AnyOf<T, Cursor, BlankRow, BlankScreen, Trait, Traits, ColorBG, ColorFG, Brush>;
-
-/**
- * Convenience function to concatenate multiple escapable objects at once.
- * @details Returns a single string containing the escape sequences for all args
- * @tparam Args... A list of escapable types.
- * @param args... A list of escapable objects.
- * @return A single string containing the escape sequences for all args...
- */
-template <Escapable... Args, typename = std::enable_if_t<(sizeof...(Args) > 1), void>>
-[[nodiscard]] auto escape(Args&&... args) -> std::string
+// Adapt once, on the stack, so quantization is not repeated by the two passes.
+struct PreparedBrush {
+    std::optional<ColorBG> background;
+    std::optional<ColorFG> foreground;
+    std::optional<Traits> traits;
+};
+void encode(SequenceWriter&, PreparedBrush const&);
+template<class Command>
+void encode(SequenceWriter& output, std::optional<Command> const& command)
+{ if (command) encode(output, *command); }
+void validate_profile(TerminalProfile const&);
+auto prepare(TerminalProfile const&, Cursor const&) -> std::optional<Cursor>;
+auto prepare(TerminalProfile const&, MoveCursor const&) -> std::optional<MoveCursor>;
+auto prepare(TerminalProfile const&, BlankRow const&) -> std::optional<BlankRow>;
+auto prepare(TerminalProfile const&, BlankScreen const&) -> std::optional<BlankScreen>;
+auto prepare(TerminalProfile const&, ResetStyle const&) -> std::optional<ResetStyle>;
+auto prepare(TerminalProfile const&, Traits const&) -> std::optional<Traits>;
+auto prepare(TerminalProfile const&, ColorFG const&) -> std::optional<ColorFG>;
+auto prepare(TerminalProfile const&, ColorBG const&) -> std::optional<ColorBG>;
+auto prepare(TerminalProfile const&, ScreenBuffer const&) -> std::optional<ScreenBuffer>;
+auto prepare(TerminalProfile const&, CursorMode const&) -> std::optional<CursorMode>;
+auto prepare(TerminalProfile const&, MouseReporting const&) -> std::optional<MouseReporting>;
+auto prepare(TerminalProfile const&, FocusReporting const&) -> std::optional<FocusReporting>;
+auto prepare(TerminalProfile const&, BracketedPaste const&) -> std::optional<BracketedPaste>;
+auto prepare(TerminalProfile const&, Trait) -> std::optional<Traits>;
+auto prepare(TerminalProfile const&, Brush const&) -> PreparedBrush;
+template<Escapable... Commands>
+auto prepare_pack(TerminalProfile const& profile, Commands const&... commands)
 {
-    return (escape(std::forward<Args>(args)) + ...);
+    validate_profile(profile);
+    return std::tuple{prepare(profile, commands)...};
+}
+template<class Tuple>
+void encode_pack(SequenceWriter& output, Tuple const& commands)
+{
+    std::apply([&](auto const&... command) { (encode(output, command), ...); }, commands);
+}
+} // namespace detail
+
+// Preserve the prefix on validation, size, or allocation failure. A reserved
+// destination needs no allocation, and no intermediate strings are constructed.
+template<Escapable... Commands>
+void append_escape(std::string& output, Commands const&... commands)
+{
+    detail::SequenceWriter measure;
+    (detail::encode(measure, commands), ...);
+    auto const required = measure.size();
+    auto const prefix = output.size();
+    if (required > output.max_size() - prefix)
+        throw std::length_error{"escape: encoded output exceeds string size limit"};
+    if (required == 0) return;
+    output.resize(prefix + required);
+    detail::SequenceWriter writer{output.data() + prefix};
+    (detail::encode(writer, commands), ...);
 }
 
-}  // namespace esc
+template<Escapable... Commands>
+[[nodiscard]] auto escape(Commands const&... commands) -> std::string
+{
+    std::string output;
+    append_escape(output, commands...);
+    return output;
+}
+
+// All-or-nothing encoding; no terminator and no heap allocation. Insufficient
+// capacity returns the exact required size and leaves every destination byte intact.
+template<Escapable... Commands>
+[[nodiscard]] auto escape_to(std::span<char> output, Commands const&... commands) -> EncodeResult
+{
+    detail::SequenceWriter measure;
+    (detail::encode(measure, commands), ...);
+    auto const required = measure.size();
+    if (required > output.size()) return {0, required};
+    detail::SequenceWriter writer{output.data()};
+    (detail::encode(writer, commands), ...);
+    return {required, required};
+}
+
+// Explicit capability-aware overloads. The prepared pack is local storage;
+// neither validation/adaptation nor bounded/reserved encoding allocates.
+template<Escapable... Commands>
+void append_escape(std::string& output, TerminalProfile const& profile, Commands const&... commands)
+{
+    auto const prepared = detail::prepare_pack(profile, commands...);
+    detail::SequenceWriter measure;
+    detail::encode_pack(measure, prepared);
+    auto const required = measure.size();
+    auto const prefix = output.size();
+    if (required > output.max_size() - prefix)
+        throw std::length_error{"escape: encoded output exceeds string size limit"};
+    if (required == 0) return;
+    output.resize(prefix + required);
+    detail::SequenceWriter writer{output.data() + prefix};
+    detail::encode_pack(writer, prepared);
+}
+template<Escapable... Commands>
+[[nodiscard]] auto escape(TerminalProfile const& profile, Commands const&... commands) -> std::string
+{
+    std::string output;
+    append_escape(output, profile, commands...);
+    return output;
+}
+template<Escapable... Commands>
+[[nodiscard]] auto escape_to(std::span<char> output, TerminalProfile const& profile,
+                             Commands const&... commands) -> EncodeResult
+{
+    auto const prepared = detail::prepare_pack(profile, commands...);
+    detail::SequenceWriter measure;
+    detail::encode_pack(measure, prepared);
+    auto const required = measure.size();
+    if (required > output.size()) return {0, required};
+    detail::SequenceWriter writer{output.data()};
+    detail::encode_pack(writer, prepared);
+    return {required, required};
+}
+
+// Existing convenience spellings remain pure wrappers.
+[[nodiscard]] inline auto clear_traits() -> std::string { return escape(Traits{}); }
+[[nodiscard]] inline auto escape_fg(Color color) -> std::string { return escape(fg(color)); }
+[[nodiscard]] inline auto escape_bg(Color color) -> std::string { return escape(bg(color)); }
+
+} // namespace esc

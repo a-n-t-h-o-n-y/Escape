@@ -10,8 +10,8 @@ namespace esc {
  * is vertical.
  */
 struct Point {
-    int x;
-    int y;
+    int x = 0;
+    int y = 0;
 
     constexpr auto operator==(Point const& other) const -> bool = default;
     constexpr auto operator!=(Point const& other) const -> bool = default;

@@ -1,12 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 project(Escape LANGUAGES CXX)
 
-# UTF Support
-find_package(ICU REQUIRED COMPONENTS dt uc i18n)
-if(NOT ICU_FOUND)
-    message(FATAL_ERROR "ICU not found")
-endif()
-
 # Utility Library Dependency
 include(FetchContent)
 FetchContent_Declare(
@@ -24,10 +18,13 @@ add_library(escape STATIC
     include/esc/esc.hpp
     include/esc/event.hpp
     include/esc/glyph.hpp
+    include/esc/text.hpp
+    include/esc/detail/unicode.hpp
     include/esc/io.hpp
     include/esc/key.hpp
     include/esc/mouse.hpp
     include/esc/point.hpp
+    include/esc/capabilities.hpp
     include/esc/sequence.hpp
     include/esc/terminal.hpp
     include/esc/terminfo.hpp
@@ -40,9 +37,12 @@ add_library(escape STATIC
     include/esc/detail/transcode.hpp
     include/esc/detail/tty_file.hpp
 
+    src/text.cpp
+    src/glyph.cpp
     src/io.cpp
     src/terminfo.cpp
     src/terminal.cpp
+    src/capabilities.cpp
     src/sequence.cpp
     src/detail/is_urxvt.cpp
     src/detail/transcode.cpp
@@ -58,9 +58,6 @@ target_include_directories(escape
 target_link_libraries(escape
     PUBLIC
         zzz
-        ICU::dt
-        ICU::uc
-        ICU::i18n
 )
 
 target_compile_features(escape
@@ -70,4 +67,9 @@ target_compile_features(escape
 
 add_subdirectory(tools)
 add_subdirectory(examples)
+option(ESCAPE_BUILD_CONTRACT_TESTS "Build proposed-interface behavior tests" OFF)
+if(ESCAPE_BUILD_CONTRACT_TESTS)
+    enable_testing()
+endif()
+
 add_subdirectory(tests)

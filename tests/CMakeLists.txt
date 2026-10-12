@@ -41,3 +41,8 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
             /fsanitize=address
     )
 endif()
+
+# Future interface contract; deliberately opt-in during the refactor.
+if(ESCAPE_BUILD_CONTRACT_TESTS)
+    add_subdirectory(contract)
+endif()

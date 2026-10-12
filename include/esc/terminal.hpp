@@ -5,6 +5,7 @@
 #include <esc/area.hpp>
 #include <esc/detail/any_of.hpp>
 #include <esc/mouse.hpp>
+#include <esc/sequence.hpp>
 
 namespace esc {
 
@@ -56,7 +57,7 @@ void set(Signals x);
  * `Normal` will display the existing terminal screen; `Alternate` will display a blank
  * screen.
  */
-enum class ScreenBuffer { Normal, Alternate };
+// ScreenBuffer is declared in sequence.hpp.
 
 /**
  * Set the screen buffer to the given value.
@@ -88,7 +89,7 @@ void set(KeyMode x);
 /**
  * `Show` will display the cursor on screen; `Hide` will not.
  */
-enum class CursorMode { Show, Hide };
+// CursorMode is declared in sequence.hpp.
 
 /**
  * Set the cursor to the given value.

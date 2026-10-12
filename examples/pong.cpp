@@ -407,7 +407,7 @@ using EventResponse = std::optional<State>;
     {  // Net
         bytes += escape(Trait::Dim);
         for (int i = 0; i < display_space.height; ++i) {
-            bytes += escape(offset + Point{display_space.width / 2, i}) + "╳";
+            bytes += escape(esc::cursor(offset + Point{display_space.width / 2, i})) + "╳";
         }
         bytes += escape(Trait::None);
     }
@@ -419,8 +419,8 @@ using EventResponse = std::optional<State>;
             return std::array{"▄", "▃", "▂", "▁", "█", "▇", "▆", "▅"}[i];
         }();
 
-        auto cursor = offset + Point{.x = (int)std::round(state.ball.at.x),
-                                     .y = (int)std::round(state.ball.at.y)};
+        auto cursor = esc::cursor(offset + Point{.x = (int)std::round(state.ball.at.x),
+                                                 .y = (int)std::round(state.ball.at.y)});
 
         bytes += escape(fg(velocity_to_color(state.ball.velocity)));
         bytes += escape(cursor, Trait::Inverse) + glyph;
@@ -460,21 +460,21 @@ using EventResponse = std::optional<State>;
     }
 
     {  // Scores
-        bytes += escape(offset - Point{.x = 0, .y = 2});
+        bytes += escape(esc::cursor(offset - Point{.x = 0, .y = 2}));
         bytes += state.left.player.name + ": ";
         bytes += std::to_string(state.left.score);
 
         auto const rhs = state.right.player.name + ": ";
-        bytes += escape(offset + Point{
+        bytes += escape(esc::cursor(offset + Point{
                                      .x = display_space.width - (int)rhs.size() - 1,
                                      .y = -2,
-                                 });
+                                 }));
         bytes += rhs;
         bytes += std::to_string(state.right.score);
     }
 
     {  // Border
-        bytes += escape(offset - Point{.x = 1, .y = 1}) +
+        bytes += escape(esc::cursor(offset - Point{.x = 1, .y = 1})) +
                  escape(fg(XColor::Blue), Trait::Dim);
         bytes += "╭";
 
@@ -484,14 +484,14 @@ using EventResponse = std::optional<State>;
         bytes += "╮";
 
         for (int i = 0; i < display_space.height; ++i) {
-            bytes += escape(offset + Point{.x = -1, .y = i});
+            bytes += escape(esc::cursor(offset + Point{.x = -1, .y = i}));
             bytes += "│";
 
-            bytes += escape(offset + Point{.x = display_space.width, .y = i});
+            bytes += escape(esc::cursor(offset + Point{.x = display_space.width, .y = i}));
             bytes += "│";
         }
 
-        bytes += escape(offset + Point{.x = -1, .y = display_space.height});
+        bytes += escape(esc::cursor(offset + Point{.x = -1, .y = display_space.height}));
         bytes += "╰";
 
         for (int i = 0; i < display_space.width; ++i) {

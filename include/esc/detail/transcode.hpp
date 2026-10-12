@@ -10,7 +10,7 @@ namespace esc::detail {
 
 /**
  * Convert the given char32_t to its UTF8 reprensentation.
- * @details The input must be a valid UTF32 sequence, otherwise UB.
+ * @details Invalid Unicode throws UnicodeError; see esc/text.hpp.
  * @param c The char32_t to convert.
  * @return The UTF8 bytes.
  */
@@ -19,7 +19,7 @@ auto u32_to_u8(char32_t c) -> std::string;
 
 /**
  * Convert the given char32_t string to its UTF8 reprensentation.
- * @details The input must be a valid UTF32 sequence, otherwise UB.
+ * @details Invalid Unicode throws UnicodeError; see esc/text.hpp.
  * @param s The char32_t string to convert.
  * @return The UTF8 bytes.
  */
@@ -28,7 +28,7 @@ auto u32_to_u8(std::u32string_view sv) -> std::string;
 
 /**
  * Convert the given char32_t string to its UTF8 reprensentation.
- * @details The input must be a valid UTF32 sequence, otherwise UB.
+ * @details Invalid Unicode throws UnicodeError; see esc/text.hpp.
  * @param s The char32_t string to convert.
  * @param out The string to write out the utf8 bytes to, it will be `clear()`ed.
  */

@@ -1,0 +1,71 @@
+"""PKG-01: subproject and installed static-library consumers use the exported target."""
+
+import argparse
+import pathlib
+import subprocess
+import tempfile
+
+
+CONSUMER = r'''#include <esc/esc.hpp>
+#include <esc/text.hpp>
+int main() {
+    if (esc::escape(esc::Cursor{}) != "\x1b[1;1H") return 1;
+    if (esc::utf32_to_utf8(U"界") != "\xe7\x95\x8c") return 2;
+    return 0;
+}
+'''
+
+
+def run(*command):
+    subprocess.run(command, check=True, timeout=90)
+
+
+def consumer(folder, cmake_text):
+    folder.mkdir()
+    (folder / "main.cpp").write_text(CONSUMER)
+    (folder / "CMakeLists.txt").write_text(
+        "cmake_minimum_required(VERSION 3.16)\nproject(Consumer LANGUAGES CXX)\n"
+        + cmake_text
+        + "\nadd_executable(consumer main.cpp)\ntarget_link_libraries(consumer PRIVATE Escape::escape)\n"
+    )
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--source", required=True)
+    parser.add_argument("--cmake", default="cmake")
+    parser.add_argument("--compiler", required=True)
+    args = parser.parse_args()
+    source = pathlib.Path(args.source).resolve()
+    # CMake accepts slash paths quoted in its language; escape quotes/backslashes.
+    source_literal = str(source).replace("\\", "/").replace('"', '\\"')
+    with tempfile.TemporaryDirectory(prefix="escape-consumers-") as folder:
+        root = pathlib.Path(folder)
+        subproject = root / "subproject"
+        consumer(subproject, 'set(ESCAPE_BUILD_TESTS OFF CACHE BOOL "" FORCE)\n'
+                 'set(ESCAPE_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)\n'
+                 'set(ESCAPE_BUILD_CONTRACT_TESTS OFF CACHE BOOL "" FORCE)\n'
+                 f'add_subdirectory("{source_literal}" escape)')
+        run(args.cmake, "-S", str(subproject), "-B", str(root / "sub-build"),
+            f"-DCMAKE_CXX_COMPILER={args.compiler}")
+        run(args.cmake, "--build", str(root / "sub-build"), "--target", "consumer", "-j", "2")
+        run(str(root / "sub-build" / "consumer"))
+        prefix = root / "installed"
+        library_build = root / "library-build"
+        run(args.cmake, "-S", str(source), "-B", str(library_build),
+            f"-DCMAKE_CXX_COMPILER={args.compiler}", f"-DCMAKE_INSTALL_PREFIX={prefix}",
+            "-DESCAPE_BUILD_TESTS=OFF", "-DESCAPE_BUILD_EXAMPLES=OFF",
+            "-DESCAPE_BUILD_CONTRACT_TESTS=OFF", "-DBUILD_SHARED_LIBS=OFF")
+        run(args.cmake, "--build", str(library_build), "--target", "escape", "-j", "2")
+        run(args.cmake, "--install", str(library_build))
+        installed_consumer = root / "installed-consumer"
+        consumer(installed_consumer, "find_package(Escape CONFIG REQUIRED)")
+        run(args.cmake, "-S", str(installed_consumer), "-B", str(root / "installed-build"),
+            f"-DCMAKE_CXX_COMPILER={args.compiler}", f"-DCMAKE_PREFIX_PATH={prefix}")
+        run(args.cmake, "--build", str(root / "installed-build"), "--target", "consumer", "-j", "2")
+        run(str(root / "installed-build" / "consumer"))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

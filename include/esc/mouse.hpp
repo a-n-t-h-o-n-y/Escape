@@ -4,6 +4,7 @@
 #include <string>
 
 #include <esc/point.hpp>
+#include <esc/sequence.hpp>
 
 namespace esc {
 
@@ -56,6 +57,6 @@ struct Mouse {
  * @details Drag: Basic, plus Move Events while a Button is pressed.
  * @details Move: Basic, plus Move Events sent with or without a Button pressed.
  */
-enum class MouseMode { Off, Basic, Drag, Move };
+// MouseMode is declared in sequence.hpp.
 
 }  // namespace esc

@@ -3,8 +3,9 @@
 #include <esc/area.hpp>
 #include <esc/brush.hpp>
 #include <esc/color.hpp>
+#include <esc/capabilities.hpp>
 #include <esc/detail/signals.hpp>
-#include <esc/detail/transcode.hpp>
+#include <esc/text.hpp>
 #include <esc/event.hpp>
 #include <esc/glyph.hpp>
 #include <esc/io.hpp>

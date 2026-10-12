@@ -1,90 +1,23 @@
 #include <esc/detail/transcode.hpp>
+#include <esc/detail/unicode.hpp>
+#include <esc/text.hpp>
 
-#include <array>
-#include <cstdint>
-#include <stdexcept>
-#include <string>
-#include <string_view>
-
-#include <unicode/stringpiece.h>
-#include <unicode/uchar.h>
-#include <unicode/unistr.h>
-
-#include <zzz/coro.hpp>
-
+// Transitional adapters for the existing I/O implementation. Public text and
+// glyph APIs use the strict, allocation-free scalar decoder directly.
 namespace esc::detail {
-
-auto u32_to_u8(char32_t c) -> std::string
-{
-    auto buffer = std::array<char, U8_MAX_LENGTH>{};  // UTF-8 max length is 4 bytes
-    auto i = 0;
-    U8_APPEND_UNSAFE(buffer.data(), i, static_cast<UChar32>(c));  // ICU macro
-    return std::string{buffer.data(), static_cast<std::size_t>(i)};
-}
-
-auto u32_to_u8(std::u32string_view sv) -> std::string
-{
-    auto result = std::string{};
-    u32_to_u8(sv, result);
-    return result;
-}
-
-void u32_to_u8(std::u32string_view sv, std::string& out)
-{
-    out.clear();
-    out.reserve(sv.size());  // Common case every char is 1 byte.
-
-    for (auto c : sv) {
-        char utf8_buffer[U8_MAX_LENGTH];
-        auto i = 0;
-        U8_APPEND_UNSAFE(utf8_buffer, i, static_cast<UChar32>(c));
-        out.append(utf8_buffer, i);
-    }
-}
-
+auto u32_to_u8(char32_t scalar) -> std::string
+{ auto const encoded = encode_utf8(scalar); return std::string{encoded.view()}; }
+auto u32_to_u8(std::u32string_view input) -> std::string { return utf32_to_utf8(input); }
+void u32_to_u8(std::u32string_view input, std::string& output) { output = utf32_to_utf8(input); }
 auto u8_to_u32(std::array<char, 4> bytes) -> char32_t
 {
-    auto u_str = icu::UnicodeString::fromUTF8(icu::StringPiece{
-        bytes.data(),
-        bytes.size(),
-    });
-    return u_str.char32At(0);
+    std::size_t offset = 0;
+    return decode_utf8({bytes.data(), bytes.size()}, offset);
 }
-
-auto u8_string_to_u32(std::string_view sv) -> zzz::Generator<char32_t>
+auto u8_string_to_u32(std::string_view input) -> zzz::Generator<char32_t>
 {
-    auto i = std::int32_t{0};  // Index in the UTF-8 string
-    auto const length = static_cast<std::int32_t>(sv.length());
-
-    while (i < length) {
-        UChar32 ch;
-        U8_NEXT(sv.data(), i, length, ch);
-        if (ch < 0) { throw std::runtime_error{"Invalid UTF-8 sequence"}; }
-        co_yield static_cast<char32_t>(ch);
-    }
+    for (std::size_t offset = 0; offset < input.size();) co_yield decode_utf8(input, offset);
 }
-
-[[nodiscard]]
-auto u8_string_to_u32_string(std::string_view sv) -> std::u32string
-{
-    auto result = std::u32string{};
-    u8_string_to_u32_string(sv, result);
-    return result;
-}
-
-void u8_string_to_u32_string(std::string_view sv, std::u32string& out)
-{
-    auto i = std::int32_t{0};  // Index in the UTF-8 string
-    auto const length = static_cast<std::int32_t>(sv.length());
-
-    out.clear();
-    out.reserve(sv.length());
-    while (i < length) {
-        UChar32 ch;
-        U8_NEXT(sv.data(), i, length, ch);
-        if (ch < 0) { throw std::runtime_error{"Invalid UTF-8 sequence"}; }
-        out.push_back(static_cast<char32_t>(ch));
-    }
-}
-
-}  // namespace esc::detail
+auto u8_string_to_u32_string(std::string_view input) -> std::u32string { return utf8_to_utf32(input); }
+void u8_string_to_u32_string(std::string_view input, std::u32string& output) { output = utf8_to_utf32(input); }
+} // namespace esc::detail

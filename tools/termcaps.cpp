@@ -68,7 +68,7 @@ using namespace esc;
 {
     return
         escape(
-            Cursor{offset},
+            cursor(offset),
             Trait::Underline
         ) + "~Terminal Capabilities~ -- q to quit";
 }
@@ -77,7 +77,7 @@ using namespace esc;
 {
     return
         escape(
-            Cursor{offset},
+            cursor(offset),
             Trait::Bold
         ) + "TERM env var:        " +
         escape(Trait::None).append(TERM_var());
@@ -87,7 +87,7 @@ using namespace esc;
 {
     return
         escape(
-            Cursor{offset},
+            cursor(offset),
             Trait::Bold
         ) + "Palette Color Count: " +
         escape(Trait::None) + std::to_string(color_palette_size());
@@ -97,7 +97,7 @@ using namespace esc;
 {
     return
         escape(
-            Cursor{offset},
+            cursor(offset),
             Trait::Bold
         ) + "Has True Color:      " +
         escape(Trait::None) + (has_true_color() ? "Yes" : "No");
@@ -118,7 +118,7 @@ using namespace esc;
 {
     return
         escape(
-            Cursor{offset},
+            cursor(offset),
             Trait::Bold
         ) + "Terminal Size:       " +
         escape(Trait::None) + area_display(a);
@@ -128,7 +128,7 @@ using namespace esc;
 {
     return
         escape(
-            Cursor{offset},
+            cursor(offset),
             Trait::Bold
         ) + "UTF8 Text Examples:  " +
         escape(Trait::None) + "Ɣ ѝ ₪ ⌛ ▚ 😳 ㅎꂆ";
@@ -138,7 +138,7 @@ using namespace esc;
 {
     return
         escape(
-            Cursor{offset},
+            cursor(offset),
             Trait::Bold
         ) + "Traits:              " +
         escape(Trait::Standout) + "Standout " +
@@ -171,14 +171,14 @@ using namespace esc;
 [[nodiscard]] auto key_display(Key k) -> std::string
 {
     auto const d = key_to_char32(k);
-    return detail::u32_to_u8(d == U'\0' ? U' ' : d);
+    return std::string{encode_utf8(d == U'\0' ? U' ' : d).view()};
 }
 
 [[nodiscard]] auto key_release_display(Point offset, Key k) -> std::string
 {
     return
         escape(
-            Cursor{offset},
+            cursor(offset),
             Trait::Inverse
         ) + "Last Key Release -----" +
         escape(Cursor{offset.x, offset.y + 1}, Trait::Bold) +
@@ -193,7 +193,7 @@ using namespace esc;
 {
     return
         escape(
-            Cursor{offset},
+            cursor(offset),
             Trait::Inverse
         ) + "Last Key Press -----" +
         escape(Cursor{offset.x, offset.y + 1}, Trait::Bold) +
@@ -217,7 +217,7 @@ using namespace esc;
 {
     return
         escape(
-            Cursor{offset},
+            cursor(offset),
             Trait::Inverse
         ) + "Last Mouse Event -----" +
         escape(Cursor{offset.x, offset.y + 1}, Trait::Bold, BlankRow{}) +
@@ -234,7 +234,7 @@ using namespace esc;
 {
     return
         escape(
-            Cursor{offset},
+            cursor(offset),
             Trait::Bold
         ) + "Click to Change Mouse Mode:" +
         escape(Trait::None) + ' ' + to_string(mm) + ' ';
@@ -297,7 +297,7 @@ using namespace esc;
 
     return
         escape(
-            Cursor{offset},
+            cursor(offset),
             Trait::Bold
         ) + "True Color Example" +
         escape(Cursor{offset.x, offset.y + 1}) +
