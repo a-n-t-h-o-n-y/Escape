@@ -11,24 +11,24 @@ static_assert(Encodable<GlyphString> && Drawable<GlyphString>);
 static_assert(!Drawable<decltype(sequence(ScreenBuffer::Alternate))>);
 static_assert(!Drawable<decltype(styled(sequence(CursorMode::Hide), bold))>);
 static_assert(!Encodable<int> && !Encodable<bool>);
-constexpr auto warning_patch = fg(XColor::Yellow) | bold;
+constexpr auto warning_patch = fg(colors::yellow) | bold;
 static_assert((Style{} | warning_patch).traits == Traits{bold});
 
 TEST(ENC_05_mixed_commands_text_and_unicode_share_every_sink)
 {
     contract::encodes("\x1b[3;5H\x1b[36m\x1b[1mHello 👽\0界\x1b[0m"sv, Cursor{4, 2},
-                      fg(XColor::Cyan), bold, "Hello 👽\0"sv, U'界', ResetStyle{});
+                      fg(colors::cyan), bold, "Hello 👽\0"sv, U'界', ResetStyle{});
     contract::encodes("ab界", sequence("a", 'b', U'界'));
 }
 TEST(ENC_05_style_patches_are_pure_and_last_component_wins)
 {
     auto original = warning_patch;
-    auto changed = original | fg(XColor::Red) | without(bold) | underline;
+    auto changed = original | fg(colors::red) | without(bold) | underline;
     CHECK(original == warning_patch);
     CHECK((Style{.traits = bold | italic} | changed) ==
-          Style{.foreground = XColor::Red, .traits = italic | underline});
+          Style{.foreground = colors::red, .traits = italic | underline});
     CHECK((changed | Style{}) == Style{});
-    CHECK((Style{.foreground = XColor::Red} | fg(TermColor::Default)) == Style{});
+    CHECK((Style{.foreground = colors::red} | fg(default_color)) == Style{});
     contract::encodes("\x1b[31m\x1b[22m\x1b[4m", changed);
     contract::encodes("\x1b[1m\x1b[4m", bold, underline);
     contract::encodes("", Traits{}, Trait::None, StylePatch{});
@@ -57,7 +57,7 @@ TEST(ENC_05_styled_text_owns_storage_and_pipes_preserve_inputs)
 }
 TEST(ENC_05_nested_styled_runs_restore_known_enclosing_style)
 {
-    auto inner = styled("b", without(bold) | fg(XColor::Red));
+    auto inner = styled("b", without(bold) | fg(colors::red));
     auto outer = styled(sequence("a", inner, "c"), warning_patch);
     contract::encodes(
         "\x1b[49m\x1b[33m\x1b[22;23;24;25;27;28;29;1ma"
@@ -68,7 +68,7 @@ TEST(ENC_05_nested_styled_runs_restore_known_enclosing_style)
     contract::encodes(
         "\x1b[34m\x1b[49m\x1b[34m\x1b[22;23;24;25;27;28;29;1mx"
         "\x1b[49m\x1b[34m\x1b[22;23;24;25;27;28;29my",
-        fg(XColor::Blue), styled("x", bold), "y");
+        fg(colors::blue), styled("x", bold), "y");
 }
 TEST(BUF_05_nested_borrowed_aliases_survive_append_growth)
 {
@@ -173,7 +173,7 @@ TEST(BUF_05_lazy_glyph_views_can_read_the_append_destination)
 }
 TEST(ENC_05_glyph_values_and_ranges_share_bounded_and_owned_encoding)
 {
-    auto values = glyphs("a界", Style{.foreground = XColor::Red});
+    auto values = glyphs("a界", Style{.foreground = colors::red});
     contract::encodes(
         "\x1b[49m\x1b[31m\x1b[22;23;24;25;27;28;29ma界"
         "\x1b[49m\x1b[39m\x1b[22;23;24;25;27;28;29m",

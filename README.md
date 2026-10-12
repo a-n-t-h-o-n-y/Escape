@@ -13,7 +13,7 @@ Raw encoding is pure and does not read the environment or retain drawing state:
 ```cpp
 #include <esc/esc.hpp>
 
-auto warning = esc::fg(esc::XColor::Yellow) | esc::bold;
+auto warning = esc::fg(esc::colors::yellow) | esc::bold;
 auto label = esc::styled("Warning 👽", warning);
 auto bytes = esc::encode(esc::Cursor{0, 0}, label);
 std::string frame;
@@ -37,7 +37,7 @@ TERM matches use the documented heuristic table and return per-feature evidence.
 ```cpp
 auto terminal = esc::Terminal::open(esc::TerminalOptions::interactive());
 terminal.write(esc::BlankScreen{}, esc::Cursor{},
-               esc::styled("Hello 👽", esc::fg(esc::XColor::Cyan) | esc::bold));
+               esc::styled("Hello 👽", esc::fg(esc::colors::cyan) | esc::bold));
 terminal.flush();
 
 auto result = terminal.read(std::chrono::milliseconds{100});
@@ -93,7 +93,7 @@ explicit capability selection or an explicit synchronization probe. See
 
 ```cpp
 auto scalars = esc::utf8_to_utf32("Hello 👽");
-auto text = esc::styled("Hello 👽", esc::fg(esc::XColor::Cyan));
+auto text = esc::styled("Hello 👽", esc::fg(esc::colors::cyan));
 auto highlighted = text | esc::bold; // text is unchanged
 esc::write(highlighted);
 

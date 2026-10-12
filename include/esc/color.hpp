@@ -22,7 +22,10 @@ namespace esc {
  * @details Foreground/Background is determined by the encode(...) function overload set
  * depending on if ColorFG or ColorBG is used.
  */
-enum class TermColor : bool { Default };
+struct DefaultColor {
+    [[nodiscard]] constexpr bool operator==(DefaultColor const&) const = default;
+};
+inline constexpr DefaultColor default_color{};
 
 // -------------------------------------------------------------------------------------
 
@@ -34,51 +37,34 @@ enum class TermColor : bool { Default };
  *     [16, 231] -- 216 non-system colors.
  *     [232, 255] - Grayscale colors.
  * The actual color values are defined by your terminal.
- * @details This provides the first 16 colors of the XTerm palette by name.
+ * @details The colors namespace names the first 16 terminal palette slots.
  * @see https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit
  * @see https://www.ditig.com/publications/256-colors-cheat-sheet
  */
-struct XColor {
-    std::uint8_t value;
-
-    static XColor const Black;
-    static XColor const Red;
-    static XColor const Green;
-    static XColor const Yellow;
-    static XColor const Blue;
-    static XColor const Magenta;
-    static XColor const Cyan;
-    static XColor const White;
-    static XColor const BrightBlack;
-    static XColor const BrightRed;
-    static XColor const BrightGreen;
-    static XColor const BrightYellow;
-    static XColor const BrightBlue;
-    static XColor const BrightMagenta;
-    static XColor const BrightCyan;
-    static XColor const BrightWhite;
-
-    [[nodiscard]] constexpr bool operator==(XColor const&) const = default;
-    [[nodiscard]] constexpr bool operator!=(XColor const&) const = default;
+struct IndexedColor {
+    std::uint8_t value = 0;
+    [[nodiscard]] constexpr bool operator==(IndexedColor const&) const = default;
 };
 
-// Yes, defining constexpr with const declaration is legal here.
-constexpr XColor XColor::Black = XColor{0};
-constexpr XColor XColor::Red = XColor{1};
-constexpr XColor XColor::Green = XColor{2};
-constexpr XColor XColor::Yellow = XColor{3};
-constexpr XColor XColor::Blue = XColor{4};
-constexpr XColor XColor::Magenta = XColor{5};
-constexpr XColor XColor::Cyan = XColor{6};
-constexpr XColor XColor::White = XColor{7};
-constexpr XColor XColor::BrightBlack = XColor{8};
-constexpr XColor XColor::BrightRed = XColor{9};
-constexpr XColor XColor::BrightGreen = XColor{10};
-constexpr XColor XColor::BrightYellow = XColor{11};
-constexpr XColor XColor::BrightBlue = XColor{12};
-constexpr XColor XColor::BrightMagenta = XColor{13};
-constexpr XColor XColor::BrightCyan = XColor{14};
-constexpr XColor XColor::BrightWhite = XColor{15};
+// These select terminal palette slots, preserving the user's configured theme.
+namespace colors {
+inline constexpr IndexedColor black{0};
+inline constexpr IndexedColor red{1};
+inline constexpr IndexedColor green{2};
+inline constexpr IndexedColor yellow{3};
+inline constexpr IndexedColor blue{4};
+inline constexpr IndexedColor magenta{5};
+inline constexpr IndexedColor cyan{6};
+inline constexpr IndexedColor white{7};
+inline constexpr IndexedColor bright_black{8};
+inline constexpr IndexedColor bright_red{9};
+inline constexpr IndexedColor bright_green{10};
+inline constexpr IndexedColor bright_yellow{11};
+inline constexpr IndexedColor bright_blue{12};
+inline constexpr IndexedColor bright_magenta{13};
+inline constexpr IndexedColor bright_cyan{14};
+inline constexpr IndexedColor bright_white{15};
+}  // namespace colors
 
 // -------------------------------------------------------------------------------------
 
@@ -231,10 +217,11 @@ auto constexpr rgb_to_hsl(RGB v) -> HSL
 constexpr RGB::RGB(HSL value) : RGB{hsl_to_rgb(value)} {}
 
 /**
- * Variant holding any of the color types that can be used.
+ * A terminal default, a palette slot, or an explicit RGB color.
+ * Default construction selects the terminal default for the chosen channel.
  * Select a channel with fg(Color) or bg(Color) before encoding.
  */
-using Color = std::variant<XColor, RGB, TermColor>;
+using Color = std::variant<DefaultColor, IndexedColor, RGB>;
 
 // -------------------------------------------------------------------------------------
 

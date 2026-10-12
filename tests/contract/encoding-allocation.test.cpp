@@ -6,7 +6,7 @@ using namespace esc;
 TEST(BUF_02_raw_encoding_and_capacity_failure_allocate_nothing)
 {
     std::array<char,256> bytes;
-    Style style{.background=RGB{0x010203},.foreground=XColor::BrightRed,.traits=contract::full_traits()};
+    Style style{.background=RGB{0x010203},.foreground=colors::bright_red,.traits=contract::full_traits()};
     std::size_t allocations=0;
     EncodeResult result{};
     EncodeResult short_result{};
@@ -59,7 +59,7 @@ TEST(BUF_01_raw_append_uses_one_destination_allocation_for_a_pack)
 }
 TEST(ENC_04_invalid_values_validate_the_whole_pack_before_mutation)
 {
-    auto invalid=fg(static_cast<TermColor>(true));
+    auto invalid=StylePatch{.enabled=bold, .disabled=bold};
     std::string output="unchanged";
     CHECK_THROWS(std::invalid_argument,append_encoded(output,ResetStyle{},invalid));
     CHECK(output=="unchanged");

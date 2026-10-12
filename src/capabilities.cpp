@@ -164,7 +164,7 @@ void require(bool supported, Feature feature)
     auto const cube = index - 16;
     return {levels[cube / 36], levels[(cube / 6) % 6], levels[cube % 6]};
 }
-[[nodiscard]] auto nearest_color(TerminalProfile const& profile, RGB color) -> XColor
+[[nodiscard]] auto nearest_color(TerminalProfile const& profile, RGB color) -> IndexedColor
 {
     unsigned const candidates = profile.colors == ColorSupport::Basic8 ? 8 : 16;
     unsigned best = 0;
@@ -209,7 +209,7 @@ void require(bool supported, Feature feature)
     -> std::optional<Color>
 {
     validate_color(color);
-    if (std::holds_alternative<TermColor>(color))
+    if (std::holds_alternative<DefaultColor>(color))
         return profile.colors == ColorSupport::None ? std::nullopt
                                                     : std::optional<Color>{color};
     if (profile.colors == ColorSupport::None) {
@@ -217,7 +217,7 @@ void require(bool supported, Feature feature)
             throw UnsupportedFeature{Feature::Colors};
         return std::nullopt;
     }
-    if (auto const* indexed = std::get_if<XColor>(&color)) {
+    if (auto const* indexed = std::get_if<IndexedColor>(&color)) {
         if (profile.colors == ColorSupport::Indexed256 ||
             profile.colors == ColorSupport::TrueColor ||
             indexed->value < (profile.colors == ColorSupport::Basic8 ? 8 : 16))
@@ -225,7 +225,7 @@ void require(bool supported, Feature feature)
         if (profile.fallback == FallbackPolicy::Strict)
             throw UnsupportedFeature{Feature::Colors};
         if (profile.colors == ColorSupport::Basic8 && indexed->value < 16)
-            return Color{XColor{static_cast<std::uint8_t>(indexed->value - 8)}};
+            return Color{IndexedColor{static_cast<std::uint8_t>(indexed->value - 8)}};
         return Color{nearest_color(profile, palette_color(profile, indexed->value))};
     }
     if (profile.colors == ColorSupport::TrueColor) return color;

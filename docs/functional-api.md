@@ -11,7 +11,7 @@ Unicode, and protocol contracts in the linked documents continue to apply.
 using namespace esc;
 
 auto terminal = Terminal::open(TerminalOptions::interactive());
-auto warning = fg(XColor::Yellow) | bold;
+auto warning = fg(colors::yellow) | bold;
 auto label = styled("Warning 👽", warning);
 
 terminal.write(Cursor{4, 2}, label, "\n");
@@ -57,7 +57,7 @@ independent of the destination; inspectable contiguous overlaps are rejected.
 ## Complete styles and partial changes
 
 ```cpp
-auto warning = fg(XColor::Yellow) | bold;
+auto warning = fg(colors::yellow) | bold;
 auto urgent = warning | underline;
 auto normal_weight = urgent | without(bold);
 auto complete = Style{} | urgent;
@@ -84,14 +84,36 @@ It cannot preserve an unknown peer set by an earlier call or another writer.
 
 `RGB` is the single RGB type, with byte-channel and checked packed-hex constructors.
 `RGB{HSL{...}}`, `hsl_to_rgb`, and `rgb_to_hsl` perform validated conversion.
-`Color` contains RGB, XColor palette slots, or TermColor::Default. The redundant
-TrueColor/TColor, foreground/background, and encoded-color helper spellings are
+`Color` contains `DefaultColor`, `IndexedColor`, or `RGB`. `Color{}`, `ColorFG{}`,
+and `ColorBG{}` select the terminal default; `Style{}` uses defaults for both
+channels. An absent color in `StylePatch` preserves the channel, while an explicit
+`default_color` resets it.
+
+```cpp
+fg(colors::red)          // The user's terminal palette slot for red.
+fg(IndexedColor{123})    // An explicit terminal palette slot.
+fg(RGB{0xe06c75})        // An explicit RGB value.
+fg(default_color)       // The terminal's configured foreground.
+```
+
+`colors` names the first 16 palette slots, including `colors::bright_red`.
+These are palette references and have no fixed RGB value. `IndexedColor` accepts
+a byte index (0..255); the profile handles approximation when the terminal has
+fewer colors. `RGB` and indexed requests remain distinct even if they happen to
+look identical. The default tag has no foreground/background identity until
+passed to `fg` or `bg`.
+
+Migration: replace `XColor::Red` with `colors::red` (and likewise for other names),
+`XColor{index}` with `IndexedColor{index}`, and `TermColor::Default` with
+`default_color`. The old spellings are removed.
+
+The redundant TrueColor/TColor, foreground/background, and encoded-color helper spellings are
 removed, along with the old Brush and escape-family APIs.
 
 ## Styled text, ownership, and nesting
 
 ```cpp
-auto inner = styled("important", fg(XColor::Red) | bold);
+auto inner = styled("important", fg(colors::red) | bold);
 auto message = styled(sequence("An ", inner, " message"), underline);
 terminal.write(message);
 

@@ -27,7 +27,7 @@ int main() {
         if (!reader.wait_state().ready || !std::holds_alternative<esc::EndOfInput>(reader.read(std::chrono::milliseconds{0}))) return 8;
     }
     std::fclose(input);
-    auto label = esc::styled("ok", esc::fg(esc::XColor::Cyan) | esc::bold);
+    auto label = esc::styled("ok", esc::fg(esc::colors::cyan) | esc::bold);
     if (label.content != "ok" || (esc::Style{} | label.appearance).traits != esc::Traits{esc::bold}) return 9;
     if (esc::encode(esc::sequence("a", 'b')) != "ab") return 10;
     esc::ReadResult timeout = esc::Timeout{};

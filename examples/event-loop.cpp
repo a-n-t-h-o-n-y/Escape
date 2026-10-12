@@ -59,7 +59,7 @@ int main()
                 auto frame = terminal.frame();
                 terminal.write(esc::Cursor{}, esc::BlankRow{},
                                esc::styled("Press q to quit.",
-                                           esc::bold | esc::fg(esc::XColor::Cyan)),
+                                           esc::bold | esc::fg(esc::colors::cyan)),
                                " Timer: ", std::to_string(seconds++));
                 frame.close();
                 tick = Clock::now() + 1s;

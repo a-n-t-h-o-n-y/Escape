@@ -49,13 +49,13 @@ TEST(ENC_01_erase_scope_does_not_home_or_clear_history)
 }
 TEST(ENC_01_default_and_named_colors)
 {
-    encodes("\x1b[39m", fg(TermColor::Default));
-    encodes("\x1b[49m", bg(TermColor::Default));
-    encodes("\x1b[30m", fg(XColor::Black));
-    encodes("\x1b[31m", fg(XColor::Red));
-    encodes("\x1b[46m", bg(XColor::Cyan));
-    encodes("\x1b[97m", fg(XColor::BrightWhite));
-    encodes("\x1b[100m", bg(XColor::BrightBlack));
+    encodes("\x1b[39m", fg(default_color));
+    encodes("\x1b[49m", bg(default_color));
+    encodes("\x1b[30m", fg(colors::black));
+    encodes("\x1b[31m", fg(colors::red));
+    encodes("\x1b[46m", bg(colors::cyan));
+    encodes("\x1b[97m", fg(colors::bright_white));
+    encodes("\x1b[100m", bg(colors::bright_black));
 }
 TEST(ENC_01_every_index_has_its_canonical_encoding)
 {
@@ -67,15 +67,15 @@ TEST(ENC_01_every_index_has_its_canonical_encoding)
         auto bg_bytes = index<8 ? "\x1b["+std::to_string(40+index)+"m"
                       : index<16 ? "\x1b["+std::to_string(100+index-8)+"m"
                       : "\x1b[48;5;"+std::to_string(index)+"m";
-        encodes(fg_bytes, fg(XColor{static_cast<std::uint8_t>(index)}));
-        encodes(bg_bytes, bg(XColor{static_cast<std::uint8_t>(index)}));
+        encodes(fg_bytes, fg(IndexedColor{static_cast<std::uint8_t>(index)}));
+        encodes(bg_bytes, bg(IndexedColor{static_cast<std::uint8_t>(index)}));
     }
 }
 TEST(ENC_01_true_color_preserves_channels_and_helpers)
 {
     encodes("\x1b[38;2;0;127;255m", fg(RGB{RGB{0,127,255}}));
     encodes("\x1b[48;2;240;33;39m", bg(RGB{0xF02127}));
-    CHECK(encode(fg(XColor::Red)) == "\x1b[31m");
+    CHECK(encode(fg(colors::red)) == "\x1b[31m");
     CHECK(encode(bg(RGB{0x010203})) == "\x1b[48;2;1;2;3m");
 }
 TEST(ENC_03_traits_enable_without_replacing_other_traits)
@@ -108,13 +108,13 @@ TEST(ENC_03_style_order_and_full_reset_are_distinct)
 {
     encodes("\x1b[49m\x1b[39m\x1b[22;23;24;25;27;28;29m", Style{});
     encodes("\x1b[44m\x1b[97m\x1b[22;23;24;25;27;28;29;1m",
-            Style{.background=XColor::Blue,.foreground=XColor::BrightWhite,.traits=Trait::Bold});
+            Style{.background=colors::blue,.foreground=colors::bright_white,.traits=Trait::Bold});
     encodes("\x1b[0m", ResetStyle{});
 }
 TEST(ENC_02_composition_retains_order_and_repeated_commands)
 {
     encodes(""); // Zero commands.
-    encodes("\x1b[31m\x1b[1;1H\x1b[31m\x1b[0m", fg(XColor::Red),Cursor{},fg(XColor::Red),ResetStyle{});
+    encodes("\x1b[31m\x1b[1;1H\x1b[31m\x1b[0m", fg(colors::red),Cursor{},fg(colors::red),ResetStyle{});
     const Cursor cursor_value{4,2};
     encodes("\x1b[3;5H\x1b[3;5H",cursor_value,cursor_value);
 }
@@ -158,8 +158,8 @@ TEST(BUF_02_empty_span_reports_required_size_without_writing)
 }
 TEST(BUF_03_owned_results_are_independent_of_later_encodings)
 {
-    auto first = encode(fg(XColor::Red));
-    auto second = encode(fg(XColor::Blue));
+    auto first = encode(fg(colors::red));
+    auto second = encode(fg(colors::blue));
     static_cast<void>(encode(Style{}));
     CHECK(first == "\x1b[31m");
     CHECK(second == "\x1b[34m");
@@ -167,7 +167,6 @@ TEST(BUF_03_owned_results_are_independent_of_later_encodings)
 
 TEST(ENC_04_invalid_enum_values_are_not_silently_treated_as_defaults)
 {
-    CHECK_THROWS(std::invalid_argument,encode(fg(static_cast<TermColor>(true))));
     CHECK_THROWS(std::invalid_argument,encode(static_cast<ScreenBuffer>(99)));
     CHECK_THROWS(std::invalid_argument,encode(static_cast<CursorMode>(99)));
     CHECK_THROWS(std::invalid_argument,encode(MouseReporting{MouseMode::Off,static_cast<MouseProtocol>(99)}));

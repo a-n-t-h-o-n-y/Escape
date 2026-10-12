@@ -90,7 +90,7 @@ int main(int argc, char** argv)
             terminal.write(decision.explanation, "\r\n");
         terminal.write("System palette: ");
         for (unsigned i = 0; i < 16; ++i) {
-            terminal.write(fg(XColor{static_cast<std::uint8_t>(i)}));
+            terminal.write(fg(IndexedColor{static_cast<std::uint8_t>(i)}));
             terminal.write("██");
         }
         terminal.write(ResetStyle{});

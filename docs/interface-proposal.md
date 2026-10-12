@@ -50,7 +50,7 @@ The public value model must not depend on POSIX or Windows console headers.
 
 int main()
 {
-    esc::write(esc::fg(esc::XColor::Cyan), "Hello", esc::ResetStyle{}, "\n");
+    esc::write(esc::fg(esc::colors::cyan), "Hello", esc::ResetStyle{}, "\n");
     esc::flush();
 }
 ```
@@ -65,7 +65,7 @@ bytes; applications wanting automatic capability handling use a terminal profile
 using namespace std::chrono_literals;
 
 auto terminal = esc::Terminal::open(esc::TerminalOptions::interactive());
-terminal.write(esc::Cursor{0, 0}, esc::Style{.foreground = esc::XColor::Cyan});
+terminal.write(esc::Cursor{0, 0}, esc::Style{.foreground = esc::colors::cyan});
 terminal.write("Hello");
 terminal.flush();
 
@@ -183,12 +183,14 @@ are pure conversion helpers. HSL ranges are hue 0..359 and saturation/lightness
 0..100; invalid values throw. Conversions round to the nearest channel, ties up;
 achromatic hue is zero, negative computed hues normalize into 0..359.
 
-`Color = std::variant<XColor, RGB, TermColor>`. `XColor` is a palette index with
-named system colors. Its first sixteen slots may be customized by the terminal;
+`Color = std::variant<DefaultColor, IndexedColor, RGB>`. `IndexedColor` is a palette
+index with named system colors. Its first sixteen slots may be customized by the terminal;
 remaining slots use the conventional cube and grayscale palette when selected.
 `fg(Color)` and `bg(Color)` select the channel. There are no duplicate color types
-or long-form channel helper aliases. Invalid default-color enum values and
-valueless variants are rejected before destination mutation.
+or long-form channel helper aliases. `DefaultColor` is a value tag, exposed as
+`default_color`, and `Color{}` selects it. The `colors` namespace provides lowercase
+palette names such as `colors::red` and `colors::bright_red`. Valueless variants
+are rejected before destination mutation.
 
 ### Traits, styles, and patches
 
@@ -209,7 +211,7 @@ is pure, with the last supplied color or enable/disable decision winning. A patc
 that directly contains overlapping enabled/disabled sets is invalid.
 
 ```cpp
-auto warning = esc::fg(esc::XColor::Yellow) | esc::bold;
+auto warning = esc::fg(esc::colors::yellow) | esc::bold;
 auto urgent = warning | esc::underline;
 auto appearance = esc::Style{} | urgent;
 auto quieter = appearance | esc::without(esc::bold);

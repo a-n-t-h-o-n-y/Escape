@@ -10,8 +10,8 @@
 namespace esc {
 // A complete appearance. Applying it replaces colors and modeled traits.
 struct Style {
-    Color background = TermColor::Default;
-    Color foreground = TermColor::Default;
+    Color background = default_color;
+    Color foreground = default_color;
     Traits traits = {};
     [[nodiscard]] constexpr bool operator==(Style const&) const = default;
 };
@@ -42,9 +42,6 @@ constexpr void validate_color(Color const& color)
 {
     if (color.valueless_by_exception())
         throw std::invalid_argument{"Style: valueless color"};
-    if (auto const* value = std::get_if<TermColor>(&color);
-        value && *value != TermColor::Default)
-        throw std::invalid_argument{"Style: invalid default color"};
 }
 constexpr void validate_style(Style const& style)
 {

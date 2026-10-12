@@ -7,7 +7,7 @@ TEST(BUF_02_bounded_encoding_and_capacity_failure_allocate_nothing)
 {
     std::array<char,256> bytes;
     auto profile=contract::full_profile();
-    Style style{.background=RGB{0x010203},.foreground=XColor::BrightRed,.traits=contract::full_traits()};
+    Style style{.background=RGB{0x010203},.foreground=colors::bright_red,.traits=contract::full_traits()};
     std::size_t allocations=0;
     EncodeResult result{};
     EncodeResult short_result{};

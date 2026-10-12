@@ -111,7 +111,7 @@ TEST(OUT_05_mixed_commands_and_scoped_styling_stream_in_order)
 {
     contract::File file;
     Output output{file.get()};
-    auto label = styled("Hello 👽", fg(XColor::Cyan) | bold);
+    auto label = styled("Hello 👽", fg(colors::cyan) | bold);
     output.write(Cursor{4,2}, label, "\0tail"sv);
     CHECK(file.contents() ==
           "\x1b[3;5H\x1b[49m\x1b[36m\x1b[22;23;24;25;27;28;29;1mHello 👽"
@@ -130,8 +130,8 @@ TEST(OUT_05_styled_views_are_streamed_in_bounded_chunks)
 TEST(OUT_05_glyph_ranges_coalesce_styles_and_restore_the_enclosing_style)
 {
     contract::File file;
-    auto values = glyphs("a界", Style{.foreground=XColor::Red, .traits=bold});
-    Output{file.get()}.write(fg(XColor::Blue), values, "b");
+    auto values = glyphs("a界", Style{.foreground=colors::red, .traits=bold});
+    Output{file.get()}.write(fg(colors::blue), values, "b");
     CHECK(file.contents() ==
           "\x1b[34m\x1b[49m\x1b[31m\x1b[22;23;24;25;27;28;29;1ma界"
           "\x1b[49m\x1b[34m\x1b[22;23;24;25;27;28;29mb");

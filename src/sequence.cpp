@@ -67,12 +67,10 @@ void color(SequenceWriter& out, Color const& value, bool foreground)
     std::visit(
         [&](auto c) {
             using C = decltype(c);
-            if constexpr (std::same_as<C, TermColor>) {
-                if (c != TermColor::Default)
-                    throw std::invalid_argument{"escape: invalid default color"};
+            if constexpr (std::same_as<C, DefaultColor>) {
                 parameter(out, foreground ? 39 : 49, "m");
             }
-            else if constexpr (std::same_as<C, XColor>) {
+            else if constexpr (std::same_as<C, IndexedColor>) {
                 if (c.value < 8)
                     parameter(out, (foreground ? 30 : 40) + c.value, "m");
                 else if (c.value < 16)

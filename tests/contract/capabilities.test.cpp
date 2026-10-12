@@ -9,7 +9,7 @@ using contract::encodes;
 TEST(CAP_01_plain_output_drops_style_but_rejects_geometry)
 {
     TerminalProfile plain;
-    encodes("",plain,fg(XColor::Red),bg(RGB{0x010203}),Trait::Bold,Style{},ResetStyle{});
+    encodes("",plain,fg(colors::red),bg(RGB{0x010203}),Trait::Bold,Style{},ResetStyle{});
     CHECK_THROWS(UnsupportedFeature,encode(plain,Cursor{}));
     CHECK_THROWS(UnsupportedFeature,encode(plain,MoveCursor{1,0}));
     CHECK_THROWS(UnsupportedFeature,encode(plain,BlankRow{}));
@@ -19,8 +19,8 @@ TEST(CAP_01_strict_plain_profile_accepts_only_default_style)
 {
     TerminalProfile plain;
     plain.fallback=FallbackPolicy::Strict;
-    encodes("",plain,Style{},Traits{},fg(TermColor::Default),ResetStyle{});
-    CHECK_THROWS(UnsupportedFeature,encode(plain,fg(XColor::Red)));
+    encodes("",plain,Style{},Traits{},fg(default_color),ResetStyle{});
+    CHECK_THROWS(UnsupportedFeature,encode(plain,fg(colors::red)));
     CHECK_THROWS(UnsupportedFeature,encode(plain,Trait::Bold));
 }
 TEST(CAP_01_supported_commands_match_the_raw_contract)
@@ -59,8 +59,8 @@ TEST(CAP_01_color_quantization_uses_specified_palette_and_ties)
     encodes("\x1b[31m",profile,fg(RGB{0x800000}));
     encodes("\x1b[30m",profile,fg(RGB{0x400000})); // Equidistant black/dark red, lower slot wins.
     encodes("\x1b[41m",profile,bg(RGB{0x800000}));
-    encodes("\x1b[31m",profile,fg(XColor::BrightRed)); // Fold brightness, never add Bold.
-    encodes("\x1b[37m",profile,fg(XColor{255}));
+    encodes("\x1b[31m",profile,fg(colors::bright_red)); // Fold brightness, never add Bold.
+    encodes("\x1b[37m",profile,fg(IndexedColor{255}));
     profile.colors=ColorSupport::Basic16;
     encodes("\x1b[91m",profile,fg(RGB{0xFF0000}));
     profile.system_palette[4]=RGB{1,2,3};
@@ -73,8 +73,8 @@ TEST(CAP_01_indexed_quantization_has_fixed_expected_candidates)
     encodes("\x1b[38;5;67m",profile,fg(RGB{0x5F87AF}));
     encodes("\x1b[38;5;232m",profile,fg(RGB{0x080808}));
     encodes("\x1b[38;5;245m",profile,fg(RGB{0x8A8A8A}));
-    encodes("\x1b[31m",profile,fg(XColor::Red));
-    encodes("\x1b[38;5;196m",profile,fg(XColor{196})); // Preserve slot even if RGB matches slot 9.
+    encodes("\x1b[31m",profile,fg(colors::red));
+    encodes("\x1b[38;5;196m",profile,fg(IndexedColor{196})); // Preserve slot even if RGB matches slot 9.
 }
 TEST(CAP_01_palette_approximation_matches_exhaustive_distance_search)
 {
@@ -104,7 +104,7 @@ TEST(CAP_01_palette_approximation_matches_exhaustive_distance_search)
             unsigned score = r * r + g * g + b * b;
             if (score < distance) { best = i; distance = score; }
         }
-        CHECK(encode(profile, fg(RGB{input})) == encode(fg(XColor{static_cast<std::uint8_t>(best)})));
+        CHECK(encode(profile, fg(RGB{input})) == encode(fg(IndexedColor{static_cast<std::uint8_t>(best)})));
     };
     for (auto support : {ColorSupport::Basic8, ColorSupport::Basic16, ColorSupport::Indexed256}) {
         profile.colors = support;
@@ -136,21 +136,21 @@ TEST(CAP_01_default_colors_remain_default_and_none_drops_only_colors)
 {
     auto profile=contract::full_profile();
     profile.colors=ColorSupport::Basic8;
-    encodes("\x1b[39m\x1b[49m",profile,fg(TermColor::Default),bg(TermColor::Default));
+    encodes("\x1b[39m\x1b[49m",profile,fg(default_color),bg(default_color));
     profile.colors=ColorSupport::None;
-    encodes("\x1b[1m",profile,fg(XColor::Red),Trait::Bold);
-    encodes("",profile,fg(TermColor::Default));
+    encodes("\x1b[1m",profile,fg(colors::red),Trait::Bold);
+    encodes("",profile,fg(default_color));
     profile.fallback=FallbackPolicy::Strict;
-    CHECK_THROWS(UnsupportedFeature,encode(profile,bg(XColor::Red)));
+    CHECK_THROWS(UnsupportedFeature,encode(profile,bg(colors::red)));
 }
 TEST(CAP_01_strict_policy_never_approximates_color)
 {
     auto profile=contract::full_profile();
     profile.colors=ColorSupport::Basic8;
     profile.fallback=FallbackPolicy::Strict;
-    encodes("\x1b[31m",profile,fg(XColor::Red));
-    CHECK_THROWS(UnsupportedFeature,encode(profile,fg(XColor::BrightRed)));
-    CHECK_THROWS(UnsupportedFeature,encode(profile,fg(XColor{67})));
+    encodes("\x1b[31m",profile,fg(colors::red));
+    CHECK_THROWS(UnsupportedFeature,encode(profile,fg(colors::bright_red)));
+    CHECK_THROWS(UnsupportedFeature,encode(profile,fg(IndexedColor{67})));
     CHECK_THROWS(UnsupportedFeature,encode(profile,fg(RGB{0x800000})));
 }
 TEST(CAP_01_mouse_protocol_can_fallback_but_tracking_cannot)
@@ -327,14 +327,14 @@ TEST(CAP_01_supported_indexed_colors_are_preserved_exhaustively)
     for (auto depth : {ColorSupport::Indexed256,ColorSupport::TrueColor}) {
         profile.colors=depth;
         for (unsigned i=0;i<256;++i) {
-            auto color=XColor{static_cast<std::uint8_t>(i)};
+            auto color=IndexedColor{static_cast<std::uint8_t>(i)};
             encodes(encode(fg(color)),profile,fg(color));
         }
     }
     profile.colors=ColorSupport::Basic8;
     for (unsigned i=8;i<16;++i)
-        encodes(encode(fg(XColor{static_cast<std::uint8_t>(i-8)})),profile,
-                fg(XColor{static_cast<std::uint8_t>(i)}));
+        encodes(encode(fg(IndexedColor{static_cast<std::uint8_t>(i-8)})),profile,
+                fg(IndexedColor{static_cast<std::uint8_t>(i)}));
 }
 TEST(CAP_01_unsupported_errors_identify_the_feature)
 {

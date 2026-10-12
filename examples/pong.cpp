@@ -508,7 +508,7 @@ using EventResponse = std::optional<State>;
 
     {  // Border
         append_encoded(bytes, esc::cursor(offset - Point{.x = 1, .y = 1}),
-                       fg(XColor::Blue), Trait::Dim);
+                       fg(colors::blue), Trait::Dim);
         bytes += "╭";
 
         for (int i = 0; i < display_space.width; ++i) {

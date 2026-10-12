@@ -5,6 +5,32 @@
 
 using namespace esc;
 
+static_assert(Color{} == Color{default_color});
+static_assert(fg({}) == fg(default_color));
+static_assert(bg({}) == bg(default_color));
+static_assert(Style{}.foreground == Color{});
+static_assert(Style{}.background == Color{});
+static_assert((fg(colors::red) | fg(default_color)).foreground == Color{});
+
+TEST(COL_01_defaults_and_palette_names_preserve_color_intent)
+{
+    CHECK(std::holds_alternative<DefaultColor>(Color{}));
+    CHECK(std::holds_alternative<DefaultColor>(ColorFG{}.value));
+    CHECK(std::holds_alternative<DefaultColor>(ColorBG{}.value));
+    CHECK(std::holds_alternative<IndexedColor>(Color{colors::black}));
+    CHECK(Color{RGB{0x000000}} != Color{colors::black});
+    CHECK(Color{colors::black} != Color{});
+    constexpr IndexedColor named[] = {
+        colors::black, colors::red, colors::green, colors::yellow,
+        colors::blue, colors::magenta, colors::cyan, colors::white,
+        colors::bright_black, colors::bright_red, colors::bright_green,
+        colors::bright_yellow, colors::bright_blue, colors::bright_magenta,
+        colors::bright_cyan, colors::bright_white};
+    for (unsigned i = 0; i < 16; ++i)
+        CHECK(named[i] == IndexedColor{static_cast<std::uint8_t>(i)});
+    contract::encodes("\x1b[39m\x1b[49m", ColorFG{}, ColorBG{});
+}
+
 TEST(COL_01_rgb_and_packed_color_construction_preserve_channels)
 {
     CHECK(RGB{0,127,255} == RGB{0x007FFF});
@@ -63,14 +89,14 @@ TEST(ENC_03_traits_are_canonical_values_with_explicit_mutation)
 }
 TEST(ENC_03_style_and_color_helpers_have_value_semantics)
 {
-    CHECK(Style{} == Style{TermColor::Default,TermColor::Default,Traits{}});
-    CHECK(fg(XColor::Red).value == Color{XColor::Red});
-    CHECK(bg(XColor::Blue).value == Color{XColor::Blue});
-    auto style=Style{.foreground=XColor::Red};
-    auto changed=style | bg(XColor::Blue);
-    CHECK(style.background == Color{TermColor::Default});
-    CHECK(changed.background == Color{XColor::Blue});
-    CHECK(changed.foreground == Color{XColor::Red});
+    CHECK(Style{} == Style{default_color,default_color,Traits{}});
+    CHECK(fg(colors::red).value == Color{colors::red});
+    CHECK(bg(colors::blue).value == Color{colors::blue});
+    auto style=Style{.foreground=colors::red};
+    auto changed=style | bg(colors::blue);
+    CHECK(style.background == Color{default_color});
+    CHECK(changed.background == Color{colors::blue});
+    CHECK(changed.foreground == Color{colors::red});
 }
 TEST(ENC_04_geometry_values_preserve_signed_offsets)
 {
