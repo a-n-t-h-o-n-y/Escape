@@ -203,7 +203,6 @@ class Tester {
     std::string frame;
     std::deque<std::string> events;
     std::vector<std::string> probes;
-    std::array<char, 10> verdict{};
     unsigned page = 0;
     bool chrome_color = true, mouse = false, focus = false, paste = false,
          cursor_visible = false;
@@ -211,7 +210,7 @@ class Tester {
     char control_sample = 0;
     int cursor_y = 12;
     unsigned palette_offset = 0, report_offset = 0, cursor_shape = 0;
-    std::string message = "Samples are sent directly; inspect them, then mark y / x.";
+    std::string message = "Explore samples; press p to query terminal capabilities.";
     int x = 24, y = 7, width = 50;
     void row(int column,
              int line,
@@ -417,7 +416,7 @@ class Tester {
         if (size.width < 70 || size.height < 24) {
             row(1, 1, "ESCAPE / TERMCAPS", bold);
             row(1, 3, "Resize to at least 70 x 24 for the tester.");
-            row(1, 5, "q quit | arrows change page | y pass | x fail");
+            row(1, 5, "q quit | arrows change page");
             terminal.output().write(frame);
             terminal.flush();
             return;
@@ -428,30 +427,20 @@ class Tester {
         row(size.width - 22, 1,
             std::to_string(size.width) + " x " + std::to_string(size.height));
         row(2, 3, "TERM " + safe(env.term) + "  |  COLORTERM " + safe(env.colorterm));
-        row(2, 4, "Raw samples   /   visual verdicts   /   terminal replies", dim);
+        row(2, 4, "Raw samples   /   input events   /   terminal replies", dim);
         row(2, 5, std::string(static_cast<std::size_t>(size.width - 4), '-'), dim);
         body();
         for (unsigned i = 0; i < pages.size(); ++i) {
             std::string label =
                 (i == 9 ? "0" : std::to_string(i + 1)) + " " + std::string{pages[i]};
             label = fit(label, 19);
-            auto state = verdict[i] == 'y' ? "+" : verdict[i] == 'x' ? "!" : "?";
-            label += " " + std::string{state};
             row(2, 7 + static_cast<int>(i), label,
                 i == page ? Traits{inverse} : Traits{});
         }
-        row(2, 19, "+ pass  ! fail  ? untested");
         row(2, size.height - 4, message, {}, true);
         row(2, size.height - 3,
-            "Arrows / 1-0 pages   y pass   x fail   u clear   q quit", bold);
-        unsigned passed = 0, failed = 0;
-        for (auto v : verdict) {
-            passed += v == 'y';
-            failed += v == 'x';
-        }
-        row(2, size.height - 2,
-            "Observed: " + std::to_string(passed) + " pass / " +
-                std::to_string(failed) + " fail. Page: " + std::string{pages[page]});
+            "Arrows / 1-0 pages   p probe   q quit", bold);
+        row(2, size.height - 2, "Page: " + std::string{pages[page]});
         // Full styled rows restore defaults; samples deliberately bypass fallback.
         if (cursor_visible && page == 6)
             append_encoded(frame, Cursor{x + 16, cursor_y});
@@ -471,7 +460,7 @@ class Tester {
             probes.push_back(label + " / " + outcome(o.result));
         }
         page = 9;
-        message = "Replies describe protocols; visual verdicts remain yours.";
+        message = "Terminal replies recorded on the probe page.";
     }
     void kitty()
     {
@@ -520,12 +509,6 @@ class Tester {
                 page = static_cast<unsigned>(c - '1');
             else if (c == '0')
                 page = 9;
-            else if (c == 'y' || c == 'x' || c == 'u') {
-                verdict[page] = c == 'u' ? 0 : static_cast<char>(c);
-                message = c == 'u' ? "Verdict cleared."
-                                   : "Recorded your visual verdict for " +
-                                         std::string{pages[page]};
-            }
             else if (c == 'p')
                 query_modes();
             else if (c == 'k')
@@ -595,18 +578,6 @@ class Tester {
             terminal.flush();
         }
         return true;
-    }
-    void summary() const
-    {
-        std::cout << "Escape / termcaps - visual observations\n";
-        for (unsigned i = 0; i < pages.size(); ++i)
-            std::cout << pages[i] << ": "
-                      << (verdict[i] == 'y'   ? "pass"
-                          : verdict[i] == 'x' ? "fail"
-                                              : "untested")
-                      << '\n';
-        for (auto const& p : probes)
-            std::cout << "Reply: " << p << '\n';
     }
 };
 struct VisualCleanup {
@@ -696,7 +667,6 @@ int main(int argc, char** argv)
             }
         }
         terminal.close();
-        tester.summary();
         return 0;
     }
     catch (std::exception const& e) {

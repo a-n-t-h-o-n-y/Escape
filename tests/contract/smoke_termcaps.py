@@ -57,7 +57,7 @@ class Session:
 
     def close(self):
         try:
-            output = self.send(b"q", b"visual observations")
+            output = self.send(b"q", b"\x1b[?1049l")
             self.process.wait(timeout=4)
             assert self.process.returncode == 0, self.process.stderr.read()
             assert b"\x1b[?25h" in self.output and b"\x1b[?1049l" in self.output
@@ -92,7 +92,6 @@ def main(binary):
     s = Session(binary)
     try:
         assert b"\x07" not in s.output and b",~" not in s.output
-        s.send(b"y", b"Recorded your visual verdict")
         s.send(b"2", b"256-COLOR PALETTE")
         s.send(b"3", b"RGB / TRUE COLOR")
         assert b"\x1b[48;2;" in s.output
@@ -132,7 +131,8 @@ def main(binary):
                b"\x1b[48;5;255m")
         output = s.close()
         s = None
-        assert b"System palette: pass" in output
+        assert b"visual observations" not in output
+        assert b"System palette: pass" not in output
         assert b"\x1b[=0;1u" in output  # Restore the captured keyboard flags.
     finally:
         if s is not None:

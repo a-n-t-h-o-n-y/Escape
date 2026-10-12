@@ -8,14 +8,12 @@ cmake --build build --target termcaps
 ```
 
 The tester uses an alternate screen and restores the screen, cursor, input modes,
-and negotiated keyboard flags on normal exit. Press `q` or Ctrl+C to exit; your
-visual verdicts and latest query results are printed afterward. Cursor shape and
-scroll margins return to their defaults. It needs at least 70 columns and 24 rows;
+and negotiated keyboard flags on normal exit. Press `q` or Ctrl+C to exit.
+Cursor shape and scroll margins return to their defaults. It needs at least
+70 columns and 24 rows;
 resizing smaller shows a compact message until space is available again.
 
 Use Left/Right or Tab to change pages, or jump with `1` through `9` and `0`.
-Press `y` for a passing visual result, `x` for a failure, and `u` to clear the
-current page's verdict. Nothing is automatically marked as passing.
 
 | Page | What to inspect |
 | --- | --- |
@@ -75,6 +73,6 @@ termcaps --help
 
 Redirected input/output automatically selects the plain report. Empty or `dumb`
 TERM also selects it unless `--force` is supplied; forcing still requires terminal
-input and output. The plain report supports copying into an issue or log. The
-interactive summary records human observations, separately from the resolver's
-assumptions and query replies.
+input and output. The plain report supports copying into an issue or log.
+Query results remain available on the probe page during the session; exiting
+restores the terminal without printing a summary.
