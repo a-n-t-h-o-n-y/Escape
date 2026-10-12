@@ -58,6 +58,13 @@ def run(binary, width=100, height=30, quit_key=b"q", synchronize=False):
             resize(80, 24)
             until(b"\x1b[24;1H", start)
             start = len(output)
+            resize(240, 80)
+            large = until(b"\x1b[80;1H", start)
+            frame = large[large.rfind(b"\x1b[1;1H"):]
+            assert b"\x1b[79;1H" in frame
+            assert frame.count("▀".encode()) == 239 * 78
+            send(b"\x1b[<35;220;70M", b"space pause")
+            start = len(output)
             resize(1, 1)
             until(b"\x1b[2J", start)
             start = len(output)

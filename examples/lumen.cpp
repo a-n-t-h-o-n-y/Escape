@@ -172,8 +172,8 @@ void render(Terminal& terminal,
     title.resize(std::min(title.size(), std::size_t(std::max(0, area.width - 1))));
     append_encoded(bytes, ResetStyle{}, Cursor{}, bg(RGB{0x03050B}), BlankRow{},
                    fg(RGB{0x9EDBFF}), title);
-    int columns = std::clamp(area.width - 1, 0, 160);
-    int rows = std::clamp(area.height - 2, 0, 60);
+    int columns = std::max(0, area.width - 1);
+    int rows = std::max(0, area.height - 2);
     for (int y = 0; y < rows; ++y) {
         append_encoded(bytes, Cursor{0, y + 1});
         RGB previous_top{0, 0, 0}, previous_bottom{0, 0, 0};
@@ -226,8 +226,7 @@ int main()
             auto size = terminal.area();
             if (size != area) {
                 area = size;
-                scene.resize(std::clamp(area.width - 1, 0, 160),
-                             std::clamp(area.height - 2, 0, 60));
+                scene.resize(std::max(0, area.width - 1), std::max(0, area.height - 2));
                 terminal.output().write(ResetStyle{}, BlankScreen{});
                 dirty = true;
             }

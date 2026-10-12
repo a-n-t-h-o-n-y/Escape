@@ -142,7 +142,7 @@ click for ripples, scroll to shift colors, and press Space to pause or `q` to qu
 It uses half-block pixels and requests SGR mouse motion and true color explicitly,
 including when NO_COLOR is set. Before mouse input it follows an animated path.
 Frames use synchronized output when the terminal confirms support. The animation
-is capped at 160 columns by 60 rows, targeting 60 frames per second.
+fills the terminal and follows resizing, targeting 60 frames per second.
 
 `ESCAPE_BUILD_TESTS` and `ESCAPE_BUILD_EXAMPLES` default on for a top-level
 build and off for add_subdirectory consumers. `ESCAPE_BUILD_CONTRACT_TESTS`
