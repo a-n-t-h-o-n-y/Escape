@@ -137,12 +137,20 @@ cmake --build build --target escape.examples.lumen
 ./build/examples/escape.examples.lumen
 ```
 
-Lumen is a glowing liquid comet with a spring-driven trail. Move the mouse to steer,
-click for ripples, scroll to shift colors, and press Space to pause or `q` to quit.
-It uses half-block pixels and requests SGR mouse motion and true color explicitly,
-including when NO_COLOR is set. Before mouse input it follows an animated path.
-Frames use synchronized output when the terminal confirms support. The animation
-fills the terminal and follows resizing, targeting 60 frames per second.
+Lumen is a gallery of four interactive demos. Switch with Tab/Shift+Tab, Left/Right,
+`1`–`4`, or click a tab. Space pauses the active scene; `q` quits.
+
+| Demo | Interaction |
+| --- | --- |
+| Liquid | A glowing spring-driven comet; move to steer, click for ripples, wheel for color |
+| Tide | A damped wave simulation with refracted light; move to disturb, click to splash, wheel for strength |
+| Warp | A perspective starfield; move to steer, click to boost, wheel for speed |
+| Julia | An animated Julia fractal; move to morph, click to recenter, wheel to zoom |
+
+Each scene keeps its state when switching tabs. The gallery uses half-block pixels
+and requests SGR mouse motion and true color explicitly, including when NO_COLOR
+is set. Frames use synchronized output when the terminal confirms support. All
+scenes fill the terminal and follow resizing, targeting 60 frames per second.
 
 `ESCAPE_BUILD_TESTS` and `ESCAPE_BUILD_EXAMPLES` default on for a top-level
 build and off for add_subdirectory consumers. `ESCAPE_BUILD_CONTRACT_TESTS`

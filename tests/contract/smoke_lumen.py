@@ -54,6 +54,25 @@ def run(binary, width=100, height=30, quit_key=b"q", synchronize=False):
             if synchronize:
                 assert b"\x1b[?2026h" in output and b"\x1b[?2026l" in output
             send(b" ", b"space pause")
+            images = []
+            for key, hint in [(b"1", b"mouse steer | click ripple"),
+                              (b"2", b"mouse disturb | click splash"),
+                              (b"3", b"mouse steer | click boost"),
+                              (b"4", b"mouse morph | click recenter")]:
+                data = send(key, hint)
+                frame = data[data.rfind(b"\x1b[1;1H"):]
+                images.append(frame[frame.find(b"\x1b[2;1H"):frame.find(b"\x1b[30;1H")])
+                send(b"\x1b[<35;65;14M\x1b[<0;65;14M\x1b[<64;65;14M", hint)
+            assert len(set(images)) == 4
+            send(b"\t", b"mouse steer | click ripple")
+            send(b"\x1b[Z", b"mouse morph | click recenter")
+            send(b"\x1b[<0;22;1M", b"mouse disturb | click splash")
+            send(b" ", b"PAUSED")
+            send(b"3", b" 3 Warp")
+            # A tab change still redraws while animation is paused.
+            until(b"PAUSED", len(output) - 100)
+            send(b" ", b"mouse steer | click boost")
+            send(b"1", b"mouse steer | click ripple")
             start = len(output)
             resize(80, 24)
             until(b"\x1b[24;1H", start)
@@ -64,6 +83,12 @@ def run(binary, width=100, height=30, quit_key=b"q", synchronize=False):
             assert b"\x1b[79;1H" in frame
             assert frame.count("▀".encode()) == 239 * 78
             send(b"\x1b[<35;220;70M", b"space pause")
+            for key, hint in [(b"2", b"mouse disturb"), (b"3", b"click boost"),
+                              (b"4", b"mouse morph"), (b"1", b"click ripple")]:
+                data = send(key, hint)
+                frame = data[data.rfind(b"\x1b[1;1H"):]
+                assert b"\x1b[79;1H" in frame
+                assert frame.count("▀".encode()) == 239 * 78
             start = len(output)
             resize(1, 1)
             until(b"\x1b[2J", start)
@@ -97,4 +122,4 @@ if __name__ == "__main__":
     binary = parser.parse_args().lumen
     run(binary, synchronize=True)
     run(binary, width=4, height=2, quit_key=b"\x03")
-    print("PASS Lumen colors, mouse, pause, resize, synchronization, and cleanup")
+    print("PASS Lumen distinct scenes, tabs, colors, mouse, pause, resize, synchronization, and cleanup")
