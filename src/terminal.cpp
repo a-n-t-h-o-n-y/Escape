@@ -134,7 +134,9 @@ auto explicit_report(TerminalProfile profile) -> ProfileReport
                                     Feature::Editing,
                                     Feature::WindowTitle,
                                     Feature::Hyperlinks,
-                                    Feature::SynchronizedOutput};
+                                    Feature::SynchronizedOutput,
+                                    Feature::Bell,
+                                    Feature::PlayNotes};
     result.decisions.reserve(std::size(features));
     for (auto feature : features)
         result.decisions.push_back(

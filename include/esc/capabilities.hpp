@@ -9,7 +9,7 @@
 
 namespace esc {
 
-enum class Feature { Control, Colors, Traits, AlternateScreen, CursorVisibility, Mouse, Focus, BracketedPaste, CursorStyle, CursorSaveRestore, Scrolling, Editing, WindowTitle, Hyperlinks, SynchronizedOutput };
+enum class Feature { Control, Colors, Traits, AlternateScreen, CursorVisibility, Mouse, Focus, BracketedPaste, CursorStyle, CursorSaveRestore, Scrolling, Editing, WindowTitle, Hyperlinks, SynchronizedOutput, Bell, PlayNotes };
 class UnsupportedFeature : public std::runtime_error {
 public:
     explicit UnsupportedFeature(Feature feature);
@@ -49,6 +49,9 @@ struct TerminalProfile {
     bool window_title = false;
     bool hyperlinks = false;
     bool synchronized_output = false;
+    // Bell is independent of cursor/color control. Playback requires DECPS.
+    bool bell = false;
+    bool play_notes = false;
 };
 
 struct Environment {

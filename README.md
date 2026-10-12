@@ -162,3 +162,7 @@ library; its callers need migration to this revised interface.
 Set `ESCAPE_BUILD_BENCHMARKS=ON` for the standalone `escape.benchmarks` target
 (default off). See [workloads, commands, and the local baseline](benchmarks/README.md)
 for encoding, reused buffers, parser, reader, and output measurements.
+
+Bell and optional DECPS note playback compose with output through `esc::Bell{}`
+and `esc::PlayNotes`. See [sound commands](docs/terminal-extensions.md#bell-and-note-playback)
+for durations, volume, and terminal capability requirements.

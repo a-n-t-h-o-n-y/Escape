@@ -378,7 +378,8 @@ A caller knowing a customized system palette can supply it in the profile.
 Indexed256 and TrueColor profiles assume the conventional xterm cube and ramp;
 other indexed layouts, including 88-color terminals, need a later adapter and
 must not be mislabeled Indexed256. Validate enum values and these invariants:
-control=false implies no color/trait/protocol features; a None mouse protocol
+control=false implies no color/trait/protocol features except the independent
+bell flag (see [sound commands](terminal-extensions.md#bell-and-note-playback)); a None mouse protocol
 requires maximum_mouse_mode=Off; a non-None protocol requires at least Basic.
 
 Capability-aware counterparts take the profile explicitly:

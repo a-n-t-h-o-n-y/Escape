@@ -150,3 +150,18 @@ TEST(OUT_05_late_nested_validation_happens_before_any_output)
     CHECK_THROWS(UnicodeError, Output{file.get()}.write("prefix", label));
     CHECK(file.contents().empty());
 }
+
+TEST(OUT_SOUND_commands_stream_in_order_and_validate_before_writing)
+{
+    PlayNotes melody{.notes={Note::C5, Note::Rest, Note::C7}};
+    contract::File file;
+    Output output{file.get()};
+    output.write("start", Bell{}, sequence(melody), "end");
+    output.flush();
+    CHECK(file.contents()=="start\x07\x1b[4;4;1;0;25,~end");
+    contract::File invalid_file;
+    CHECK_THROWS(std::invalid_argument,
+                 Output{invalid_file.get()}.write(Bell{},
+                     PlayNotes{.notes={static_cast<Note>(26)}}));
+    CHECK(invalid_file.contents().empty());
+}

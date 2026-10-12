@@ -35,6 +35,8 @@ auto unsupported_message(Feature feature) -> char const*
         case Feature::WindowTitle:
             return "Terminal profile does not support window titles";
         case Feature::Hyperlinks: return "Terminal profile does not support hyperlinks";
+        case Feature::Bell: return "Terminal profile does not support the bell";
+        case Feature::PlayNotes: return "Terminal profile does not support DECPS playback";
         case Feature::SynchronizedOutput:
             return "Terminal profile does not support synchronized output";
     }
@@ -104,7 +106,8 @@ auto resolve_profile(Environment const& environment, bool output_is_terminal)
                 .mouse_protocol = entry.full ? MouseProtocol::Sgr : MouseProtocol::None,
                 .maximum_mouse_mode = entry.full ? MouseMode::Move : MouseMode::Off,
                 .focus_reporting = entry.full,
-                .bracketed_paste = entry.full};
+                .bracketed_paste = entry.full,
+                .bell = true};
             source = EvidenceSource::KnownTerminal;
             explanation =
                 "Advertised-protocol heuristic from exact TERM match in table v1: " +
@@ -131,7 +134,7 @@ auto resolve_profile(Environment const& environment, bool output_is_terminal)
         Feature::Control,         Feature::Colors,           Feature::Traits,
         Feature::AlternateScreen, Feature::CursorVisibility, Feature::Mouse,
         Feature::Focus,           Feature::BracketedPaste};
-    report.decisions.reserve(std::size(features) + 7);
+    report.decisions.reserve(std::size(features) + 9);
     for (auto feature : features) {
         bool const color = feature == Feature::Colors;
         report.decisions.push_back({feature, color ? color_source : source,
@@ -143,6 +146,9 @@ auto resolve_profile(Environment const& environment, bool output_is_terminal)
         report.decisions.push_back({feature, EvidenceSource::Default,
                                     "Extension support requires an explicit profile or "
                                     "a supported explicit probe"});
+    report.decisions.push_back({Feature::Bell, source, explanation});
+    report.decisions.push_back({Feature::PlayNotes, EvidenceSource::Default,
+                                "DECPS playback requires an explicit profile"});
     return report;
 }
 }  // namespace esc
@@ -287,7 +293,8 @@ void validate_profile(TerminalProfile const& profile)
          profile.mouse_protocol != MouseProtocol::None || profile.focus_reporting ||
          profile.bracketed_paste || profile.cursor_style ||
          profile.cursor_save_restore || profile.scrolling || profile.editing ||
-         profile.window_title || profile.hyperlinks || profile.synchronized_output))
+         profile.window_title || profile.hyperlinks || profile.synchronized_output ||
+         profile.play_notes))
         throw std::invalid_argument{
             "TerminalProfile: plain output cannot have control features"};
 }

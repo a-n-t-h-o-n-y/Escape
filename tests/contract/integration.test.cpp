@@ -357,3 +357,27 @@ TEST(SES_EXT_confirmed_on_baseline_and_timeout_preserve_inherited_mode)
     terminal.close();
     CHECK(pty.drain() == "\x1b[?2026$p\x1b[?2026$pinherited");
 }
+
+TEST(SES_SOUND_profile_controls_bell_and_playback_without_changing_modes)
+{
+    contract::Pty pty;
+    auto options=opts(false);
+    options.profile->bell=true;
+    options.profile->play_notes=true;
+    auto terminal=Terminal::open({pty.input.get(), pty.output.get()}, options);
+    static_cast<void>(pty.drain());
+    terminal.write("ready", Bell{},
+                   PlayNotes{.notes={Note::C5, Note::E5, Note::G5}});
+    terminal.flush();
+    CHECK(pty.drain()=="ready\x07\x1b[4;4;1;5;8,~");
+    CHECK(terminal.profile_report().decisions.size()==17);
+    CHECK(terminal.profile_report().decisions[15].feature==Feature::Bell);
+    CHECK(terminal.profile_report().decisions[16].feature==Feature::PlayNotes);
+    auto no_sound=opts(false);
+    contract::Pty quiet_pty;
+    auto quiet=Terminal::open({quiet_pty.input.get(), quiet_pty.output.get()}, no_sound);
+    static_cast<void>(quiet_pty.drain());
+    quiet.write("ready", Bell{}, PlayNotes{.notes={Note::C5}});
+    quiet.flush();
+    CHECK(quiet_pty.drain()=="ready");
+}

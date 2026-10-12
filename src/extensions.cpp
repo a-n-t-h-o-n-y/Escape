@@ -60,6 +60,45 @@ auto prepare_optional(TerminalProfile const& profile,
     return {};
 }
 }  // namespace
+void encode(SequenceWriter& out, Bell) { out.text("\x07"); }
+void encode(SequenceWriter& out, PlayNotes const& value)
+{
+    auto const duration = value.duration.count();
+    if (duration < 0 || duration > 255 * 31250 || duration % 31250 != 0)
+        throw std::invalid_argument{
+            "PlayNotes: duration must be 0..255 exact 31,250us ticks"};
+    if (value.volume > 7)
+        throw std::invalid_argument{"PlayNotes: volume must be 0..7"};
+    for (auto note : value.notes)
+        if (static_cast<unsigned>(note) > 25)
+            throw std::invalid_argument{"PlayNotes: note must be Rest or C5..C7"};
+    for (std::size_t start = 0; start < value.notes.size();) {
+        auto const end = start + (std::min)(std::size_t{16}, value.notes.size() - start);
+        out.text("\x1b[");
+        out.number(value.volume);
+        out.text(";");
+        out.number(static_cast<std::uint64_t>(duration / 31250));
+        for (; start < end; ++start) {
+            out.text(";");
+            out.number(static_cast<unsigned>(value.notes[start]));
+        }
+        out.text(",~");
+    }
+}
+void encode(SequenceWriter& out, PlayNotes const* value)
+{
+    if (value) encode(out, *value);
+}
+auto prepare(TerminalProfile const& profile, PlayNotes const& value)
+    -> PlayNotes const*
+{
+    SequenceWriter validation;
+    encode(validation, value);
+    if (profile.play_notes || value.notes.empty()) return &value;
+    if (profile.fallback == FallbackPolicy::Strict)
+        throw UnsupportedFeature{Feature::PlayNotes};
+    return nullptr;
+}
 void encode(SequenceWriter& out, CursorStyle style)
 {
     auto n = static_cast<unsigned>(style);
@@ -136,6 +175,13 @@ auto payload_overlaps(WindowTitle const& value,
                       char const* data,
                       std::size_t size) noexcept -> bool
 { return overlaps(value.text, data, size); }
+auto payload_overlaps(PlayNotes const& value,
+                      char const* data,
+                      std::size_t size) noexcept -> bool
+{
+    return overlaps({reinterpret_cast<char const*>(value.notes.data()),
+                     value.notes.size() * sizeof(Note)}, data, size);
+}
 auto payload_overlaps(BeginHyperlink const& value,
                       char const* data,
                       std::size_t size) noexcept -> bool
@@ -156,6 +202,7 @@ void relocate_payload(BeginHyperlink& value,
 #define ESC_PREPARE(Type, member, feature)                                           \
     auto prepare(TerminalProfile const& p, Type const& value) -> std::optional<Type> \
     { return prepare_optional(p, value, p.member, Feature::feature); }
+ESC_PREPARE(Bell, bell, Bell)
 ESC_PREPARE(CursorStyle, cursor_style, CursorStyle)
 ESC_PREPARE(SaveCursor, cursor_save_restore, CursorSaveRestore)
 ESC_PREPARE(RestoreCursor, cursor_save_restore, CursorSaveRestore)

@@ -110,6 +110,15 @@ Migration: replace `XColor::Red` with `colors::red` (and likewise for other name
 The redundant TrueColor/TColor, foreground/background, and encoded-color helper spellings are
 removed, along with the old Brush and escape-family APIs.
 
+## Bell and note playback
+
+`Bell{}` requests the terminal's configured bell. `PlayNotes` owns DECPS musical
+notes with per-note chrono duration and volume. Both compose with text and other
+commands. Profile-aware output uses separate `bell` and `play_notes` flags;
+unsupported requests are omitted under `BestEffort` and rejected under `Strict`.
+See [bell and note playback](terminal-extensions.md#bell-and-note-playback) for
+parameter ranges, explicit playback capability selection, and examples.
+
 ## Styled text, ownership, and nesting
 
 ```cpp

@@ -10,7 +10,10 @@ operations explicitly own I/O and state. There is no terminfo dependency.
 `editing`, `window_title`, `hyperlinks`, and `synchronized_output`. All default to
 false. Environment resolution and the automatic Windows profile leave these
 extensions disabled and report that support needs explicit selection. Existing
-features retain their earlier evidence. A report contains fifteen decisions.
+features retain their earlier evidence. The sound commands add independent `bell`
+and `play_notes` flags, both false by default; known terminal profiles enable
+basic bells, while DECPS playback requires explicit selection. A report contains
+seventeen decisions.
 
 Raw `encode`, `append_encoded`, and `encode_to` encode without checking a profile.
 Their profile overloads and `Terminal::write` use the selected capabilities.
@@ -217,3 +220,77 @@ cached input, and frame mode restoration. See [test status](../tests/contract/RE
 and [live acceptance checks](../tests/contract/live-terminals.md). Cross-builds
 establish compilation/linking; native Windows/Linux and emulator rendering checks
 remain separate pending evidence.
+
+## Bell and note playback
+
+`Bell{}` encodes one BEL byte (`0x07`). It requests the terminal's configured bell;
+that may be audible, visual, or muted. It does not change styles or modes and
+uses the same output buffering as other commands. Flush to deliver it immediately.
+
+```cpp
+terminal.write("Invalid input", esc::Bell{});
+terminal.flush();
+```
+
+`PlayNotes` owns a sequence of DECPS musical notes:
+
+```cpp
+using namespace esc;
+using namespace std::chrono_literals;
+
+auto chime = PlayNotes{
+    .notes = {Note::C5, Note::E5, Note::G5, Note::Rest, Note::C7},
+    .duration = 125ms,
+    .volume = 4,
+};
+auto bytes = encode(chime); // Pure encoding; no sound is played here.
+```
+
+Notes run chromatically from `C5` through `C7`. Sharps use `Cs5`, `Ds5`, `Fs5`,
+`Gs5`, `As5`, and the corresponding octave-6 names. `Rest` is silence. Duration
+is per note (including rests), stored in `std::chrono::microseconds`; it must be
+an exact multiple of 31,250 microseconds, between zero and 7,968,750 inclusive
+(0..255 DECPS ticks). Volume is 0..7; zero requests silent playback. Invalid
+parameters throw `std::invalid_argument` before destination mutation or output,
+even when playback would be omitted by a profile. Empty melodies emit nothing;
+their duration and volume still validate. Melodies longer than 16 notes are split
+into consecutive DECPS commands. Use multiple `PlayNotes` values for changes in
+duration or volume. Output never sleeps or waits for playback to finish.
+
+The encoding is `ESC [ volume ; ticks ; note [; note ...] , ~`, with note codes
+0 for rest and 1..25 for C5..C7. This follows the
+[DEC VT520 protocol](https://vt100.net/dec/ek-vt520-rm.pdf), supported by
+[Windows Terminal](https://github.com/microsoft/terminal/blob/main/src/terminal/adapter/adaptDispatch.cpp)
+and [mintty](https://github.com/mintty/mintty/wiki/CtrlSeqs#audio-support).
+Sound output and scheduling remain subject to the terminal's implementation and
+user configuration; writing successfully does not acknowledge audible playback.
+
+`TerminalProfile::bell` and `TerminalProfile::play_notes` are independent flags,
+both false by default. Bell can be enabled without cursor/color control;
+`play_notes=true` requires `control=true`. Under `BestEffort`, an unsupported
+command is omitted. Under `Strict`, it throws `UnsupportedFeature` with
+`Feature::Bell` or `Feature::PlayNotes`. An empty, valid melody remains a no-op
+under either policy. Playback never automatically falls back to a bell.
+
+Known TERM entries enable basic bell support when output is a terminal.
+Unrecognized TERM values and redirected output retain the plain fallback.
+`NO_COLOR` does not affect bells. DECPS playback always requires an explicit
+profile; neither `TERM=xterm` nor Windows VT mode establishes playback support.
+For a terminal known to support DECPS, open the session with a caller-supplied
+profile:
+
+```cpp
+auto profile = resolve_profile(snapshot_environment(), true).profile;
+profile.control = true;
+profile.bell = true;
+profile.play_notes = true;
+auto options = TerminalOptions{};
+options.profile = profile;
+auto terminal = Terminal::open(options);
+terminal.write(chime);
+terminal.flush();
+```
+
+Raw `encode`, `Output::write`, and free `write` always emit the requested command;
+only profile-aware output applies capability policy. `Bell` and `PlayNotes` can
+also be placed in `sequence` values, and melodies retain their owned notes.

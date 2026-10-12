@@ -2,6 +2,7 @@
 #include <climits>
 #include <esc/esc.hpp>
 #include "support/allocations.hpp"
+#include "support/encoding.hpp"
 #include "support/test.hpp"
 using namespace esc;
 namespace {
@@ -177,7 +178,7 @@ TEST(CAP_EXT_report_lists_each_new_feature_without_environment_guesses)
                           Feature::Scrolling,         Feature::Editing,
                           Feature::WindowTitle,       Feature::Hyperlinks,
                           Feature::SynchronizedOutput};
-    CHECK(report.decisions.size() == 15);
+    CHECK(report.decisions.size() == 17);
     for (std::size_t i = 0; i < 7; ++i) {
         CHECK(report.decisions[i + 8].feature == expected[i]);
         CHECK(report.decisions[i + 8].source == EvidenceSource::Default);
@@ -211,4 +212,116 @@ TEST(ENC_EXT_ascii_payload_scanning_preserves_validation_at_every_word_offset)
         CHECK_THROWS(std::invalid_argument, append_encoded(destination, WindowTitle{payload}));
         CHECK(destination == "prefix");
     }
+}
+
+static_assert(DrawingCommand<Bell> && DrawingCommand<PlayNotes>);
+static_assert(Drawable<decltype(sequence(Bell{}, PlayNotes{}))>);
+
+TEST(ENC_SOUND_bell_and_melody_have_literal_wire_encodings)
+{
+    using namespace std::chrono_literals;
+    contract::encodes("\x07", Bell{});
+    contract::encodes("\x1b[4;4;1;5;8,~",
+                     PlayNotes{.notes={Note::C5, Note::E5, Note::G5},
+                               .duration=125ms, .volume=4});
+    contract::encodes("\x1b[7;1;0;25,~",
+                     PlayNotes{.notes={Note::Rest, Note::C7},
+                               .duration=31250us, .volume=7});
+    contract::encodes("\x1b[0;255;1,~",
+                     PlayNotes{.notes={Note::C5}, .duration=7968750us, .volume=0});
+    contract::encodes("\x1b[4;0;1,~", PlayNotes{.notes={Note::C5}, .duration=0us});
+    contract::encodes("", PlayNotes{});
+    std::string expected="\x1b[4;4";
+    for (unsigned i=1; i<=25; ++i) {
+        contract::encodes("\x1b[4;4;" + std::to_string(i) + ",~",
+                         PlayNotes{.notes={static_cast<Note>(i)}});
+    }
+    PlayNotes long_melody{.notes=std::vector<Note>(17, Note::C5)};
+    for (unsigned i=0; i<16; ++i) expected += ";1";
+    expected += ",~\x1b[4;4;1,~";
+    contract::encodes(expected, long_melody);
+    auto owned=sequence(PlayNotes{.notes={Note::C5}});
+    contract::encodes("a\x07\x1b[4;4;1,~z", "a", Bell{}, owned, "z");
+}
+TEST(ENC_SOUND_invalid_melodies_validate_before_any_output)
+{
+    using namespace std::chrono_literals;
+    std::vector<PlayNotes> invalid = {
+        {.notes={Note::C5}, .duration=-31250us},
+        {.notes={Note::C5}, .duration=1us},
+        {.notes={Note::C5}, .duration=100ms},
+        {.notes={Note::C5}, .duration=8000000us},
+        {.notes={Note::C5}, .volume=8},
+        {.notes={Note::C5, static_cast<Note>(26)}},
+        {.notes={}, .volume=8}};
+    for (auto const& value : invalid) {
+        CHECK_THROWS(std::invalid_argument, encode(value));
+        CHECK_THROWS(std::invalid_argument, encode(TerminalProfile{}, value));
+        std::string output="unchanged";
+        CHECK_THROWS(std::invalid_argument, append_encoded(output, Bell{}, value));
+        CHECK(output=="unchanged");
+        std::array<char,128> bytes;
+        bytes.fill('#');
+        auto before=bytes;
+        CHECK_THROWS(std::invalid_argument, encode_to(bytes, "prefix", value));
+        CHECK(bytes==before);
+        CHECK_THROWS(std::invalid_argument, encode_to(std::span<char>{}, value));
+    }
+    PlayNotes alias{.notes={Note::C5}};
+    alias.notes.reserve(128);
+    auto const before=alias.notes;
+    CHECK_THROWS(std::invalid_argument,
+                 encode_to(std::span{reinterpret_cast<char*>(alias.notes.data()),
+                                     alias.notes.capacity()}, alias));
+    CHECK(alias.notes==before);
+}
+TEST(CAP_SOUND_bell_and_playback_are_independent_optional_features)
+{
+    PlayNotes melody{.notes={Note::C5}};
+    TerminalProfile profile;
+    CHECK(encode(profile, Bell{}, melody).empty());
+    profile.bell=true; // BEL does not require cursor/color control.
+    CHECK(encode(profile, Bell{}, melody)=="\x07");
+    profile.fallback=FallbackPolicy::Strict;
+    CHECK(encode(profile, Bell{})=="\x07");
+    CHECK(encode(profile, PlayNotes{}).empty());
+    try { static_cast<void>(encode(profile, melody)); CHECK(false); }
+    catch (UnsupportedFeature const& e) { CHECK(e.feature()==Feature::PlayNotes); }
+    profile.bell=false;
+    try { static_cast<void>(encode(profile, Bell{})); CHECK(false); }
+    catch (UnsupportedFeature const& e) { CHECK(e.feature()==Feature::Bell); }
+    profile.control=true;
+    profile.play_notes=true;
+    CHECK(encode(profile, melody)=="\x1b[4;4;1,~");
+    profile.control=false;
+    CHECK_THROWS(std::invalid_argument, encode(profile, melody));
+    auto report=resolve_profile(Environment{"xterm-256color", "", true}, true);
+    CHECK(report.profile.bell && !report.profile.play_notes);
+    CHECK(report.decisions[15].feature==Feature::Bell);
+    CHECK(report.decisions[15].source==EvidenceSource::KnownTerminal);
+    CHECK(report.decisions[16].feature==Feature::PlayNotes);
+    CHECK(report.decisions[16].source==EvidenceSource::Default);
+    CHECK(!resolve_profile(Environment{"xterm", "", false}, false).profile.bell);
+    CHECK(!resolve_profile(Environment{"unknown", "", false}, true).profile.bell);
+}
+TEST(BUF_SOUND_preallocated_encoding_does_not_copy_the_melody)
+{
+    PlayNotes melody{.notes=std::vector<Note>(100, Note::C5)};
+    TerminalProfile profile;
+    profile.control=true;
+    profile.play_notes=true;
+    profile.bell=true;
+    std::array<char,1024> bytes;
+    std::string output;
+    output.reserve(1024);
+    std::size_t allocations;
+    {
+        contract::AllocationScope scope;
+        auto result=encode_to(bytes, profile, Bell{}, melody);
+        CHECK(result.written==result.required && result.written>0);
+        append_encoded(output, profile, Bell{}, melody);
+        allocations=scope.count();
+    }
+    CHECK(allocations==0);
+    CHECK(output==encode(Bell{}, melody));
 }

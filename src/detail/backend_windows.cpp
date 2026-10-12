@@ -406,6 +406,7 @@ auto session_profile(int, int output) -> ProfileReport
     }
     profile.traits = Trait::Bold | Trait::Underline | Trait::Inverse;
     profile.alternate_screen = profile.cursor_visibility = true;
+    profile.bell = true;
     ProfileReport result{profile, {}};
     constexpr Feature features[] = {
         Feature::Control,         Feature::Colors,           Feature::Traits,
@@ -420,6 +421,10 @@ auto session_profile(int, int output) -> ProfileReport
                                "NO_COLOR disables colors"};
     for (auto feature : {Feature::CursorStyle, Feature::CursorSaveRestore, Feature::Scrolling, Feature::Editing, Feature::WindowTitle, Feature::Hyperlinks, Feature::SynchronizedOutput})
         result.decisions.push_back({feature, EvidenceSource::Default, "Extension support requires an explicit profile or explicit probe"});
+    result.decisions.push_back({Feature::Bell, EvidenceSource::KnownTerminal,
+                               "Windows console baseline supports BEL"});
+    result.decisions.push_back({Feature::PlayNotes, EvidenceSource::Default,
+                               "DECPS playback requires an explicit profile"});
     return result;
 }
 auto get_attributes(int input, int output, Attributes* settings) -> int

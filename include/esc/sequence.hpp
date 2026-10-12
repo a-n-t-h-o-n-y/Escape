@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -10,6 +11,7 @@
 #include <string_view>
 #include <tuple>
 #include <type_traits>
+#include <vector>
 
 #include <algorithm>
 #include <array>
@@ -43,6 +45,24 @@ struct BlankScreen {
     Erase extent = Erase::All;
 };
 struct ResetStyle {};
+
+// Request the terminal's configured audible/visual bell. Does not flush output.
+struct Bell {};
+
+// DECPS note identities: Rest = 0; C5 through C7 = 1 through 25.
+enum class Note : std::uint8_t {
+    Rest, C5, Cs5, D5, Ds5, E5, F5, Fs5, G5, Gs5, A5, As5, B5,
+    C6, Cs6, D6, Ds6, E6, F6, Fs6, G6, Gs6, A6, As6, B6, C7
+};
+
+// Owns the melody. Duration is per note, including rests; no application sleeps.
+// Require 0..255 exact 31,250us ticks and volume 0..7. Empty notes emit nothing.
+// Long melodies are encoded as consecutive DECPS commands of up to 16 notes.
+struct PlayNotes {
+    std::vector<Note> notes;
+    std::chrono::microseconds duration = std::chrono::milliseconds{125};
+    unsigned volume = 4;
+};
 enum class CursorStyle {
     Default,
     BlinkingBlock,
@@ -105,6 +125,8 @@ concept DrawingCommand = detail::AnyOf<std::remove_cvref_t<T>,
                                        BlankRow,
                                        BlankScreen,
                                        ResetStyle,
+                                       Bell,
+                                       PlayNotes,
                                        Trait,
                                        Traits,
                                        ColorFG,
@@ -169,6 +191,9 @@ void encode(SequenceWriter&, MoveCursor);
 void encode(SequenceWriter&, BlankRow);
 void encode(SequenceWriter&, BlankScreen);
 void encode(SequenceWriter&, ResetStyle);
+void encode(SequenceWriter&, Bell);
+void encode(SequenceWriter&, PlayNotes const&);
+void encode(SequenceWriter&, PlayNotes const*);
 void encode(SequenceWriter&, Trait);
 void encode(SequenceWriter&, Traits);
 void encode(SequenceWriter&, ColorFG const&);
@@ -213,6 +238,9 @@ auto prepare(TerminalProfile const&, MoveCursor const&) -> std::optional<MoveCur
 auto prepare(TerminalProfile const&, BlankRow const&) -> std::optional<BlankRow>;
 auto prepare(TerminalProfile const&, BlankScreen const&) -> std::optional<BlankScreen>;
 auto prepare(TerminalProfile const&, ResetStyle const&) -> std::optional<ResetStyle>;
+auto prepare(TerminalProfile const&, Bell const&) -> std::optional<Bell>;
+// Borrow the owned payload for this encoding pass, avoiding melody copies.
+auto prepare(TerminalProfile const&, PlayNotes const&) -> PlayNotes const*;
 auto prepare(TerminalProfile const&, Traits const&) -> std::optional<Traits>;
 auto prepare(TerminalProfile const&, ColorFG const&) -> std::optional<ColorFG>;
 auto prepare(TerminalProfile const&, ColorBG const&) -> std::optional<ColorBG>;
@@ -257,6 +285,7 @@ auto overlaps(std::string_view input, char const* storage, std::size_t size) noe
     -> bool;
 auto payload_overlaps(WindowTitle const&, char const*, std::size_t) noexcept -> bool;
 auto payload_overlaps(BeginHyperlink const&, char const*, std::size_t) noexcept -> bool;
+auto payload_overlaps(PlayNotes const&, char const*, std::size_t) noexcept -> bool;
 void relocate_payload(WindowTitle&, char const*, std::size_t, char const*);
 void relocate_payload(BeginHyperlink&, char const*, std::size_t, char const*);
 
@@ -397,7 +426,8 @@ auto value_overlaps(T const& value, char const* storage, std::size_t size) -> bo
                          view.size() * sizeof(char32_t)},
                         storage, size);
     }
-    else if constexpr (std::same_as<V, WindowTitle> || std::same_as<V, BeginHyperlink>)
+    else if constexpr (std::same_as<V, WindowTitle> || std::same_as<V, BeginHyperlink> ||
+                       std::same_as<V, PlayNotes>)
         return payload_overlaps(value, storage, size);
     else if constexpr (GlyphRange<V const>) {
         if constexpr (std::ranges::contiguous_range<V const>)

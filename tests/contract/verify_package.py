@@ -34,6 +34,7 @@ int main() {
     if (esc::match(timeout, [](esc::Event const&) { return 1; },
                    [](esc::Timeout) { return 2; }, [](esc::EndOfInput) { return 3; }) != 2) return 11;
     if (!esc::KeyEvent{U'q'}.matches(U'q')) return 12;
+    if (esc::encode(esc::Bell{}, esc::PlayNotes{.notes={esc::Note::C5}}) != "\x07\x1b[4;4;1,~") return 13;
     return 0;
 }
 '''
