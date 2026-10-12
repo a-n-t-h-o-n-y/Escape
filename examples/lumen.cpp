@@ -394,63 +394,56 @@ class Warp {
 class Julia {
     int width = 0, height = 0;
     Vec parameter{-0.745, 0.186}, target = parameter;
-    long double center_x = 0, center_y = 0;
+    lumen::FractalPoint center;
     double time = 0;
-    lumen::Zoom zoom;
+    lumen::JuliaView view;
     long double scale = 1;
     unsigned iterations = 40;
     bool extended = false;
-    bool following = false;
 
    public:
     void resize(int columns, int rows)
     {
         width = columns;
         height = rows * 2;
+        view.resize(width, height);
     }
 
     void aim(Point at)
     {
         target = {-0.745 + (double(at.x) / std::max(1, width) - 0.5) * 0.35,
                   0.186 + (double((at.y - 1) * 2) / std::max(1, height) - 0.5) * 0.4};
-        following = true;
     }
 
-    void splash(Point at)
+    void aim(MouseMove const& mouse)
     {
-        auto pixel_scale = zoom.pixel_scale(height);
-        center_x += (at.x - width * 0.5L) * pixel_scale;
-        center_y += ((at.y - 1) * 2 - height * 0.5L) * pixel_scale;
-        zoom.magnify();
-        target = parameter;
-        following = true;
+        if (mouse.held_button == MouseButton::Left) aim(mouse.at);
     }
 
-    void shift(int steps)
+    void splash(Point at) { aim(at); }
+
+    void shift(Point at, int steps)
     {
-        zoom.scroll(steps);
+        view.scroll(at, steps);
         target = parameter;
-        following = true;
     }
 
     void step(double elapsed)
     {
         double dt = std::min(elapsed, 0.1);
         time += dt;
-        if (!following)
-            target = {-0.745 + std::sin(time * 0.3) * 0.025,
-                      0.186 + std::cos(time * 0.23) * 0.03};
         double follow = 1 - std::exp(-dt * 4);
         parameter.x += (target.x - parameter.x) * follow;
         parameter.y += (target.y - parameter.y) * follow;
-        zoom.step(follow);
+        view.step(follow);
     }
 
     void prepare()
     {
-        scale = zoom.pixel_scale(height);
-        extended = zoom.logarithm() > std::log(1e6L);
-        auto depth = std::max(0.0L, zoom.logarithm()) / std::log(2.0L);
+        scale = view.pixel_scale();
+        center = view.position();
+        extended = view.logarithm() > std::log(1e6L);
+        auto depth = std::max(0.0L, view.logarithm()) / std::log(2.0L);
         iterations = 40 + static_cast<unsigned>(std::min(depth * 8, 984.0L));
     }
 
@@ -458,9 +451,9 @@ class Julia {
     template <class Number>
     auto sample_at(double x, double y) const -> RGB
     {
-        Number zx = static_cast<Number>(center_x) +
+        Number zx = static_cast<Number>(center.x) +
                     static_cast<Number>(x - width * 0.5) * static_cast<Number>(scale);
-        Number zy = static_cast<Number>(center_y) +
+        Number zy = static_cast<Number>(center.y) +
                     static_cast<Number>(y - height * 0.5) * static_cast<Number>(scale);
         unsigned iteration = 0;
         Number magnitude = 0;
@@ -491,8 +484,7 @@ constexpr std::array<std::string_view, 4> titles = {"Liquid", "Tide", "Warp", "J
 constexpr std::array<std::string_view, 4> controls = {
     "mouse steer | click ripple | wheel color",
     "mouse disturb | click splash | wheel strength",
-    "mouse steer | click boost | wheel speed",
-    "mouse morph | click recenter | wheel zoom"};
+    "mouse steer | click boost | wheel speed", "drag morph | wheel zoom at mouse"};
 
 template <class Scene>
 void encode_frame(Scene& scene,
@@ -640,7 +632,12 @@ int main()
                         },
                         [&](MouseMove const& mouse) {
                             if (mouse.at.y > 0 && mouse.at.y < area.height - 1)
-                                active_scene([&](auto& scene) { scene.aim(mouse.at); });
+                                active_scene([&](auto& scene) {
+                                    if constexpr (requires { scene.aim(mouse); })
+                                        scene.aim(mouse);
+                                    else
+                                        scene.aim(mouse.at);
+                                });
                         },
                         [&](MousePress const& mouse) {
                             if (mouse.button != MouseButton::Left) return;
@@ -653,7 +650,16 @@ int main()
                                     [&](auto& scene) { scene.splash(mouse.at); });
                         },
                         [&](MouseWheel const& mouse) {
-                            active_scene([&](auto& scene) { scene.shift(mouse.dy); });
+                            active_scene([&](auto& scene) {
+                                if constexpr (requires {
+                                                  scene.shift(mouse.at, mouse.dy);
+                                              }) {
+                                    if (mouse.at.y > 0 && mouse.at.y < area.height - 1)
+                                        scene.shift(mouse.at, mouse.dy);
+                                }
+                                else
+                                    scene.shift(mouse.dy);
+                            });
                             dirty = true;
                         },
                         [&](auto const&) {});

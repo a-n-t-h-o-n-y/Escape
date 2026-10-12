@@ -145,10 +145,11 @@ Lumen is a gallery of four interactive demos. Switch with Tab/Shift+Tab, Left/Ri
 | Liquid | A glowing spring-driven comet; move to steer, click for ripples, wheel for color |
 | Tide | A damped wave simulation with refracted light; move to disturb, click to splash, wheel for strength |
 | Warp | A perspective starfield; move to steer, click to boost, wheel for speed |
-| Julia | An animated Julia fractal; move to morph, click to recenter, wheel up to zoom in and down to zoom out |
+| Julia | An animated Julia fractal; left-drag to morph, wheel up to zoom in at the pointer and down to zoom out |
 
-Julia has no fixed magnification cap. Zooming stops automatic morphing so the
-fractal stays still while exploring; moving the mouse still morphs it. Deeper views
+Julia has no fixed magnification cap. Hovering leaves its shape unchanged;
+hold the left mouse button and drag to morph it. Smooth zoom keeps the point
+under the mouse fixed throughout the animation. Deeper views
 use more iterations and extended precision where available. Floating-point
 precision eventually limits visible detail, so this is not arbitrary-precision
 infinite zoom.

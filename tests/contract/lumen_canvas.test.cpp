@@ -146,16 +146,16 @@ TEST(LUMEN_scroll_up_zooms_in_and_down_reverses_it)
     CHECK(std::abs(zoom.pixel_scale(100) - initial) < 1e-15L);
 }
 
-TEST(LUMEN_wheel_and_click_zoom_continue_beyond_thirty_times)
+TEST(LUMEN_wheel_zoom_continues_beyond_thirty_times)
 {
     lumen::Zoom zoom;
     zoom.scroll(-100);
     zoom.step(1);
     CHECK(std::exp(zoom.logarithm()) > 1e7L);
     auto before = zoom.pixel_scale(100);
-    zoom.magnify();
+    zoom.scroll(-1);
     zoom.step(1);
-    CHECK(std::abs(zoom.pixel_scale(100) * 1.4L / before - 1) < 1e-12L);
+    CHECK(std::abs(zoom.pixel_scale(100) * 1.2L / before - 1) < 1e-12L);
 }
 
 TEST(LUMEN_extreme_zoom_stays_finite_and_can_zoom_back_out)
@@ -163,7 +163,7 @@ TEST(LUMEN_extreme_zoom_stays_finite_and_can_zoom_back_out)
     lumen::Zoom zoom;
     for (unsigned i = 0; i < 10; ++i) {
         zoom.scroll(std::numeric_limits<int>::min());
-        zoom.magnify();
+        zoom.scroll(-1);
         zoom.step(0.5);
         CHECK(std::isfinite(zoom.logarithm()));
         CHECK(std::isfinite(zoom.pixel_scale(0)));
@@ -172,4 +172,42 @@ TEST(LUMEN_extreme_zoom_stays_finite_and_can_zoom_back_out)
     zoom.scroll(std::numeric_limits<int>::max());
     zoom.step(1);
     CHECK(std::abs(zoom.pixel_scale(100) - 3.4L / 100 / 0.3L) < 1e-15L);
+}
+
+TEST(LUMEN_zoom_keeps_mouse_point_fixed_during_every_animation_step)
+{
+    lumen::JuliaView view;
+    view.resize(200, 100);
+    auto expected = view.point(150.5L, 69.0L);
+    view.scroll(Point{150, 35}, -10);
+    for (unsigned frame = 0; frame < 30; ++frame) {
+        view.step(0.2);
+        auto actual = view.point(150.5L, 69.0L);
+        CHECK(std::abs(actual.x - expected.x) < 1e-14L);
+        CHECK(std::abs(actual.y - expected.y) < 1e-14L);
+    }
+    // Moving the pointer while zoom is still easing replaces the anchor.
+    expected = view.point(10.5L, 29.0L);
+    view.scroll(Point{10, 15}, 4);
+    for (unsigned frame = 0; frame < 30; ++frame) {
+        view.step(0.3);
+        auto actual = view.point(10.5L, 29.0L);
+        CHECK(std::abs(actual.x - expected.x) < 1e-14L);
+        CHECK(std::abs(actual.y - expected.y) < 1e-14L);
+    }
+}
+
+TEST(LUMEN_resize_clears_old_zoom_anchor_and_preserves_view_center)
+{
+    lumen::JuliaView view;
+    view.resize(200, 100);
+    view.scroll(Point{199, 49}, -20);
+    view.step(0.2);
+    auto center = view.position();
+    view.resize(800, 400);
+    view.step(0.3);
+    CHECK(view.position().x == center.x);
+    CHECK(view.position().y == center.y);
+    auto mapped = view.point(400, 200);
+    CHECK(mapped.x == center.x && mapped.y == center.y);
 }

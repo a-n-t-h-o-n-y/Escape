@@ -3,6 +3,7 @@ import argparse
 import fcntl
 import os
 import pty
+import re
 import select
 import struct
 import subprocess
@@ -36,6 +37,22 @@ def run(binary, width=100, height=30, quit_key=b"q", synchronize=False):
         assert start >= 0 and end > start
         return data[start:end]
 
+    def interior_mask(data):
+        foreground = background = None
+        mask = []
+        for style, red, green, blue, pixel in re.findall(
+                rb"\x1b\[(38|48);2;(\d+);(\d+);(\d+)m|(\xe2\x96\x80)", data):
+            if pixel:
+                mask.extend((foreground == (8, 9, 28), background == (8, 9, 28)))
+            else:
+                color = (int(red), int(green), int(blue))
+                if style == b"38":
+                    foreground = color
+                else:
+                    background = color
+        assert len(mask) == (width - 1) * (height - 2) * 2
+        return mask
+
     def send(keys, marker):
         start = len(output)
         os.write(master, keys)
@@ -66,14 +83,28 @@ def run(binary, width=100, height=30, quit_key=b"q", synchronize=False):
             for key, hint in [(b"1", b"mouse steer | click ripple"),
                               (b"2", b"mouse disturb | click splash"),
                               (b"3", b"mouse steer | click boost"),
-                              (b"4", b"mouse morph | click recenter")]:
+                              (b"4", b"drag morph | wheel zoom")]:
                 data = send(key, hint)
                 frame = complete_frame(data, height, hint)
                 images.append(frame[frame.find(b"\x1b[2;1H"):])
+                if key == b"4":
+                    data = send(b" ", b"PAUSED")
+                    original = interior_mask(complete_frame(data, height, b"PAUSED"))
+                    send(b" ", b"space pause")
+                    os.write(master, b"\x1b[<35;95;28M")
+                    time.sleep(0.25)
+                    data = send(b" ", b"PAUSED")
+                    assert interior_mask(complete_frame(data, height, b"PAUSED")) == original
+                    os.write(master, b"\x1b[<0;30;10M\x1b[<32;95;28M\x1b[<0;95;28m")
+                    send(b" ", b"space pause")
+                    time.sleep(0.35)
+                    data = send(b" ", b"PAUSED")
+                    assert interior_mask(complete_frame(data, height, b"PAUSED")) != original
+                    send(b" ", b"space pause")
                 send(b"\x1b[<35;65;14M\x1b[<0;65;14M\x1b[<64;65;14M", hint)
             assert len(set(images)) == 4
             send(b"\t", b"mouse steer | click ripple")
-            send(b"\x1b[Z", b"mouse morph | click recenter")
+            send(b"\x1b[Z", b"drag morph | wheel zoom")
             send(b"\x1b[<0;22;1M", b"mouse disturb | click splash")
             send(b" ", b"PAUSED")
             send(b"3", b" 3 Warp")
@@ -92,7 +123,7 @@ def run(binary, width=100, height=30, quit_key=b"q", synchronize=False):
             assert frame.count("▀".encode()) == 479 * 138
             send(b"\x1b[<35;450;130M", b"space pause")
             for key, hint in [(b"2", b"mouse disturb"), (b"3", b"click boost"),
-                              (b"4", b"mouse morph"), (b"1", b"click ripple")]:
+                              (b"4", b"drag morph"), (b"1", b"click ripple")]:
                 data = send(key, hint)
                 frame = complete_frame(data, 140, hint)
                 assert b"\x1b[139;1H" in frame
