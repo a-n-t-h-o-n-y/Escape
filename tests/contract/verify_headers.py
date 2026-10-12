@@ -1,4 +1,4 @@
-"""PKG-01: each proposed public header stands alone without private dependencies."""
+"""PKG-01: each public header stands alone without private dependencies."""
 
 import argparse
 import pathlib
@@ -35,7 +35,7 @@ def main():
             leaked = [line for line in (result.stdout + result.stderr).replace("\\", "/").splitlines() if any(name in line for name in forbidden)]
             if result.returncode or leaked:
                 failures.append(header)
-                print(f"FAIL esc/{header}.hpp\n{result.stderr}")
+                print(f"FAIL esc/{header}.hpp\n{result.stdout}{result.stderr}")
             else:
                 print(f"PASS esc/{header}.hpp")
         if not failures:

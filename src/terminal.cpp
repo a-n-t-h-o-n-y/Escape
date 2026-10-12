@@ -117,7 +117,12 @@ void validate_transition(TerminalProfile const& profile,
     auto changed = changed_modes(before, after);
     if (changed[0]) require(profile.alternate_screen, Feature::AlternateScreen);
     if (changed[1]) require(profile.cursor_visibility, Feature::CursorVisibility);
-    if (changed[2]) (void)detail::prepare(profile, after.mouse);
+    if (changed[2]) {
+        require(after.mouse.mode == MouseMode::Off ||
+                    profile.mouse_protocol != MouseProtocol::None,
+                Feature::Mouse);
+        (void)detail::prepare(profile, after.mouse);
+    }
     if (changed[3]) require(profile.focus_reporting, Feature::Focus);
     if (changed[4]) require(profile.bracketed_paste, Feature::BracketedPaste);
 }

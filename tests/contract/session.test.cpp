@@ -542,3 +542,25 @@ TEST(SES_02_modern_terminal_names_open_interactive_without_overrides)
         terminal.close();
     }
 }
+
+TEST(SES_mouse_without_supported_protocol_rejects_before_effects)
+{
+    contract::Pty pty;
+    auto config = options();
+    config.profile->mouse_protocol = MouseProtocol::None;
+    config.profile->maximum_mouse_mode = MouseMode::Off;
+    auto before = pty.settings();
+    auto terminal = Terminal::open(streams(pty), config);
+    CHECK_THROWS(UnsupportedFeature, terminal.set(Echo::Off, MouseMode::Move));
+    CHECK(contract::same_settings(before, pty.settings()));
+    CHECK(pty.drain().empty());
+    terminal.close();
+
+    config.mouse = MouseMode::Basic;
+    CHECK_THROWS(UnsupportedFeature, Terminal::open(streams(pty), config));
+    CHECK(contract::same_settings(before, pty.settings()));
+    CHECK(pty.drain().empty());
+    config.mouse = MouseMode::Off;
+    auto reopened = Terminal::open(streams(pty), config);
+    CHECK(reopened.is_open());
+}
