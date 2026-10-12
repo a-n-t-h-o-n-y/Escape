@@ -25,6 +25,12 @@ if(UNIX AND (ESCAPE_BUILD_TESTS OR ESCAPE_BUILD_CONTRACT_TESTS))
                 --event-loop "$<TARGET_FILE:escape.examples.event-loop>")
         set_tests_properties(escape.contract.EXAMPLES.smoke
             PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
+        add_test(NAME escape.contract.TERMCAPS.interactive
+            COMMAND "${Python3_EXECUTABLE}"
+                "${PROJECT_SOURCE_DIR}/tests/contract/smoke_termcaps.py"
+                --termcaps "$<TARGET_FILE:termcaps>")
+        set_tests_properties(escape.contract.TERMCAPS.interactive
+            PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
     endif()
 endif()
 
