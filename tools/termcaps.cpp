@@ -22,6 +22,13 @@ constexpr std::array<std::string_view, 10> pages = {
     "System palette", "256 colors",     "True color",      "Text styles",
     "Unicode",        "Input events",   "Cursor controls", "Hyperlinks",
     "Sound",          "Probe & results"};
+constexpr std::array cursor_styles = {
+    CursorStyle::BlinkingBlock,   CursorStyle::BlinkingUnderline,
+    CursorStyle::BlinkingBar,     CursorStyle::SteadyBlock,
+    CursorStyle::SteadyUnderline, CursorStyle::SteadyBar};
+constexpr std::array<std::string_view, 6> cursor_names = {
+    "Blinking block", "Blinking underline", "Blinking bar",
+    "Steady block",   "Steady underline",   "Steady bar"};
 constexpr std::array<std::string_view, 17> features = {"Control sequences",
                                                        "Colors",
                                                        "Text styles",
@@ -314,8 +321,6 @@ class Tester {
                          std::string(static_cast<std::size_t>(12 - cells), ' ') + "| " +
                          std::to_string(cells) + " cells");
                 }
-                ++y;
-                line("Font coverage and terminal width rules matter.");
                 break;
             case 5:
                 heading("LIVE INPUT");
@@ -332,6 +337,7 @@ class Tester {
                 heading("CURSOR CONTROLS");
                 line("c cycle cursor shape   h toggle visibility");
                 line("s save/restore   e editing   r scrolling");
+                line("Shape: " + std::string{cursor_names[cursor_shape]});
                 ++y;
                 cursor_y = y;
                 line("Cursor target: [ ]");
@@ -438,8 +444,7 @@ class Tester {
                 i == page ? Traits{inverse} : Traits{});
         }
         row(2, size.height - 4, message, {}, true);
-        row(2, size.height - 3,
-            "Arrows / 1-0 pages   p probe   q quit", bold);
+        row(2, size.height - 3, "Arrows / 1-0 pages   p probe   q quit", bold);
         row(2, size.height - 2, "Page: " + std::string{pages[page]});
         // Full styled rows restore defaults; samples deliberately bypass fallback.
         if (cursor_visible && page == 6)
@@ -543,33 +548,38 @@ class Tester {
             else if (page == 8 && c == 'b') {
                 terminal.output().write(Bell{});
                 terminal.flush();
-                message =
-                    "Bell requested. Mark y if the terminal responded as expected.";
+                message = "Bell sent.";
             }
             else if (page == 8 && c == 'n') {
                 terminal.output().write(
                     PlayNotes{.notes = {Note::C5, Note::E5, Note::G5, Note::C6},
                               .duration = 125ms});
                 terminal.flush();
-                message = "DECPS chime sent. Silence does not establish support.";
+                message = "DECPS chime sent.";
             }
             else if (page == 6 && c == 'h') {
                 cursor_visible = !cursor_visible;
                 terminal.set(cursor_visible ? CursorMode::Show : CursorMode::Hide);
             }
             else if (page == 6 && c == 'c') {
-                cursor_shape = cursor_shape % 6 + 1;
+                cursor_shape = (cursor_shape + 1) % cursor_styles.size();
                 cursor_visible = true;
                 terminal.set(CursorMode::Show);
-                terminal.output().write(static_cast<CursorStyle>(cursor_shape));
+                terminal.output().write(cursor_styles[cursor_shape]);
                 terminal.flush();
-                message = "Requested cursor shape " + std::to_string(cursor_shape) +
-                          "; inspect the target.";
+                message = std::string{cursor_names[cursor_shape]};
             }
             else if (page == 6 && (c == 's' || c == 'e' || c == 'r')) {
                 control_sample = static_cast<char>(c);
                 message = "Compare the control sample with its expected result.";
             }
+        }
+        if (old_page != 6 && page == 6) {
+            cursor_shape = 0;
+            cursor_visible = true;
+            terminal.set(CursorMode::Show);
+            terminal.output().write(cursor_styles[cursor_shape]);
+            terminal.flush();
         }
         if (old_page == 6 && page != 6) {
             cursor_visible = false;

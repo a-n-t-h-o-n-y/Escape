@@ -36,8 +36,8 @@ bytes are escaped and never replayed into the terminal. Global shortcuts, includ
 `q`, remain reserved while inspecting keys. Rendering is limited to 20 frames per
 second so mouse movement does not trigger an unbounded redraw rate.
 
-Cursor controls: `c` cycles the six explicit cursor shapes and shows the cursor at
-the target; `h` toggles visibility. `s` should place `PASS` below the target, leaving
+Cursor controls: the page opens with a blinking block at the target. `c` cycles
+block, underline, and bar, first blinking and then steady; `h` toggles visibility. `s` should place `PASS` below the target, leaving
 `decoy` elsewhere. `e` edits `ABCD` into `AC!D` using deletion and insertion. `r`
 scrolls a three-line region into `row 2`, `row 3`, and `tail`. Leaving the cursor
 page hides the cursor and resets its shape.

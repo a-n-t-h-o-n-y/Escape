@@ -102,15 +102,22 @@ def main(binary):
         s.send(b"\x1b[<0;10;11M", b"Mouse press button 1 at 9,10")
         s.send(b"\x1b[I", b"Focus gained")
         s.send(b"\x1b[200~hello\x1b[31m\x1b[201~", b"hello\\x1B[31m")
-        s.send(b"7s", b"PASS")
+        output = s.send(b"7", b"Shape: Blinking block")
+        assert b"\x1b[1 q" in output and b"\x1b[?25h" in output
+        s.send(b"s", b"PASS")
         s.send(b"e", b"Expect AC!D")
         assert b"\x1b[1P" in s.output and b"\x1b[1@" in s.output
         s.send(b"r", b"Expect row 2")
-        s.send(b"c", b"Requested cursor shape")
+        for code, name in [(3, b"Blinking underline"), (5, b"Blinking bar"),
+                           (2, b"Steady block"), (4, b"Steady underline"),
+                           (6, b"Steady bar"), (1, b"Blinking block")]:
+            output = s.send(b"c", b"Shape: " + name)
+            assert ("\x1b[%d q" % code).encode() in output
+        assert b"Font coverage and terminal width rules matter." not in s.output
         s.send(b"8", b"OSC 8 HYPERLINKS")
         assert b"\x1b]8;;https://" in s.output
         s.send(b"9", b"BELL / DECPS SOUND")
-        s.send(b"b", b"Bell requested")
+        s.send(b"b", b"Bell sent")
         assert b"\x07" in s.output
         s.send(b"n", b"DECPS chime sent")
         assert b"\x1b[4;4;1;5;8;13,~" in s.output
