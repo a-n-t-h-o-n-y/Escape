@@ -10,36 +10,35 @@ namespace {
 auto unsupported_message(Feature feature) -> char const*
 {
     switch (feature) {
-        case Feature::Control:
-            return "Terminal profile does not support cursor control";
+        case Feature::Control: return "Terminal profile does not enable cursor control";
         case Feature::Colors:
-            return "Terminal profile does not support the requested color";
+            return "Terminal profile does not enable the requested color";
         case Feature::Traits:
-            return "Terminal profile does not support the requested traits";
+            return "Terminal profile does not enable the requested traits";
         case Feature::AlternateScreen:
-            return "Terminal profile does not support alternate screen mode";
+            return "Terminal profile does not enable alternate screen mode";
         case Feature::CursorVisibility:
-            return "Terminal profile does not support cursor visibility";
+            return "Terminal profile does not enable cursor visibility";
         case Feature::Mouse:
-            return "Terminal profile does not support the requested mouse reporting";
-        case Feature::Focus: return "Terminal profile does not support focus reporting";
+            return "Terminal profile does not enable the requested mouse reporting";
+        case Feature::Focus: return "Terminal profile does not enable focus reporting";
         case Feature::BracketedPaste:
-            return "Terminal profile does not support bracketed paste";
+            return "Terminal profile does not enable bracketed paste";
         case Feature::CursorStyle:
-            return "Terminal profile does not support cursor style";
+            return "Terminal profile does not enable cursor style";
         case Feature::CursorSaveRestore:
-            return "Terminal profile does not support cursor save/restore";
-        case Feature::Scrolling: return "Terminal profile does not support scrolling";
+            return "Terminal profile does not enable cursor save/restore";
+        case Feature::Scrolling: return "Terminal profile does not enable scrolling";
         case Feature::Editing:
-            return "Terminal profile does not support line/character editing";
+            return "Terminal profile does not enable line/character editing";
         case Feature::WindowTitle:
-            return "Terminal profile does not support window titles";
-        case Feature::Hyperlinks: return "Terminal profile does not support hyperlinks";
-        case Feature::Bell: return "Terminal profile does not support the bell";
+            return "Terminal profile does not enable window titles";
+        case Feature::Hyperlinks: return "Terminal profile does not enable hyperlinks";
+        case Feature::Bell: return "Terminal profile does not enable the bell";
         case Feature::PlayNotes:
-            return "Terminal profile does not support DECPS playback";
+            return "Terminal profile does not enable DECPS playback";
         case Feature::SynchronizedOutput:
-            return "Terminal profile does not support synchronized output";
+            return "Terminal profile does not enable synchronized output";
     }
     throw std::invalid_argument{"UnsupportedFeature: invalid feature"};
 }
@@ -61,7 +60,7 @@ struct KnownTerminal {
     bool visibility;
 };
 
-// Resolution table v1, matching interface-proposal.md Appendix C. This is a
+// Resolution table v2, documented in interface-proposal.md Appendix C. This is a
 // reviewed advertised-protocol heuristic, not a captured-emulator claim.
 // Protocol basis: https://invisible-island.net/xterm/ctlseqs/ctlseqs.html
 // Mux input features stay conservative; do not infer the terminal behind a mux.
@@ -70,16 +69,43 @@ constexpr KnownTerminal known_terminals[] = {
     {"xterm", ColorSupport::Basic8, true, true, true},
     {"xterm-color", ColorSupport::Basic8, true, true, true},
     {"xterm-256color", ColorSupport::Indexed256, true, true, true},
+    {"xterm-ghostty", ColorSupport::Indexed256, true, true, true},
+    {"xterm-kitty", ColorSupport::Indexed256, true, true, true},
+    {"wezterm", ColorSupport::Indexed256, true, true, true},
     {"screen", ColorSupport::Basic8, false, true, true},
     {"tmux", ColorSupport::Basic8, false, true, true},
     {"screen-256color", ColorSupport::Indexed256, false, true, true},
     {"tmux-256color", ColorSupport::Indexed256, false, true, true},
     {"linux", ColorSupport::Basic16, false, false, true},
 };
+
+auto diagnostic_term(std::string_view term) -> std::string
+{
+    if (term.empty()) return "<empty>";
+    std::string result;
+    constexpr char hex[] = "0123456789ABCDEF";
+    for (unsigned char c : term) {
+        if (c >= 32 && c < 127)
+            result += static_cast<char>(c);
+        else {
+            result += "\\x";
+            result += hex[c >> 4];
+            result += hex[c & 15];
+        }
+    }
+    return result;
+}
+
 }  // namespace
 
 UnsupportedFeature::UnsupportedFeature(Feature feature)
     : std::runtime_error{unsupported_message(feature)}, feature_{feature}
+{}
+
+UnsupportedFeature::UnsupportedFeature(Feature feature, std::string context)
+    : std::runtime_error{std::string{unsupported_message(feature)} + " (" + context +
+                         ")"},
+      feature_{feature}
 {}
 
 auto snapshot_environment() -> Environment
@@ -98,7 +124,10 @@ auto resolve_profile(Environment const& environment, bool output_is_terminal)
     ProfileReport report;
     auto source = EvidenceSource::Default;
     std::string explanation =
-        "Plain fallback: TERM is empty, dumb, or not in resolution table v1";
+        environment.term.empty() || environment.term == "dumb"
+            ? "Plain fallback: TERM=" + diagnostic_term(environment.term)
+            : "Support is unknown for TERM=" + diagnostic_term(environment.term) +
+                  "; plain fallback";
     if (!output_is_terminal) explanation = "Plain fallback: output is not a terminal";
     if (output_is_terminal) {
         for (auto const& entry : known_terminals) {
@@ -116,10 +145,22 @@ auto resolve_profile(Environment const& environment, bool output_is_terminal)
                 .bell = true};
             source = EvidenceSource::KnownTerminal;
             explanation =
-                "Advertised-protocol heuristic from exact TERM match in table v1: " +
+                "Advertised-protocol heuristic from exact TERM match in table v2: " +
                 environment.term;
             break;
         }
+    }
+    if (output_is_terminal && source == EvidenceSource::Default &&
+        environment.term.starts_with("xterm-") && environment.term.size() > 6) {
+        report.profile = {.control = true,
+                          .colors = ColorSupport::Basic8,
+                          .traits = basic_traits(),
+                          .alternate_screen = true,
+                          .cursor_visibility = true,
+                          .bell = true};
+        source = EvidenceSource::TerminalFamily;
+        explanation = "Conservative xterm-* compatibility baseline: " +
+                      diagnostic_term(environment.term);
     }
     auto color_source = source;
     auto color_explanation = explanation;

@@ -122,6 +122,25 @@ void validate_transition(TerminalProfile const& profile,
     if (changed[4]) require(profile.bracketed_paste, Feature::BracketedPaste);
 }
 
+void validate_transition(ProfileReport const& report,
+                         ProtocolState const& before,
+                         ProtocolState const& after)
+{
+    try {
+        validate_transition(report.profile, before, after);
+    }
+    catch (UnsupportedFeature const& error) {
+        for (auto const& decision : report.decisions) {
+            if (decision.feature == error.feature())
+                throw UnsupportedFeature{
+                    error.feature(),
+                    decision.explanation +
+                        "; supply TerminalOptions::profile to override"};
+        }
+        throw;
+    }
+}
+
 void merge_os(TerminalOptions& current, TerminalOptions const& patch)
 {
     if (patch.echo) current.echo = patch.echo;
@@ -383,7 +402,7 @@ struct Terminal::Impl {
     {
         validate_options(patch);
         auto next = desired_modes(report.profile, modes, patch);
-        validate_transition(report.profile, modes, next);
+        validate_transition(report, modes, next);
         auto new_options = options;
         merge_os(new_options, patch);
         auto attributes = detail::desired_attributes(captured, new_options);
@@ -507,7 +526,7 @@ auto Terminal::open(Streams streams, TerminalOptions options) -> Terminal
     detail::validate_profile(report.profile);
     validate_inherited(report.profile, options.restore_modes);
     auto target = desired_modes(report.profile, options.restore_modes, options);
-    validate_transition(report.profile, options.restore_modes, target);
+    validate_transition(report, options.restore_modes, target);
     // Allocate parser/session storage and validate limits before OS changes.
     auto impl =
         std::make_unique<Impl>(streams, input, output, device, std::move(report),

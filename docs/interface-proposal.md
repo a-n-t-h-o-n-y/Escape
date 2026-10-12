@@ -1386,17 +1386,20 @@ contract change; never regenerate expectations merely to make a failing test pas
 
 ## Appendix C. Initial environment-resolution data
 
-The initial resolution table below makes the proposed resolver deterministic.
+Resolution table v2 below makes the resolver deterministic.
 It is an advertised-protocol heuristic, not a statement that emulator behavior
 has been verified. Versioned live fixtures can justify subsequent table changes.
 Profiles always start with the conventional system palette and BestEffort policy.
-Names not listed are unknown; do not match arbitrary prefixes or suffixes.
+Exact names take priority. Other nonempty `xterm-*` names use the compatibility
+baseline below; other names remain unknown. No screen/tmux family matching is
+performed, and the resolver never infers the terminal behind a multiplexer.
 
 | Exact TERM values | Colors before COLORTERM/NO_COLOR | Trait set | Alternate / visibility | Mouse | Focus / paste |
 | --- | --- | --- | --- | --- | --- |
 | `ansi` | Basic8 | Basic | false / false | None / Off | false / false |
 | `xterm`, `xterm-color` | Basic8 | Full | true / true | Sgr / Move | true / true |
-| `xterm-256color` | Indexed256 | Full | true / true | Sgr / Move | true / true |
+| `xterm-256color`, `xterm-ghostty`, `xterm-kitty`, `wezterm` | Indexed256 | Full | true / true | Sgr / Move | true / true |
+| Other nonempty `xterm-*` names | Basic8 | Basic | true / true | None / Off | false / false |
 | `screen`, `tmux` | Basic8 | Basic | true / true | None / Off | false / false |
 | `screen-256color`, `tmux-256color` | Indexed256 | Basic | true / true | None / Off | false / false |
 | `linux` | Basic16 | Basic | false / true | None / Off | false / false |
@@ -1408,13 +1411,22 @@ input are deliberate conservative defaults; caller-supplied profiles can enable
 verified protocols. Do not infer a terminal behind the multiplexer.
 
 Resolution order is: plain default; if output is a terminal, apply an exact known
-TERM entry; for a recognized entry apply COLORTERM=truecolor/24bit; finally apply
-nonempty NO_COLOR. Redirected output never applies the table or COLORTERM.
+TERM entry, otherwise the xterm-family baseline; for either recognized case apply
+COLORTERM=truecolor/24bit; finally apply nonempty NO_COLOR. Redirected output never
+applies the table, family baseline, or COLORTERM. Family decisions report
+TerminalFamily, distinct from KnownTerminal.
 Report one final CapabilityDecision per Feature in the order listed in section 3,
 with the strongest applied evidence source and an explanation. Default/unknown
 results explain the plain fallback; NO_COLOR explains color suppression. Diagnostic
 wording is not a stable string API. Explicit terminal profiles bypass this
-resolver and report Explicit for each feature.
+resolver and report Explicit for each feature. Failed session transitions include
+the feature decision and the profile override hint; unknown TERM diagnostics say
+that support is unknown, rather than declaring the terminal incapable.
+
+Modern exact entries are still assumptions based on advertised protocols. They
+do not enable optional output extensions or DECPS playback. Explicit queries
+remain available through `probe`, `query`, `enable_keyboard`, and
+`confirm_synchronized_output`; opening a session never probes automatically.
 
 Windows backend references: Microsoft's [console modes](https://learn.microsoft.com/en-us/windows/console/setconsolemode),
 [low-level input](https://learn.microsoft.com/en-us/windows/console/low-level-console-input-functions),

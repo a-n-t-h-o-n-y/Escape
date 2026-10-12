@@ -5,6 +5,35 @@ Ordinary sessions retain the native/POSIX input path. All query operations requi
 an open control-capable session with immediate input; Windows also requires echo
 off. `TerminalOptions::interactive()` supplies these input settings.
 
+## Default profiles and overrides
+
+The resolver recognizes `xterm-ghostty`, `xterm-kitty`, and `wezterm` alongside
+traditional TERM names ([Ghostty](https://ghostty.org/docs/help/terminfo),
+[kitty](https://sw.kovidgoyal.net/kitty/faq/#i-get-errors-about-the-terminal-being-unknown-or-opening-the-terminal-failing-or-functional-keys-like-arrow-keys-not-working),
+[WezTerm](https://wezterm.org/config/lua/config/term.html)).
+Exact matches take priority over a conservative baseline
+for other nonempty `xterm-*` names. That baseline enables cursor movement/erasing,
+alternate screen, cursor visibility, basic colors/styles, and BEL. It leaves
+extended input modes and optional output extensions disabled. COLORTERM and
+NO_COLOR still govern colors. Empty/dumb TERM and redirected output stay plain;
+other unknown names need a caller-supplied profile for interactive mode.
+
+```cpp
+auto options = esc::TerminalOptions::interactive();
+auto profile = esc::resolve_profile(esc::snapshot_environment(), true).profile;
+profile.control = true;
+profile.alternate_screen = true;
+profile.cursor_visibility = true;
+options.profile = profile;
+auto terminal = esc::Terminal::open(options);
+```
+
+An explicit profile bypasses environment resolution. Enable additional features
+only when the application has established support. `probe()` reports mode and
+keyboard replies; `enable_keyboard()` negotiates Kitty input, and
+`confirm_synchronized_output()` enables synchronized output after confirmation.
+Timeouts leave support unknown. DECPS note playback remains an explicit opt-in.
+
 ## Query interface
 
 ```cpp

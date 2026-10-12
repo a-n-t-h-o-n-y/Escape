@@ -33,6 +33,8 @@ class UnsupportedFeature : public std::runtime_error {
    public:
     explicit UnsupportedFeature(Feature feature);
 
+    UnsupportedFeature(Feature feature, std::string context);
+
     [[nodiscard]] auto feature() const noexcept -> Feature { return feature_; }
 
    private:
@@ -83,7 +85,14 @@ struct Environment {
     bool no_color = false;
 };
 
-enum class EvidenceSource { Default, Environment, KnownTerminal, Explicit, Probe };
+enum class EvidenceSource {
+    Default,
+    Environment,
+    KnownTerminal,
+    TerminalFamily,
+    Explicit,
+    Probe
+};
 
 struct CapabilityDecision {
     Feature feature;
@@ -97,7 +106,7 @@ struct ProfileReport {
 };
 
 // Snapshot is the explicit environment-reading boundary. The resolver below is
-// pure and uses exact TERM names from the versioned table in the implementation.
+// pure: exact TERM entries take priority over the conservative xterm-* baseline.
 [[nodiscard]] auto snapshot_environment() -> Environment;
 
 [[nodiscard]] auto resolve_profile(Environment const& environment,

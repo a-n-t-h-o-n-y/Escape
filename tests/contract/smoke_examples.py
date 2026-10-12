@@ -11,12 +11,12 @@ import termios
 import time
 
 
-def run(binary, keys, width=100, height=30, expected=None):
+def run(binary, keys, width=100, height=30, expected=None, term="xterm-256color"):
     master, slave = pty.openpty()
     try:
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", height, width, 0, 0))
         before = termios.tcgetattr(slave)
-        env = dict(os.environ, TERM="xterm-256color", COLORTERM="truecolor")
+        env = dict(os.environ, TERM=term, COLORTERM="truecolor")
         env.pop("NO_COLOR", None)
         process = subprocess.Popen([binary], stdin=slave, stdout=slave,
                                    stderr=subprocess.PIPE, env=env)
@@ -75,6 +75,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     run(args.termcaps, b"q")
     run(args.pong, b"\r\x1b[B\x1b[B\r")
+    for term in ("xterm-ghostty", "xterm-kitty", "wezterm", "xterm-new-emulator"):
+        run(args.pong, b"\r\x1b[B\x1b[B\r", term=term)
     play_and_quit = b"\r\r\r\r\r\x1b\x1b[B\x1b[B\r"
     run(args.pong, play_and_quit, width=81, height=25,
         expected=b"Resize to at least 83 x 29 to play")

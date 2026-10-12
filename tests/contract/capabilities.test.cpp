@@ -242,7 +242,7 @@ TEST(CAP_02_inconsistent_and_invalid_profiles_are_rejected)
 TEST(CAP_02_unknown_dumb_empty_and_redirected_output_are_plain)
 {
     for (auto term :
-         {"", "dumb", "unknown-terminal", "xterm-256color-extra", "not-xterm"}) {
+         {"", "dumb", "unknown-terminal", "xterm-", "not-xterm", "XTERM-ghostty"}) {
         auto report =
             resolve_profile(Environment{.term = term, .colorterm = "truecolor"}, true);
         CHECK(!report.profile.control);
@@ -271,6 +271,9 @@ TEST(CAP_03_exact_resolution_table_and_noncolor_capabilities)
         {"xterm", ColorSupport::Basic8, true, true, true, true},
         {"xterm-color", ColorSupport::Basic8, true, true, true, true},
         {"xterm-256color", ColorSupport::Indexed256, true, true, true, true},
+        {"xterm-ghostty", ColorSupport::Indexed256, true, true, true, true},
+        {"xterm-kitty", ColorSupport::Indexed256, true, true, true, true},
+        {"wezterm", ColorSupport::Indexed256, true, true, true, true},
         {"screen", ColorSupport::Basic8, false, true, true, false},
         {"tmux", ColorSupport::Basic8, false, true, true, false},
         {"screen-256color", ColorSupport::Indexed256, false, true, true, false},
@@ -447,3 +450,31 @@ TEST(CAP_02_environment_snapshot_owns_values_and_resolution_is_pure)
     CHECK(!snapshot_environment().no_color);
 }
 #endif
+
+TEST(CAP_03_xterm_family_baseline_and_precedence)
+{
+    for (auto term : {"xterm-new-emulator", "xterm-256color-extra"}) {
+        auto report = resolve_profile(Environment{.term = term}, true);
+        auto const& p = report.profile;
+        CHECK(p.control && p.alternate_screen && p.cursor_visibility && p.bell);
+        CHECK(p.colors == ColorSupport::Basic8 && p.traits == contract::basic_traits());
+        CHECK(p.mouse_protocol == MouseProtocol::None &&
+              p.maximum_mouse_mode == MouseMode::Off);
+        CHECK(!p.focus_reporting && !p.bracketed_paste && !p.cursor_style);
+        CHECK(!p.hyperlinks && !p.synchronized_output && !p.play_notes);
+        CHECK(report.decisions[0].source == EvidenceSource::TerminalFamily);
+        CHECK(!resolve_profile(Environment{.term = term}, false).profile.control);
+        auto hinted = resolve_profile(Environment{term, "truecolor", false}, true);
+        CHECK(hinted.profile.colors == ColorSupport::TrueColor);
+        CHECK(hinted.decisions[1].source == EvidenceSource::Environment);
+        auto suppressed = resolve_profile(Environment{term, "truecolor", true}, true);
+        CHECK(suppressed.profile.colors == ColorSupport::None);
+        CHECK(suppressed.profile.alternate_screen);
+    }
+    for (auto term : {"xterm-ghostty", "xterm-kitty", "wezterm"}) {
+        auto report = resolve_profile(Environment{.term = term}, true);
+        CHECK(report.decisions[0].source == EvidenceSource::KnownTerminal);
+        CHECK(report.profile.colors == ColorSupport::Indexed256);
+        CHECK(!report.profile.play_notes && !report.profile.synchronized_output);
+    }
+}

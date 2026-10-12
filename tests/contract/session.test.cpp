@@ -504,3 +504,41 @@ TEST(SES_05_mixed_output_uses_profile_for_styles_and_restoration)
           "\x1b[49m\x1b[39m\x1b[22;23;24;25;27;28;29m!");
     terminal.close();
 }
+
+TEST(SES_02_unknown_terminal_diagnostic_and_explicit_override)
+{
+    contract::EnvironmentVariable term{"TERM", "unknown-terminal"};
+    contract::Pty pty;
+    auto before = pty.settings();
+    auto config = TerminalOptions::interactive();
+    try {
+        auto terminal = Terminal::open(streams(pty), config);
+        CHECK(false);
+    }
+    catch (UnsupportedFeature const& error) {
+        CHECK(error.feature() == Feature::AlternateScreen);
+        auto message = std::string{error.what()};
+        CHECK(message.find("unknown for TERM=unknown-terminal") != message.npos);
+        CHECK(message.find("TerminalOptions::profile") != message.npos);
+    }
+    CHECK(contract::same_settings(before, pty.settings()));
+    CHECK(pty.drain().empty());
+    config.profile = contract::full_profile();
+    auto terminal = Terminal::open(streams(pty), config);
+    CHECK(terminal.profile_report().decisions[0].source == EvidenceSource::Explicit);
+    terminal.close();
+}
+
+TEST(SES_02_modern_terminal_names_open_interactive_without_overrides)
+{
+    for (auto name :
+         {"xterm-ghostty", "xterm-kitty", "wezterm", "xterm-new-emulator"}) {
+        contract::EnvironmentVariable term{"TERM", name};
+        contract::Pty pty;
+        auto terminal = Terminal::open(streams(pty), TerminalOptions::interactive());
+        CHECK(terminal.profile().alternate_screen &&
+              terminal.profile().cursor_visibility);
+        CHECK(pty.drain().find("\x1b[?1049h") != std::string::npos);
+        terminal.close();
+    }
+}

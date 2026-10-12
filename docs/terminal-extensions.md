@@ -278,8 +278,9 @@ command is omitted. Under `Strict`, it throws `UnsupportedFeature` with
 `Feature::Bell` or `Feature::PlayNotes`. An empty, valid melody remains a no-op
 under either policy. Playback never automatically falls back to a bell.
 
-Known TERM entries enable basic bell support when output is a terminal.
-Unrecognized TERM values and redirected output retain the plain fallback.
+Known TERM entries and the xterm-family baseline enable basic bell support when
+output is a terminal. Other unknown TERM values and redirected output retain
+the plain fallback.
 `NO_COLOR` does not affect bells. DECPS playback always requires an explicit
 profile; neither `TERM=xterm` nor Windows VT mode establishes playback support.
 For a terminal known to support DECPS, open the session with a caller-supplied
