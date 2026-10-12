@@ -1,12 +1,23 @@
-name: Build and behavior contracts
+name: CI
+
 on:
   push:
   pull_request:
+  workflow_dispatch:
+
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   contracts:
+    name: Tests (${{ matrix.os }})
+    timeout-minutes: 20
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
@@ -14,26 +25,54 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DESCAPE_BUILD_BENCHMARKS=ON
-      - name: Build library and contracts
+        run: >-
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          -DESCAPE_BUILD_TESTS=ON -DESCAPE_BUILD_EXAMPLES=ON
+          -DESCAPE_BUILD_BENCHMARKS=ON
+      - name: Build library, tests, tutorials, and demos
         run: cmake --build build --config Release --parallel 2
-      - name: Build examples
-        run: cmake --build build --target termcaps escape.examples.pong --config Release --parallel 2
-      - name: Check behavior, headers, and package consumers
+      - name: Test behavior, examples, headers, and packaging
         run: ctest --test-dir build -C Release --output-on-failure
+
   sanitizers:
+    name: ASan and UBSan
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Configure ASan and UBSan
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Configure
         run: >-
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+          -DESCAPE_BUILD_TESTS=ON -DESCAPE_BUILD_EXAMPLES=ON
           -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
           -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
       - name: Build
         run: cmake --build build --parallel 2
-      - name: Check behavior
+      - name: Test with sanitizers
         run: ctest --test-dir build -E PKG --output-on-failure
+
+  reference:
+    name: API reference
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install Doxygen
+        run: brew install doxygen
+      - name: Configure reference
+        run: >-
+          cmake -S . -B build -DESCAPE_BUILD_DOCS=ON
+          -DESCAPE_BUILD_TESTS=OFF -DESCAPE_BUILD_EXAMPLES=OFF
+      - name: Generate reference without warnings
+        run: cmake --build build --target escape.docs
