@@ -1,7 +1,9 @@
 #pragma once
 #include <esc/area.hpp>
 #include <esc/key.hpp>
+#include <esc/keyboard.hpp>
 #include <esc/mouse.hpp>
+#include <esc/query.hpp>
 #include <optional>
 #include <string>
 #include <variant>
@@ -65,5 +67,7 @@ using Event = std::variant<KeyPress,
                            Resize,
                            Focus,
                            PasteChunk,
-                           UnknownInput>;
+                           UnknownInput,
+                           TerminalReply,
+                           KeyEvent>;
 }  // namespace esc

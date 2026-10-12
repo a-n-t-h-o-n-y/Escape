@@ -25,6 +25,15 @@ auto terminal_identity(int input, int output) -> std::uint64_t
                                 "Terminal: streams refer to different devices"};
     return static_cast<std::uint64_t>(in.st_rdev);
 }
+Input::~Input() = default;
+auto query_attributes(Attributes captured) -> Attributes
+{
+    if (captured.c_lflag & ICANON)
+        throw std::invalid_argument{"Query: immediate input is required"};
+    return captured;
+}
+void prepare_queries(Input&) {}
+void stop_queries(Input&) noexcept {}
 auto transport_setup_required() noexcept -> bool { return false; }
 void begin_session(Attributes&) {}
 auto session_profile(int, int) -> ProfileReport

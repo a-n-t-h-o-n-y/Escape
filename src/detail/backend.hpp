@@ -8,6 +8,7 @@
 #include <esc/terminal.hpp>
 #include <utility>
 #ifdef _WIN32
+#    include <memory>
 #    include <string>
 #else
 #    include <poll.h>
@@ -28,6 +29,8 @@ struct Input {
     int descriptor;
     bool terminal = false, hung_up = false;
 #ifdef _WIN32
+    struct ConsoleRead;
+    std::unique_ptr<ConsoleRead> console_read;
     std::string pending, line;
     InputProtocols protocols{};
     int output_descriptor = -1;
@@ -39,6 +42,7 @@ struct Input {
     std::string repeated;
 #endif
     explicit Input(int fd);
+    ~Input();
 };
 auto descriptor(std::FILE* stream) -> int;
 auto is_terminal(int fd) -> bool;
@@ -52,6 +56,9 @@ auto get_attributes(int input, int output, Attributes* settings) -> int;
 auto set_attributes(int input, Attributes const* settings) -> int;
 auto desired_attributes(Attributes captured, TerminalOptions const& options)
     -> Attributes;
+auto query_attributes(Attributes captured) -> Attributes;
+void prepare_queries(Input& input);
+void stop_queries(Input& input) noexcept;
 auto transport_setup_required() noexcept -> bool;
 void begin_session(Attributes& captured);
 auto get_size(int fd) -> Area;

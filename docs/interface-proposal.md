@@ -510,7 +510,9 @@ reviewed separately, not an unsupported compatibility claim in this document.
 An explicit profile supplied to Terminal::open takes precedence over resolution,
 including NO_COLOR; that is a deliberate application choice. The library never
 looks through SSH or a multiplexer to assume support greater than the immediate
-connection reports. Active probing and runtime terminfo expansion are deferred.
+connection reports. Explicit probing and Kitty keyboard input are specified in
+[the query/keyboard extension](queries-and-keyboard.md), which supersedes the
+legacy-only input and query deferrals below. Runtime terminfo expansion is deferred.
 There is no hidden probe on construction, and unknown terminals remain usable
 through an explicit profile. A later probe API must define deadlines, reply
 demultiplexing, and preservation of ordinary input before it is added.
@@ -1190,8 +1192,8 @@ reporting, key release, uniform Unicode width, or accurate environment hints.
 The architecture leaves room for adapters without forcing terminfo, probes, or
 an emulator dependency on ordinary byte generation.
 
-Deferred additions require their own reviewed contracts: active queries,
-terminfo-backed arbitrary terminals, enhanced keyboard protocols, synchronized
+Deferred additions require their own reviewed contracts:
+terminfo-backed arbitrary terminals, synchronized
 output, hyperlinks/titles/clipboard, graphics, event-loop or
 nonblocking output adapters, and style diff rendering. They must not be smuggled
 into current functions through hidden environment behavior or magic flags.

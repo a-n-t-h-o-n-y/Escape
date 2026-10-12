@@ -80,7 +80,11 @@ class Reader {
 
    private:
     friend class Terminal;
-    void configure_session(InputProtocols protocols, MouseMode mode, int output_descriptor);
+    void prepare_queries();
+    void stop_queries() noexcept;
+    void configure_session(InputProtocols protocols,
+                           MouseMode mode,
+                           int output_descriptor);
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

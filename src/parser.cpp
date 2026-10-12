@@ -5,11 +5,14 @@
 #include <esc/parser.hpp>
 #include <limits>
 #include <stdexcept>
+#include "detail/protocol.hpp"
 
 namespace esc {
 namespace {
 void validate_protocols(InputProtocols p)
 {
+    if (p.keyboard != KeyboardProtocol::Legacy && p.keyboard != KeyboardProtocol::Kitty)
+        throw std::invalid_argument{"Parser: invalid keyboard protocol"};
     switch (p.mouse) {
         case MouseProtocol::None:
         case MouseProtocol::Legacy:
@@ -256,6 +259,22 @@ auto Parser::complete_sequence() -> Event
     }
     char final = bytes.back();
     auto fields = bytes.substr(2, bytes.size() - 3);
+    if (!ss3 && active_.replies && fields.starts_with('?') &&
+        (final == 'u' || final == 'c' || final == 'y')) {
+        if (auto reply = detail::parse_reply(fields, final))
+            return succeed(TerminalReply{std::move(*reply)});
+        return unknown(InputProblem::Malformed);
+    }
+    if (!ss3 && active_.keyboard == KeyboardProtocol::Kitty && final == 'R')
+        return unknown(InputProblem::Unsupported);  // Removed by Kitty: overlaps CPR.
+    if (!ss3 && active_.keyboard == KeyboardProtocol::Kitty &&
+        (final == 'u' || final == '~' || final == 'A' || final == 'B' || final == 'C' ||
+         final == 'D' || final == 'H' || final == 'F' || final == 'P' || final == 'Q' ||
+         final == 'S' || final == 'E')) {
+        if (auto key = detail::parse_kitty(fields, final))
+            return succeed(std::move(*key));
+        return unknown(InputProblem::Malformed);
+    }
     if (!ss3 && fields.starts_with('<')) {
         if (active_.mouse != MouseProtocol::Sgr)
             return unknown(InputProblem::Unsupported);
@@ -283,8 +302,9 @@ auto Parser::complete_sequence() -> Event
     }
     if (!ss3 && final == 'Z' && p.size == 0)
         return succeed(KeyPress{KeyCode::Tab, Modifiers{.shift = true}});
-    auto key =
-        final == '~' && !ss3 && p.size ? tilde_key(p.values[0], native_function_keys_) : named_key(final, ss3);
+    auto key = final == '~' && !ss3 && p.size
+                   ? tilde_key(p.values[0], native_function_keys_)
+                   : named_key(final, ss3);
     if (!key) return unknown(InputProblem::Unsupported);
     bool valid =
         p.size <= 2 && (final == '~' ? p.size >= 1 : (p.size == 0 || p.values[0] == 1));
@@ -404,11 +424,12 @@ auto Parser::next(std::span<char const> input) -> ParseResult
                 buffer_.size() > 5 ? buffer_.size() - 5 : 0);
             if (byte != 27 && input.size() - consumed >= 8 &&
                 tail.find('\x1b') == tail.npos) {
-                auto remaining = std::string_view{input.data() + consumed,
-                                                  input.size() - consumed};
+                auto remaining =
+                    std::string_view{input.data() + consumed, input.size() - consumed};
                 auto stop = remaining.find('\x1b');
-                auto count = std::min(stop == remaining.npos ? remaining.size() : stop,
-                                      options_.paste_chunk_size + end_paste.size() - buffer_.size());
+                auto count = std::min(
+                    stop == remaining.npos ? remaining.size() : stop,
+                    options_.paste_chunk_size + end_paste.size() - buffer_.size());
                 buffer_.append(remaining.data(), count);
                 consumed += count;
                 continue;

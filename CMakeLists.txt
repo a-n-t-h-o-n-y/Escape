@@ -20,7 +20,7 @@ endif()
 
 add_library(escape
     src/text.cpp src/glyph.cpp src/sequence.cpp src/capabilities.cpp
-    src/parser.cpp src/io.cpp src/terminal.cpp src/detail/backend_common.cpp)
+    src/parser.cpp src/query.cpp src/keyboard.cpp src/io.cpp src/terminal.cpp src/detail/backend_common.cpp)
 if(WIN32)
     target_sources(escape PRIVATE src/detail/backend_windows.cpp)
     target_compile_definitions(escape PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX _CRT_SECURE_NO_WARNINGS)

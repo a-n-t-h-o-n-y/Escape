@@ -57,11 +57,73 @@ enum class KeyCode {
     KeypadPlus,
     KeypadMinus,
     KeypadMultiply,
-    KeypadDivide
+    KeypadDivide,
+    F25,
+    F26,
+    F27,
+    F28,
+    F29,
+    F30,
+    F31,
+    F32,
+    F33,
+    F34,
+    F35,
+    CapsLock,
+    ScrollLock,
+    NumLock,
+    PrintScreen,
+    Pause,
+    Menu,
+    KeypadEqual,
+    KeypadSeparator,
+    KeypadLeft,
+    KeypadRight,
+    KeypadUp,
+    KeypadDown,
+    KeypadPageUp,
+    KeypadPageDown,
+    KeypadHome,
+    KeypadEnd,
+    KeypadInsert,
+    KeypadDelete,
+    KeypadBegin,
+    MediaPlay,
+    MediaPause,
+    MediaPlayPause,
+    MediaReverse,
+    MediaStop,
+    MediaFastForward,
+    MediaRewind,
+    MediaTrackNext,
+    MediaTrackPrevious,
+    MediaRecord,
+    VolumeDown,
+    VolumeUp,
+    VolumeMute,
+    LeftShift,
+    LeftControl,
+    LeftAlt,
+    LeftSuper,
+    LeftHyper,
+    LeftMeta,
+    RightShift,
+    RightControl,
+    RightAlt,
+    RightSuper,
+    RightHyper,
+    RightMeta,
+    IsoLevel3Shift,
+    IsoLevel5Shift,
 };
-using Key = std::variant<char32_t, KeyCode>;
+struct KittyKey {
+    unsigned code;
+    friend auto operator==(KittyKey const&, KittyKey const&) -> bool = default;
+};
+using Key = std::variant<char32_t, KeyCode, KittyKey>;
 struct Modifiers {
     bool shift = false, ctrl = false, alt = false, meta = false;
+    bool super = false, hyper = false, caps_lock = false, num_lock = false;
     friend auto operator==(Modifiers const&, Modifiers const&) -> bool = default;
 };
 [[nodiscard]] inline auto text_scalar(Key const& key) noexcept

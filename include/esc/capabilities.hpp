@@ -49,7 +49,7 @@ struct Environment {
     std::string colorterm;
     bool no_color = false;
 };
-enum class EvidenceSource { Default, Environment, KnownTerminal, Explicit };
+enum class EvidenceSource { Default, Environment, KnownTerminal, Explicit, Probe };
 struct CapabilityDecision {
     Feature feature;
     EvidenceSource source;

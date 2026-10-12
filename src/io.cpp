@@ -187,6 +187,17 @@ void Reader::configure(InputProtocols protocols)
 }  // namespace esc
 
 namespace esc {
+void Reader::prepare_queries()
+{
+    detail::prepare_queries(impl_->input);
+#ifdef _WIN32
+    // Preserve native records already normalized before switching transport.
+#endif
+}
+void Reader::stop_queries() noexcept
+{
+    if (impl_) detail::stop_queries(impl_->input);
+}
 void Reader::configure_session(InputProtocols protocols,
                                MouseMode mode,
                                int output_descriptor)

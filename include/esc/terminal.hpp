@@ -59,6 +59,15 @@ concept Setting = detail::AnyOf<T,
                                 FocusReporting,
                                 BracketedPaste>;
 
+struct ProbeObservation {
+    Query request;
+    QueryResult result;
+    EvidenceSource source = EvidenceSource::Probe;
+};
+struct ProbeReport {
+    std::vector<ProbeObservation> observations;
+};
+
 class Terminal {
    public:
     static auto open(TerminalOptions options = {}) -> Terminal;
@@ -97,6 +106,18 @@ class Terminal {
             prepared);
     }
     void flush();
+    // Request sends and flushes only; replies arrive through read().
+    void request(Query const& query);
+    void request(std::span<Query const> queries);
+    auto query(Query const& query, std::chrono::milliseconds timeout) -> QueryResult;
+    auto probe(std::chrono::milliseconds timeout = std::chrono::milliseconds{250})
+        -> ProbeReport;
+    auto enable_keyboard(KittyFlags flags = KittyFlags::Disambiguate,
+                         std::chrono::milliseconds timeout = std::chrono::milliseconds{
+                             250}) -> QueryResult;
+    void disable_keyboard();
+    auto keyboard_protocol() const -> KeyboardProtocol;
+
     template <Setting... Settings>
     void set(Settings const&... settings)
     {

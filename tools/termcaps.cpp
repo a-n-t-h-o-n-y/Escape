@@ -38,6 +38,15 @@ void display_event(Terminal& terminal, Event const& event)
                 terminal.write("Unknown input bytes: ",
                                std::to_string(value.bytes.size()));
             }
+            else if constexpr (std::same_as<T, TerminalReply>) {
+                terminal.write("Terminal reply kind: ",
+                               std::to_string(value.value.index()));
+            }
+            else if constexpr (std::same_as<T, KeyEvent>) {
+                terminal.write("Enhanced key action: ",
+                               std::to_string(static_cast<unsigned>(value.action)),
+                               " text scalars: ", std::to_string(value.text.size()));
+            }
             else {
                 terminal.write("Mouse at ", std::to_string(value.at.x), ",",
                                std::to_string(value.at.y));
@@ -45,9 +54,19 @@ void display_event(Terminal& terminal, Event const& event)
         },
         event);
 }
-int main()
+int main(int argc, char** argv)
 {
     try {
+        bool probing = false, kitty = false;
+        for (int i = 1; i < argc; ++i) {
+            std::string_view option{argv[i]};
+            if (option == "--probe")
+                probing = true;
+            else if (option == "--kitty")
+                kitty = true;
+            else
+                throw std::invalid_argument{"Usage: termcaps [--probe] [--kitty]"};
+        }
         auto terminal = Terminal::open(TerminalOptions::interactive());
         terminal.send(BlankScreen{}, Cursor{});
         terminal.write("Escape capability/input inspector — press q to quit\r\n");
@@ -68,11 +87,31 @@ int main()
         if (profile.focus_reporting) terminal.set(FocusReporting::On);
         if (profile.bracketed_paste) terminal.set(BracketedPaste::On);
         terminal.flush();
+        if (probing)
+            for (auto const& observation : terminal.probe().observations)
+                terminal.write(
+                    "Probe status: ",
+                    std::to_string(static_cast<unsigned>(observation.result.status)),
+                    "\r\n");
+        if (kitty) {
+            auto result = terminal.enable_keyboard(
+                KittyFlags::Disambiguate | KittyFlags::EventTypes |
+                KittyFlags::AlternateKeys | KittyFlags::AllKeys |
+                KittyFlags::AssociatedText);
+            terminal.write("Keyboard negotiation status: ",
+                           std::to_string(static_cast<unsigned>(result.status)),
+                           "\r\n");
+        }
+        terminal.flush();
         while (true) {
             auto result = terminal.read();
             if (result.status == ReadStatus::EndOfInput) break;
             if (auto key = std::get_if<KeyPress>(&*result.event);
                 key && text_scalar(key->key) == std::optional<char32_t>{U'q'})
+                break;
+            if (auto key = std::get_if<KeyEvent>(&*result.event);
+                key && key->action != KeyAction::Release && key->key &&
+                text_scalar(*key->key) == std::optional<char32_t>{U'q'})
                 break;
             terminal.send(Cursor{0, 13}, BlankRow{});
             display_event(terminal, *result.event);

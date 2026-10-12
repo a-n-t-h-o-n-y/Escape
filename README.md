@@ -128,8 +128,9 @@ See [contract tests](tests/contract/README.md) for verification and
 validation. Synthetic fixtures and PTYs check library behavior, not emulator
 rendering or every terminal's advertised capabilities. CI builds and runs behavior
 tests on Linux, macOS, and Windows; a configured CI job is not a recorded passing
-run. Active probing, enhanced keyboard protocols, width calculation, and
-further benchmark-driven optimization remain future work.
+run. Width calculation and further benchmark-driven optimization remain future work.
+Explicit queries, capability observations, and negotiated Kitty keyboard input are
+implemented; see [their interface and usage](docs/queries-and-keyboard.md).
 
 See the [implementation review](docs/implementation-review.md) for corrected
 Windows input/echo behavior and the measured paste parsing optimization.

@@ -11,6 +11,8 @@ struct InputProtocols {
     MouseProtocol mouse = MouseProtocol::None;
     bool focus = false;
     bool bracketed_paste = false;
+    bool replies = false;
+    KeyboardProtocol keyboard = KeyboardProtocol::Legacy;
 };
 struct ParserOptions {
     std::chrono::milliseconds escape_timeout{25}, sequence_timeout{250};

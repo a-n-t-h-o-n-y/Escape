@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cerrno>
 #include <charconv>
 #include <cstdlib>
@@ -199,8 +200,8 @@ void echo(Input const& input, std::string_view bytes)
     bool borrowed = input.output_descriptor >= 0;
     auto output = borrowed ? handle(input.output_descriptor)
                            : ::CreateFileW(L"CONOUT$", GENERIC_WRITE,
-                                           FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                           nullptr, OPEN_EXISTING, 0, nullptr);
+                                           FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                                           OPEN_EXISTING, 0, nullptr);
     if (output == INVALID_HANDLE_VALUE) check(FALSE, "Reader: open echo output");
     DWORD error = 0;
     std::size_t offset = 0;
@@ -220,7 +221,8 @@ void echo(Input const& input, std::string_view bytes)
     }
     if (!borrowed) ::CloseHandle(output);
     if (error)
-        throw std::system_error{static_cast<int>(error), std::system_category(), "Reader: echo"};
+        throw std::system_error{static_cast<int>(error), std::system_category(),
+                                "Reader: echo"};
 }
 void accept(Input& input, std::string const& bytes, DWORD mode)
 {
@@ -259,6 +261,91 @@ auto is_terminal(int fd) -> bool
     DWORD mode = 0;
     return ::GetConsoleMode(handle(fd), &mode) != FALSE;
 }
+// Optional console stream worker. Native-record input remains the default.
+// One bounded ReadFile can remain pending across caller timeouts. Stop cancels
+// and joins it before session modes or borrowed handles can be released.
+struct Input::ConsoleRead {
+    HANDLE source, ready = nullptr, command = nullptr, thread = nullptr;
+    std::array<char, 4096> bytes{};
+    DWORD count = 0, error = 0;
+    std::size_t offset = 0;
+    bool requested = false;
+    std::atomic<bool> stopping{false}, done{false}, work{false};
+    explicit ConsoleRead(HANDLE handle) : source{handle}
+    {
+        ready = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
+        check(ready != nullptr, "Query: create read completion event");
+        command = ::CreateEventW(nullptr, FALSE, FALSE, nullptr);
+        if (!command) {
+            auto error = ::GetLastError();
+            ::CloseHandle(ready);
+            ::SetLastError(error);
+            check(FALSE, "Query: create read request event");
+        }
+    }
+    static DWORD WINAPI run(void* context) noexcept
+    {
+        auto& read = *static_cast<ConsoleRead*>(context);
+        while (true) {
+            if (::WaitForSingleObject(read.command, INFINITE) == WAIT_FAILED) {
+                read.error = ::GetLastError();
+                read.done.store(true, std::memory_order_release);
+                ::SetEvent(read.ready);
+                return 0;
+            }
+            if (read.stopping.load(std::memory_order_acquire)) return 0;
+            (void)read.work.exchange(false, std::memory_order_acquire);
+            if (!::ReadFile(read.source, read.bytes.data(),
+                            static_cast<DWORD>(read.bytes.size()), &read.count,
+                            nullptr))
+                read.error = ::GetLastError();
+            read.done.store(true, std::memory_order_release);
+            ::SetEvent(read.ready);
+        }
+    }
+    void start()
+    {
+        count = error = 0;
+        offset = 0;
+        done.store(false, std::memory_order_relaxed);
+        ::ResetEvent(ready);
+        if (!thread) {
+            thread = ::CreateThread(nullptr, 0, run, this, 0, nullptr);
+            check(thread != nullptr, "Query: start console read");
+        }
+        requested = true;
+        work.store(true, std::memory_order_release);
+        ::SetEvent(command);
+    }
+    ~ConsoleRead() noexcept
+    {
+        stopping.store(true, std::memory_order_release);
+        ::SetEvent(command);
+        // Retrying closes the race where cancellation precedes ReadFile entry.
+        while (thread && ::WaitForSingleObject(thread, 0) == WAIT_TIMEOUT) {
+            ::CancelSynchronousIo(thread);
+            ::WaitForSingleObject(thread, 1);
+        }
+        if (thread) ::CloseHandle(thread);
+        ::CloseHandle(command);
+        ::CloseHandle(ready);
+    }
+};
+Input::~Input() = default;
+void prepare_queries(Input& input)
+{
+    if (input.high_surrogate)
+        throw std::logic_error{
+            "Query: complete pending native UTF-16 input before switching transport"};
+    if (!input.line.empty()) {
+        input.pending += input.line;
+        input.line.clear();
+    }
+    if (input.terminal && !input.console_read)
+        input.console_read =
+            std::make_unique<Input::ConsoleRead>(handle(input.descriptor));
+}
+void stop_queries(Input& input) noexcept { input.console_read.reset(); }
 Input::Input(int fd) : descriptor{fd}, terminal{is_terminal(fd)}
 {
     if (terminal) {
@@ -280,6 +367,14 @@ auto terminal_identity(int input, int output) -> std::uint64_t
     // Windows attaches a process to at most one console. Screen buffers share
     // its input modes and code pages, so even distinct output buffers overlap.
     return 1;
+}
+auto query_attributes(Attributes captured) -> Attributes
+{
+    if (captured.input_mode & (ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT))
+        throw std::invalid_argument{"Query: immediate input with echo off is required"};
+    captured.input_mode |= ENABLE_VIRTUAL_TERMINAL_INPUT;
+    captured.input_codepage = CP_UTF8;
+    return captured;
 }
 auto transport_setup_required() noexcept -> bool { return true; }
 void begin_session(Attributes& captured)
@@ -426,6 +521,20 @@ auto poll_input(Input& input, int timeout) -> int
     if (fail) return -1;
     (void)limit;
 
+    if (input.console_read && !(input.offset < input.pending.size() || input.repeat)) {
+        auto& read = *input.console_read;
+        if (read.done.load(std::memory_order_acquire) &&
+            (read.offset < read.count || read.error))
+            return 1;
+        if (!read.requested) read.start();
+        auto result = ::WaitForSingleObject(
+            read.ready, timeout < 0 ? INFINITE : static_cast<DWORD>(timeout));
+        if (result == WAIT_TIMEOUT) return 0;
+        if (result == WAIT_FAILED) return failed();
+        (void)read.done.load(std::memory_order_acquire);
+        return 1;
+    }
+
     auto until = timeout < 0
                      ? Clock::time_point::max()
                      : deadline_after(Clock::now(), std::chrono::milliseconds{timeout});
@@ -517,6 +626,26 @@ auto read_bytes(Input& input, void* buffer, std::size_t count) -> std::ptrdiff_t
     if (fail) return -1;
     count = limit;
 
+    if (input.console_read && !(input.offset < input.pending.size() || input.repeat)) {
+        auto& read = *input.console_read;
+        if (!read.done.load(std::memory_order_acquire)) {
+            errno = EAGAIN;
+            return -1;
+        }
+        if (read.error) {
+            ::SetLastError(read.error);
+            return failed();
+        }
+        auto size = std::min(count, static_cast<std::size_t>(read.count) - read.offset);
+        std::memcpy(buffer, read.bytes.data() + read.offset, size);
+        read.offset += size;
+        if (read.offset == read.count) {
+            read.done.store(false, std::memory_order_release);
+            read.requested = false;
+        }
+        if (!size) input.hung_up = true;
+        return static_cast<std::ptrdiff_t>(size);
+    }
     if (input.terminal) {
         if (input.offset == input.pending.size() && input.repeat) {
             input.pending = input.repeated;

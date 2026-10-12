@@ -295,8 +295,9 @@ TEST(WIN_INPUT_function_keys)
     esc::Reader reader{fixture.input.stream};
     for (WORD code = VK_F1; code <= VK_F24; ++code) {
         fixture.key(0, code, SHIFT_PRESSED | LEFT_CTRL_PRESSED);
-        key(reader, static_cast<esc::KeyCode>(
-                        static_cast<unsigned>(esc::KeyCode::F1) + code - VK_F1),
+        key(reader,
+            static_cast<esc::KeyCode>(static_cast<unsigned>(esc::KeyCode::F1) + code -
+                                      VK_F1),
             {.shift = true, .ctrl = true});
     }
 }
@@ -320,9 +321,11 @@ TEST(WIN_INPUT_canonical_echo_uses_session_buffer_without_leaking_handles)
     std::array<wchar_t, 32> text{};
     DWORD count = 0;
     CHECK(::ReadConsoleOutputCharacterW(fixture.output.handle(), text.data(),
-                                        static_cast<DWORD>(text.size()), {0, 0}, &count));
+                                        static_cast<DWORD>(text.size()), {0, 0},
+                                        &count));
     CHECK(count == text.size());
-    for (auto character : text) CHECK(character == L'x');
+    for (auto character : text)
+        CHECK(character == L'x');
 }
 TEST(WIN_INPUT_repeats_do_not_require_more_os_records)
 {
@@ -629,4 +632,80 @@ TEST(WIN_INPUT_disk_file_reports_eof_without_polling_forever)
         CHECK(reader.read(0ms).status == esc::ReadStatus::EndOfInput);
     }
     CHECK(std::fclose(stream) == 0);
+}
+
+TEST(WIN_QUERY_transport_is_explicit_and_restores_native_modes_and_codepages)
+{
+    Fixture fixture;
+    auto mode = fixture.input_mode();
+    auto codepage = ::GetConsoleCP();
+    auto terminal = immediate(fixture);
+    CHECK(!(fixture.input_mode() & ENABLE_VIRTUAL_TERMINAL_INPUT));
+    terminal.request(esc::KeyboardQuery{});
+    CHECK(fixture.input_mode() & ENABLE_VIRTUAL_TERMINAL_INPUT);
+    CHECK(::GetConsoleCP() == CP_UTF8);
+    fixture.key(L'x');
+    CHECK(terminal.read(500ms).event == std::optional<esc::Event>{esc::KeyPress{U'x'}});
+    terminal.close();
+    CHECK(fixture.input_mode() == mode);
+    CHECK(::GetConsoleCP() == codepage);
+}
+TEST(WIN_QUERY_idle_worker_is_cancelled_before_close_without_handle_leaks)
+{
+    Fixture fixture;
+    DWORD before = 0, after = 0;
+    CHECK(::GetProcessHandleCount(::GetCurrentProcess(), &before));
+    for (unsigned i = 0; i < 5; ++i) {
+        auto terminal = immediate(fixture);
+        terminal.request(esc::KeyboardQuery{});
+        // No KEY_EVENT with text: readiness must not force a blocking console read.
+        fixture.key(L'x', 0, 0, 1, false);
+        (void)terminal.read(1ms);
+        auto start = std::chrono::steady_clock::now();
+        terminal.close();
+        CHECK(std::chrono::steady_clock::now() - start < 500ms);
+    }
+    CHECK(::GetProcessHandleCount(::GetCurrentProcess(), &after));
+    CHECK(before == after);
+}
+TEST(WIN_QUERY_vt_reply_bytes_are_typed_and_user_input_is_preserved)
+{
+    Fixture fixture;
+    auto terminal = immediate(fixture);
+    terminal.request(esc::KeyboardQuery{});
+    fixture.key(L'x');
+    for (auto c : std::wstring_view{L"\x1b[?3u"})
+        fixture.key(c);
+    CHECK(terminal.read(500ms).event == std::optional<esc::Event>{esc::KeyPress{U'x'}});
+    CHECK(terminal.read(500ms).event ==
+          std::optional<esc::Event>{esc::TerminalReply{esc::KeyboardReply{3}}});
+}
+TEST(WIN_QUERY_failed_transport_change_rolls_back_and_remains_usable)
+{
+    Fixture fixture;
+    auto terminal = immediate(fixture);
+    auto mode = fixture.input_mode();
+    auto codepage = ::GetConsoleCP();
+    esc::testing::FaultScope faults{{esc::testing::Operation::SetAttributes, 1,
+                                     std::make_error_code(std::errc::io_error)}};
+    CHECK_THROWS(std::system_error, terminal.request(esc::KeyboardQuery{}));
+    CHECK(fixture.input_mode() == mode && ::GetConsoleCP() == codepage);
+    fixture.key(L'z');
+    CHECK(terminal.read(500ms).event == std::optional<esc::Event>{esc::KeyPress{U'z'}});
+}
+
+TEST(WIN_QUERY_partial_native_surrogate_is_preserved_before_transport_switch)
+{
+    Fixture fixture;
+    auto terminal = immediate(fixture);
+    fixture.key(0xd83d);
+    CHECK(terminal.read(0ms).status == esc::ReadStatus::Timeout);
+    auto mode = fixture.input_mode();
+    CHECK_THROWS(std::logic_error, terminal.request(esc::KeyboardQuery{}));
+    CHECK(fixture.input_mode() == mode);
+    fixture.key(0xdc7d);
+    CHECK(terminal.read(500ms).event ==
+          std::optional<esc::Event>{esc::KeyPress{U'👽'}});
+    terminal.request(esc::KeyboardQuery{});
+    CHECK(fixture.input_mode() & ENABLE_VIRTUAL_TERMINAL_INPUT);
 }

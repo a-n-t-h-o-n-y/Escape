@@ -4,6 +4,7 @@
 #include <mutex>
 #include <set>
 #include "detail/backend.hpp"
+#include "detail/protocol.hpp"
 
 namespace esc {
 namespace {
@@ -139,6 +140,43 @@ struct Terminal::Impl {
     Area last_size{};
     detail::Clock::time_point next_resize{};
     std::array<bool, 5> touched{};
+    std::array<std::optional<Event>, 64> deferred;
+    std::size_t deferred_head = 0, deferred_count = 0;
+    bool replies = false, keyboard_touched = false;
+    KeyboardProtocol keyboard = KeyboardProtocol::Legacy;
+    unsigned saved_keyboard_flags = 0;
+    void configure_reader()
+    {
+        auto protocols = input_protocols(modes);
+        protocols.replies = replies;
+        protocols.keyboard = keyboard;
+        reader.configure_session(protocols, modes.mouse.mode, output_fd);
+    }
+    void enqueue(Event event) noexcept
+    {
+        static_assert(std::is_nothrow_move_constructible_v<Event>);
+        deferred[(deferred_head + deferred_count) % deferred.size()].emplace(
+            std::move(event));
+        ++deferred_count;
+    }
+    auto dequeue() -> Event
+    {
+        auto result = std::move(*deferred[deferred_head]);
+        deferred[deferred_head].reset();
+        deferred_head = (deferred_head + 1) % deferred.size();
+        --deferred_count;
+        return result;
+    }
+    void keyboard_command(unsigned flags)
+    {
+        std::array<char, 32> bytes;
+        detail::SequenceWriter writer{bytes.data()};
+        writer.text("\x1b[=");
+        writer.number(flags);
+        writer.text(";1u");
+        output.write(std::string_view{bytes.data(), writer.size()});
+        output.flush();
+    }
     bool leased = false, open = false, usable = true, os_touched = false;
     Impl(Streams s,
          int input,
@@ -244,9 +282,13 @@ struct Terminal::Impl {
         auto new_options = options;
         merge_os(new_options, patch);
         auto attributes = detail::desired_attributes(captured, new_options);
+        if (replies) attributes = detail::query_attributes(attributes);
         bool os = patch.echo.has_value() || patch.input_buffer.has_value() ||
                   patch.signals.has_value() || detail::transport_setup_required();
         auto changed = changed_modes(modes, next);
+        if (keyboard_touched && changed[0])
+            throw std::logic_error{
+                "Terminal: disable keyboard before changing screen buffer"};
         std::array<bool, 5> attempted{};
         if (os) {
             os_touched = true;
@@ -285,15 +327,18 @@ struct Terminal::Impl {
         options.signals = new_options.signals;
         options.mouse = new_options.mouse;
         modes = next;
-        reader.configure_session(input_protocols(modes), modes.mouse.mode, output_fd);
+        configure_reader();
     }
     auto cleanup() -> std::error_code
     {
         std::error_code error;
         attempt(error, [&] { output.flush(); });
+        if (keyboard_touched)
+            attempt(error, [&] { keyboard_command(saved_keyboard_flags); });
         for (std::size_t i = 5; i > 0; --i)
             if (touched[i - 1]) attempt(error, [&] { emit(i - 1, restore); });
         attempt(error, [&] { output.flush(); });
+        reader.stop_queries();
         if (os_touched)
             attempt(error, [&] {
                 checked(detail::set_attributes(input_fd, &captured),
@@ -424,6 +469,7 @@ auto Terminal::read_until(std::optional<std::chrono::milliseconds> timeout)
     require_open();
     if (timeout && timeout->count() < 0)
         throw std::invalid_argument{"Terminal: negative timeout"};
+    if (impl_->deferred_count) return {ReadStatus::Event, impl_->dequeue()};
     auto deadline = timeout ? detail::deadline_after(detail::Clock::now(), *timeout)
                             : detail::Clock::time_point::max();
     while (true) {
@@ -447,6 +493,223 @@ auto Terminal::read_until(std::optional<std::chrono::milliseconds> timeout)
         auto wait = std::chrono::ceil<std::chrono::milliseconds>(until - now);
         auto result = impl_->reader.read(wait);
         if (result.status != ReadStatus::Timeout) return result;
+    }
+}
+namespace {
+auto matches(Query const& query, Reply const& reply) -> bool
+{
+    return std::visit(
+        [&](auto const& request) {
+            using T = std::decay_t<decltype(request)>;
+            if constexpr (std::same_as<T, DeviceAttributesQuery>)
+                return std::holds_alternative<DeviceAttributesReply>(reply);
+            else if constexpr (std::same_as<T, KeyboardQuery>)
+                return std::holds_alternative<KeyboardReply>(reply);
+            else {
+                auto mode = std::get_if<ModeReply>(&reply);
+                return mode && mode->mode == request.mode;
+            }
+        },
+        query);
+}
+auto remaining(detail::Clock::time_point deadline) -> std::chrono::milliseconds
+{
+    auto now = detail::Clock::now();
+    return now >= deadline
+               ? std::chrono::milliseconds{0}
+               : std::chrono::ceil<std::chrono::milliseconds>(deadline - now);
+}
+}  // namespace
+void Terminal::request(Query const& query)
+{ request(std::span<Query const>{&query, 1}); }
+void Terminal::request(std::span<Query const> queries)
+{
+    require_open();
+    if (queries.empty()) return;
+    require(impl_->report.profile.control, Feature::Control);
+    // Validate the entire pack before changing transport or emitting anything.
+    for (auto const& query : queries)
+        (void)query_to({}, query);
+    if (!impl_->replies) {
+        auto attributes = detail::query_attributes(impl_->current);
+        impl_->reader.prepare_queries();  // Allocate transport before OS changes.
+        if (detail::transport_setup_required()) {
+            impl_->os_touched = true;
+            if (detail::set_attributes(impl_->input_fd, &attributes) < 0) {
+                auto primary = error_code();
+                impl_->reader.stop_queries();
+                if (detail::set_attributes(impl_->input_fd, &impl_->current) < 0) {
+                    impl_->usable = false;
+                    throw SessionError{primary, error_code()};
+                }
+                throw std::system_error{primary, "Query: enable input transport"};
+            }
+            impl_->current = attributes;
+        }
+        impl_->replies = true;
+        impl_->configure_reader();
+    }
+    std::array<char, 256> batch;
+    std::size_t used = 0;
+    for (auto const& query : queries) {
+        auto required = query_to({}, query).required;
+        if (required > batch.size() - used) {
+            impl_->output.write(std::string_view{batch.data(), used});
+            used = 0;
+        }
+        used += query_to(std::span<char>{batch}.subspan(used), query).written;
+    }
+    impl_->output.write(std::string_view{batch.data(), used});
+    impl_->output.flush();
+}
+auto Terminal::query(Query const& request, std::chrono::milliseconds timeout)
+    -> QueryResult
+{
+    require_open();
+    if (timeout.count() < 0) throw std::invalid_argument{"Query: negative timeout"};
+    // Validate even when the preservation queue is full.
+    std::array<char, 32> validation;
+    (void)query_to(validation, request);
+    require(impl_->report.profile.control, Feature::Control);
+    if (impl_->deferred_count == impl_->deferred.size())
+        return {QueryStatus::InputPending, {}};
+    auto deadline = detail::deadline_after(detail::Clock::now(), timeout);
+    this->request(request);
+    bool attempted = false;
+    while (true) {
+        if (impl_->deferred_count == impl_->deferred.size())
+            return {QueryStatus::InputPending, {}};
+        if (attempted && detail::Clock::now() >= deadline)
+            return {QueryStatus::Timeout, {}};
+        attempted = true;
+        auto result = impl_->reader.read(remaining(deadline));
+        if (result.status == ReadStatus::Timeout) return {QueryStatus::Timeout, {}};
+        if (result.status == ReadStatus::EndOfInput)
+            return {QueryStatus::EndOfInput, {}};
+        if (auto reply = std::get_if<TerminalReply>(&*result.event)) {
+            if (matches(request, reply->value))
+                return {QueryStatus::Reply, std::move(reply->value)};
+        }
+        impl_->enqueue(std::move(*result.event));
+    }
+}
+auto Terminal::probe(std::chrono::milliseconds timeout) -> ProbeReport
+{
+    require_open();
+    if (timeout.count() < 0) throw std::invalid_argument{"Probe: negative timeout"};
+    auto deadline = detail::deadline_after(detail::Clock::now(), timeout);
+    ProbeReport report;
+    Query const requests[] = {KeyboardQuery{}, ModeQuery{25},   ModeQuery{1049},
+                              ModeQuery{1000}, ModeQuery{1002}, ModeQuery{1003},
+                              ModeQuery{1006}, ModeQuery{1004}, ModeQuery{2004},
+                              ModeQuery{2026}};
+    report.observations.reserve(std::size(requests));
+    for (auto const& request : requests)
+        report.observations.push_back(
+            {request, {QueryStatus::Timeout, {}}, EvidenceSource::Probe});
+    if (impl_->deferred_count == impl_->deferred.size()) {
+        for (auto& observation : report.observations)
+            observation.result.status = QueryStatus::InputPending;
+        return report;
+    }
+    request(std::span<Query const>{requests});
+    std::size_t waiting = std::size(requests);
+    bool attempted = false;
+    while (waiting) {
+        QueryStatus stop = QueryStatus::Timeout;
+        if (impl_->deferred_count == impl_->deferred.size())
+            stop = QueryStatus::InputPending;
+        else if (!attempted || detail::Clock::now() < deadline) {
+            attempted = true;
+            auto result = impl_->reader.read(remaining(deadline));
+            if (result.status == ReadStatus::Event) {
+                bool matched = false;
+                if (auto reply = std::get_if<TerminalReply>(&*result.event))
+                    for (auto& observation : report.observations)
+                        if (observation.result.status != QueryStatus::Reply &&
+                            matches(observation.request, reply->value)) {
+                            observation.result = {QueryStatus::Reply,
+                                                  std::move(reply->value)};
+                            --waiting;
+                            matched = true;
+                            break;
+                        }
+                if (!matched) impl_->enqueue(std::move(*result.event));
+                continue;
+            }
+            if (result.status == ReadStatus::EndOfInput) stop = QueryStatus::EndOfInput;
+        }
+        for (auto& observation : report.observations)
+            if (observation.result.status != QueryStatus::Reply)
+                observation.result.status = stop;
+        break;
+    }
+    return report;
+}
+
+auto Terminal::keyboard_protocol() const -> KeyboardProtocol
+{
+    require_open();
+    return impl_->keyboard;
+}
+void Terminal::disable_keyboard()
+{
+    require_open();
+    if (!impl_->keyboard_touched) return;
+    try {
+        impl_->keyboard_command(impl_->saved_keyboard_flags);
+    }
+    catch (...) {
+        impl_->usable = false;
+        throw;
+    }
+    impl_->keyboard_touched = false;
+    impl_->keyboard = impl_->saved_keyboard_flags ? KeyboardProtocol::Kitty
+                                                  : KeyboardProtocol::Legacy;
+    impl_->configure_reader();
+}
+auto Terminal::enable_keyboard(KittyFlags flags, std::chrono::milliseconds timeout)
+    -> QueryResult
+{
+    require_open();
+    detail::validate_kitty_flags(flags);
+    if (timeout.count() < 0) throw std::invalid_argument{"Kitty: negative timeout"};
+    auto deadline = detail::deadline_after(detail::Clock::now(), timeout);
+    auto captured = query(KeyboardQuery{}, remaining(deadline));
+    if (captured.status != QueryStatus::Reply) return captured;
+    unsigned previous = std::get<KeyboardReply>(*captured.reply).flags;
+    auto old_protocol = previous ? KeyboardProtocol::Kitty : KeyboardProtocol::Legacy;
+    bool old_touched = impl_->keyboard_touched;
+    if (!impl_->keyboard_touched) impl_->saved_keyboard_flags = previous;
+    impl_->keyboard_touched = true;  // Cleanup covers partial writes too.
+    impl_->keyboard = KeyboardProtocol::Kitty;
+    impl_->configure_reader();
+    try {
+        impl_->keyboard_command(static_cast<unsigned>(flags));
+        auto accepted = query(KeyboardQuery{}, remaining(deadline));
+        if (accepted.status == QueryStatus::Reply &&
+            std::get<KeyboardReply>(*accepted.reply).flags ==
+                static_cast<unsigned>(flags))
+            return accepted;
+        impl_->keyboard_command(previous);
+        impl_->keyboard = old_protocol;
+        impl_->keyboard_touched = old_touched;
+        impl_->configure_reader();
+        if (accepted.status == QueryStatus::Reply)
+            accepted.status = QueryStatus::Rejected;
+        return accepted;
+    }
+    catch (std::system_error const& primary) {
+        std::error_code rollback;
+        Impl::attempt(rollback, [&] { impl_->keyboard_command(previous); });
+        impl_->usable = false;
+        throw SessionError{primary.code(), rollback};
+    }
+    catch (...) {
+        std::error_code rollback;
+        Impl::attempt(rollback, [&] { impl_->keyboard_command(previous); });
+        impl_->usable = false;
+        throw;
     }
 }
 }  // namespace esc

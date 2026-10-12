@@ -43,7 +43,7 @@ stream borrowing, ownership, mode/code-page/CRT restoration, and injected failur
 | OUT | output, failures |
 | IO | reader, failures |
 | SES | session, failures |
-| WIN | windows.test.cpp (35 native platform cases) |
+| WIN | windows.test.cpp (40 native platform cases) |
 | PKG | verify_headers.py, verify_package.py |
 | LIVE | Manual [acceptance matrix](live-terminals.md), still untested |
 
@@ -75,7 +75,7 @@ allocation contracts. Owned paste/unknown events may allocate.
 
 ## Verification status
 
-The macOS suite contains 198 behavior tests, plus independent header/package
+The macOS suite contains 222 behavior tests, plus independent header/package
 checks and PTY smoke tests for Pong and termcaps. It passes locally with Apple
 Clang 15 in release and ASan/UBSan builds after the backend split. Public headers
 stand alone without platform headers; Windows tests also include windows.h
@@ -84,7 +84,7 @@ and shared consumers compile, link, and run through Escape::escape on macOS.
 
 The library, both examples, portable contracts, and platform contract executables
 also cross-compile and link for x86_64 Linux and Windows with Zig 0.15.2's Clang
-20.1.2 toolchain. Cross-compilation does not execute behavior tests. The 35 native
+20.1.2 toolchain. Cross-compilation does not execute behavior tests. The 40 native
 Windows cases are compiled but have not run on this laptop. Native Linux,
 Windows/MSVC, and real emulator results are pending. GitHub Actions is configured
 for ubuntu-latest, macos-latest, windows-latest/MSVC, and Linux sanitizers; no
@@ -94,3 +94,13 @@ An earlier independent Unicode harness compared all 1,112,064 Unicode scalars
 and 75,536 short valid/malformed UTF-8 inputs against Python's strict codec.
 Those checks passed; the temporary harness is not part of CTest. No claim is
 made about multi-gigabyte stress inputs or all possible terminal byte streams.
+
+## Queries and keyboard extensions
+
+`protocols.test.cpp` adds ten core cases for pure request encoding, typed replies,
+fragmentation, malformed fields, all modifier combinations, functional key
+mappings, text identity, protocol snapshots, and allocation contracts.
+`queries.test.cpp` adds fourteen POSIX session cases for bounded input preservation,
+late replies, shared probe deadlines, negotiation, rejection, timeout rollback,
+flag restoration, and partial write failures. Five Windows cases cover explicit
+VT transport setup/restoration, cancellation/handle lifetime, typed replies, setup rollback, and pending native UTF-16 preservation. See [the extension contract](../../docs/queries-and-keyboard.md).

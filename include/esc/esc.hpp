@@ -14,3 +14,6 @@
 #include <esc/terminal.hpp>
 #include <esc/text.hpp>
 #include <esc/trait.hpp>
+
+#include <esc/query.hpp>
+#include <esc/keyboard.hpp>
