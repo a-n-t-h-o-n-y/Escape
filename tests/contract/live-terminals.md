@@ -32,7 +32,7 @@ For each connection, record the profile and fallback policy, then verify:
    and RGB samples supported by the profile. Verify configured palette behavior
    and intended lower-depth fallback. NO_COLOR suppresses color requests.
 4. Display each supported trait and replacement combinations. Verify trait
-   replacement preserves colors; Brush replaces style; ResetStyle resets SGR.
+   replacement preserves colors; Style replaces style; ResetStyle resets SGR.
 5. Capture actual keyboard bytes for arrows, home/end, function keys, keypad,
    modifiers, Escape, Alt, ASCII, and multibyte text. Preserve ambiguous cases as
    ambiguous, rather than labeling them physical-key identities.

@@ -1,6 +1,6 @@
 #pragma once
 #include <esc/area.hpp>
-#include <esc/brush.hpp>
+#include <esc/style.hpp>
 #include <esc/capabilities.hpp>
 #include <esc/color.hpp>
 #include <esc/event.hpp>
@@ -18,3 +18,6 @@
 
 #include <esc/query.hpp>
 #include <esc/keyboard.hpp>
+
+#include <esc/styled_text.hpp>
+#include <esc/result.hpp>

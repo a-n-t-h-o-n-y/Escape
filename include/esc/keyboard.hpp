@@ -15,13 +15,22 @@ enum class KittyFlags : unsigned {
 constexpr auto operator|(KittyFlags a, KittyFlags b) -> KittyFlags
 { return static_cast<KittyFlags>(static_cast<unsigned>(a) | static_cast<unsigned>(b)); }
 enum class KeyAction { Press, Repeat, Release };
-// A text-only IME event has no key. Legacy input still produces KeyPress.
+// Legacy and enhanced protocols share this event. Unreported text stays empty.
+// A text-only IME event has no key.
 struct KeyEvent {
-    std::optional<Key> key;
+    std::optional<Key> key = {};
     Modifiers modifiers = {};
     KeyAction action = KeyAction::Press;
-    std::optional<char32_t> shifted_key, base_layout_key;
-    std::u32string text;
+    std::optional<char32_t> shifted_key = {}, base_layout_key = {};
+    std::u32string text = {};
+    [[nodiscard]] auto matches(Key const& expected,
+                               Modifiers required = {},
+                               KeyAction expected_action = KeyAction::Press) const
+        -> bool
+    {
+        return key && *key == expected && modifiers == required &&
+               action == expected_action;
+    }
     friend auto operator==(KeyEvent const&, KeyEvent const&) -> bool = default;
 };
 }  // namespace esc

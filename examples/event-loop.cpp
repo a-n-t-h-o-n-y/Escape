@@ -57,18 +57,20 @@ int main()
         for (;;) {
             if (Clock::now() >= tick) {
                 auto frame = terminal.frame();
-                terminal.send(esc::Cursor{}, esc::BlankRow{});
-                terminal.write("Press q to quit. Timer: ", std::to_string(seconds++));
+                terminal.write(esc::Cursor{}, esc::BlankRow{},
+                               esc::styled("Press q to quit.",
+                                           esc::bold | esc::fg(esc::XColor::Cyan)),
+                               " Timer: ", std::to_string(seconds++));
                 frame.close();
                 tick = Clock::now() + 1s;
             }
             auto state = terminal.wait_state();
             if (!state.ready) wait(state, tick);
             auto result = terminal.read(0ms);
-            if (result.status == esc::ReadStatus::EndOfInput) break;
-            if (result.event) {
-                auto key = std::get_if<esc::KeyPress>(&*result.event);
-                if (key && key->key == esc::Key{U'q'}) break;
+            if (std::holds_alternative<esc::EndOfInput>(result)) break;
+            if (auto event = std::get_if<esc::Event>(&result)) {
+                auto key = std::get_if<esc::KeyEvent>(event);
+                if (key && key->matches(U'q')) break;
             }
         }
         terminal.close();

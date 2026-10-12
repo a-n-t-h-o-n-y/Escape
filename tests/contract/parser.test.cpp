@@ -1,3 +1,4 @@
+#include "support/results.hpp"
 #include "support/fixtures.hpp"
 
 #include <climits>
@@ -9,10 +10,10 @@ using contract::parses_at_every_split;
 TEST(PAR_01_ascii_unicode_and_control_keys_do_not_invent_modifiers)
 {
     parses_at_every_split("aA界👽\0\x01\n\t\r\b\x7f"sv,
-        {KeyPress{U'a'},KeyPress{U'A'},KeyPress{U'界'},KeyPress{U'👽'},
-         KeyPress{U'\0'},KeyPress{U'\x01'},KeyPress{U'\n'},
-         KeyPress{KeyCode::Tab},KeyPress{KeyCode::Enter},
-         KeyPress{KeyCode::Backspace},KeyPress{KeyCode::Backspace}});
+        {KeyEvent{U'a'},KeyEvent{U'A'},KeyEvent{U'界'},KeyEvent{U'👽'},
+         KeyEvent{U'\0'},KeyEvent{U'\x01'},KeyEvent{U'\n'},
+         KeyEvent{KeyCode::Tab},KeyEvent{KeyCode::Enter},
+         KeyEvent{KeyCode::Backspace},KeyEvent{KeyCode::Backspace}});
 }
 TEST(PAR_01_csi_and_ss3_navigation_and_function_keys)
 {
@@ -23,10 +24,10 @@ TEST(PAR_01_csi_and_ss3_navigation_and_function_keys)
     for (auto c : cases) {
         for (auto prefix : {"\x1b[","\x1b[1","\x1bO"}) {
             auto bytes=std::string{prefix}+c.final;
-            parses_at_every_split(bytes,{KeyPress{c.key}});
+            parses_at_every_split(bytes,{KeyEvent{c.key}});
         }
     }
-    parses_at_every_split("\x1b[Z",{KeyPress{KeyCode::Tab,Modifiers{.shift=true}}});
+    parses_at_every_split("\x1b[Z",{KeyEvent{KeyCode::Tab,Modifiers{.shift=true}}});
 }
 TEST(PAR_01_tilde_identifiers_use_named_keys_not_enum_arithmetic)
 {
@@ -39,7 +40,7 @@ TEST(PAR_01_tilde_identifiers_use_named_keys_not_enum_arithmetic)
         {24,KeyCode::F12},{25,KeyCode::F13},{26,KeyCode::F14},{28,KeyCode::F15},
         {29,KeyCode::F16},{31,KeyCode::F17},{32,KeyCode::F18},{33,KeyCode::F19},{34,KeyCode::F20}};
     for (auto c : cases)
-        parses_at_every_split("\x1b["+std::to_string(c.identifier)+"~",{KeyPress{c.key}});
+        parses_at_every_split("\x1b["+std::to_string(c.identifier)+"~",{KeyEvent{c.key}});
 }
 TEST(PAR_01_ss3_keypad_is_distinct_from_printable_text)
 {
@@ -50,8 +51,8 @@ TEST(PAR_01_ss3_keypad_is_distinct_from_printable_text)
         {'w',KeyCode::Keypad7},{'x',KeyCode::Keypad8},{'y',KeyCode::Keypad9},
         {'n',KeyCode::KeypadDecimal},{'k',KeyCode::KeypadPlus},{'m',KeyCode::KeypadMinus},
         {'j',KeyCode::KeypadMultiply},{'o',KeyCode::KeypadDivide}};
-    for (auto c : cases) parses_at_every_split(std::string{"\x1bO"}+c.final,{KeyPress{c.key}});
-    parses_at_every_split("0",{KeyPress{U'0'}});
+    for (auto c : cases) parses_at_every_split(std::string{"\x1bO"}+c.final,{KeyEvent{c.key}});
+    parses_at_every_split("0",{KeyEvent{U'0'}});
 }
 TEST(PAR_01_native_function_identifiers_are_not_portable_protocol_claims)
 {
@@ -65,8 +66,8 @@ TEST(PAR_01_every_modifier_combination_is_a_separate_value)
     for (int parameter=1;parameter<=16;++parameter) {
         auto bits=parameter-1;
         Modifiers modifiers{bool(bits&1),bool(bits&4),bool(bits&2),bool(bits&8)};
-        parses_at_every_split("\x1b[1;"+std::to_string(parameter)+"A",{KeyPress{KeyCode::ArrowUp,modifiers}});
-        parses_at_every_split("\x1b[11;"+std::to_string(parameter)+"~",{KeyPress{KeyCode::F1,modifiers}});
+        parses_at_every_split("\x1b[1;"+std::to_string(parameter)+"A",{KeyEvent{KeyCode::ArrowUp,modifiers}});
+        parses_at_every_split("\x1b[11;"+std::to_string(parameter)+"~",{KeyEvent{KeyCode::F1,modifiers}});
     }
 }
 TEST(PAR_01_sgr_mouse_press_release_and_motion)
@@ -125,7 +126,7 @@ TEST(PAR_04_focus_and_mouse_protocols_are_not_enabled_implicitly)
 TEST(PAR_02_mixed_event_stream_survives_every_fragment_boundary)
 {
     parses_at_every_split("a界\x1b[1;5A\x1b[<0;2;3M\x1b[I",
-        {KeyPress{U'a'},KeyPress{U'界'},KeyPress{KeyCode::ArrowUp,Modifiers{.ctrl=true}},
+        {KeyEvent{U'a'},KeyEvent{U'界'},KeyEvent{KeyCode::ArrowUp,Modifiers{.ctrl=true}},
          MousePress{{1,2},MouseButton::Left},Focus{true}},
         InputProtocols{.mouse=MouseProtocol::Sgr,.focus=true});
 }
@@ -136,18 +137,18 @@ TEST(PAR_03_standalone_escape_and_alt_text_have_explicit_expiry)
     contract::feed(parser,"\x1b",events);
     CHECK(events.empty());
     CHECK(parser.pending_timeout()==std::optional{PendingTimeout::Escape});
-    CHECK(parser.expire()==std::optional<Event>{KeyPress{KeyCode::Escape}});
+    CHECK(parser.expire()==std::optional<Event>{KeyEvent{KeyCode::Escape}});
     CHECK(!parser.expire());
     CHECK(!parser.pending_timeout());
-    parses_at_every_split("\x1b" "a\x1b界",{KeyPress{U'a',Modifiers{.alt=true}},KeyPress{U'界',Modifiers{.alt=true}}});
+    parses_at_every_split("\x1b" "a\x1b界",{KeyEvent{U'a',Modifiers{.alt=true}},KeyEvent{U'界',Modifiers{.alt=true}}});
 }
 TEST(PAR_03_double_escape_resolves_first_and_keeps_second_pending)
 {
     Parser parser;
     std::vector<Event> events;
     contract::feed(parser,"\x1b\x1b",events);
-    CHECK(events==std::vector<Event>{KeyPress{KeyCode::Escape}});
-    CHECK(parser.expire()==std::optional<Event>{KeyPress{KeyCode::Escape}});
+    CHECK(events==std::vector<Event>{KeyEvent{KeyCode::Escape}});
+    CHECK(parser.expire()==std::optional<Event>{KeyEvent{KeyCode::Escape}});
 }
 TEST(PAR_03_truncated_sequences_expire_without_inventing_keys)
 {
@@ -162,7 +163,7 @@ TEST(PAR_03_truncated_sequences_expire_without_inventing_keys)
         CHECK(std::get<UnknownInput>(*expired).bytes==bytes);
         CHECK(std::get<UnknownInput>(*expired).problem==InputProblem::Truncated);
         contract::feed(parser,"x",events);
-        CHECK(events==std::vector<Event>{KeyPress{U'x'}});
+        CHECK(events==std::vector<Event>{KeyEvent{U'x'}});
     }
 }
 TEST(PAR_03_plain_partial_utf8_has_no_clock_deadline)
@@ -173,7 +174,7 @@ TEST(PAR_03_plain_partial_utf8_has_no_clock_deadline)
     CHECK(events.empty() && !parser.pending_timeout());
     CHECK(!parser.expire());
     contract::feed(parser,"\x8c"sv,events);
-    CHECK(events==std::vector<Event>{KeyPress{U'界'}});
+    CHECK(events==std::vector<Event>{KeyEvent{U'界'}});
 }
 TEST(PAR_03_finish_drains_truncation_then_requires_reset)
 {
@@ -188,7 +189,7 @@ TEST(PAR_03_finish_drains_truncation_then_requires_reset)
     CHECK_THROWS(std::logic_error,parser.next(std::span<char const>{}));
     parser.reset();
     contract::feed(parser,"x",events);
-    CHECK(events==std::vector<Event>{KeyPress{U'x'}});
+    CHECK(events==std::vector<Event>{KeyEvent{U'x'}});
 }
 TEST(PAR_04_unknown_control_units_preserve_payload)
 {
@@ -206,13 +207,13 @@ TEST(PAR_04_malformed_parameters_do_not_become_partial_numbers)
         CHECK(contract::unknown_bytes(events)==bytes);
         CHECK(events.size()==1);
     }
-    parses_at_every_split("\x1b[01;05A",{KeyPress{KeyCode::ArrowUp,Modifiers{.ctrl=true}}});
+    parses_at_every_split("\x1b[01;05A",{KeyEvent{KeyCode::ArrowUp,Modifiers{.ctrl=true}}});
 }
 TEST(PAR_04_invalid_utf8_preserves_bad_bytes_and_following_valid_text)
 {
     for (auto bad : {"\x80"sv,"\xc0\xaf"sv,"\xed\xa0\x80"sv,"\xf4\x90\x80\x80"sv}) {
         auto events=contract::parse(std::string{bad}+"x");
-        CHECK(!events.empty() && events.back()==Event{KeyPress{U'x'}});
+        CHECK(!events.empty() && events.back()==Event{KeyEvent{U'x'}});
         events.pop_back();
         CHECK(contract::unknown_bytes(events)==bad);
         for (auto const& event : events) CHECK(std::get<UnknownInput>(event).problem==InputProblem::InvalidUtf8);
@@ -247,8 +248,8 @@ TEST(PAR_04_configuration_changes_only_new_sequence_beginnings)
 }
 TEST(PAR_04_cancellation_and_new_introducers_recover_in_order)
 {
-    parses_at_every_split("\x1b[1\x18" "a",{UnknownInput{"\x1b[1\x18",InputProblem::Malformed,true},KeyPress{U'a'}});
-    parses_at_every_split("\x1b[1\x1b[A",{UnknownInput{"\x1b[1",InputProblem::Truncated,true},KeyPress{KeyCode::ArrowUp}});
+    parses_at_every_split("\x1b[1\x18" "a",{UnknownInput{"\x1b[1\x18",InputProblem::Malformed,true},KeyEvent{U'a'}});
+    parses_at_every_split("\x1b[1\x1b[A",{UnknownInput{"\x1b[1",InputProblem::Truncated,true},KeyEvent{KeyCode::ArrowUp}});
 }
 TEST(PAR_05_paste_preserves_bytes_across_every_split)
 {
@@ -319,7 +320,7 @@ TEST(PAR_03_finish_resolves_standalone_escape_as_a_key)
     Parser parser;
     std::vector<Event> events;
     contract::feed(parser,"\x1b",events);
-    CHECK(parser.finish()==std::optional<Event>{KeyPress{KeyCode::Escape}});
+    CHECK(parser.finish()==std::optional<Event>{KeyEvent{KeyCode::Escape}});
     CHECK(!parser.finish());
 }
 TEST(PAR_04_all_ss3_and_opaque_truncations_remain_owned_after_input_dies)
@@ -328,7 +329,7 @@ TEST(PAR_04_all_ss3_and_opaque_truncations_remain_owned_after_input_dies)
     {
         std::string input="\x1b]owned-payload";
         auto result=parser.next(std::span<char const>{input.data(),input.size()});
-        CHECK(result.consumed==input.size() && !result.event);
+        CHECK(result.consumed==input.size() && !contract::event(result));
     }
     auto event=parser.finish();
     CHECK(std::get<UnknownInput>(*event).bytes=="\x1b]owned-payload");
@@ -357,9 +358,9 @@ TEST(PAR_04_already_invalid_unicode_prefix_does_not_wait_for_eof)
     for(auto bytes : {"\xe0\x80"sv,"\xed\xa0"sv,"\xf0\x80"sv,"\xf4\x90"sv}) {
         Parser parser;
         auto result=parser.next(std::span<char const>{bytes.data(),bytes.size()});
-        CHECK(result.status==ParseStatus::Event);
-        CHECK(std::get<UnknownInput>(*result.event).problem==InputProblem::InvalidUtf8);
-        CHECK(std::get<UnknownInput>(*result.event).bytes==bytes);
+        CHECK(contract::status(result)==contract::Status::Event);
+        CHECK(std::get<UnknownInput>(*contract::event(result)).problem==InputProblem::InvalidUtf8);
+        CHECK(std::get<UnknownInput>(*contract::event(result)).bytes==bytes);
         CHECK(!parser.finish());
     }
 }
@@ -393,7 +394,7 @@ TEST(PAR_05_bulk_paste_preserves_payload_and_following_input)
             std::vector<Event> events;
             for (std::size_t offset = 0; offset < input.size(); offset += fragment)
                 contract::feed(parser, std::string_view{input}.substr(offset, fragment), events);
-            CHECK(events.back() == Event{KeyPress{U'z'}});
+            CHECK(events.back() == Event{KeyEvent{U'z'}});
             events.pop_back();
             std::string joined;
             for (std::size_t i = 0; i < events.size(); ++i) {
@@ -446,16 +447,16 @@ TEST(PAR_02_deterministic_mixed_streams_match_independent_event_goldens)
 {
     struct Fixture { std::string_view bytes; Event event; };
     std::array fixtures={
-        Fixture{"a",KeyPress{U'a'}},Fixture{"界",KeyPress{U'界'}},
-        Fixture{"\x1b[1;5A",KeyPress{KeyCode::ArrowUp,Modifiers{.ctrl=true}}},
-        Fixture{"\x1bOP",KeyPress{KeyCode::F1}},
+        Fixture{"a",KeyEvent{U'a'}},Fixture{"界",KeyEvent{U'界'}},
+        Fixture{"\x1b[1;5A",KeyEvent{KeyCode::ArrowUp,Modifiers{.ctrl=true}}},
+        Fixture{"\x1bOP",KeyEvent{KeyCode::F1}},
         Fixture{"\x1b[I",Focus{true}},Fixture{"\x1b[O",Focus{false}},
         Fixture{"\x1b[<0;12;8M",MousePress{{11,7},MouseButton::Left}},
         Fixture{"\x1b[<0;12;8m",MouseRelease{{11,7},MouseButton::Left}},
         Fixture{"\x1b[<65;1;1M",MouseWheel{{0,0},0,1}},
         Fixture{"\x1b]reply\a",UnknownInput{"\x1b]reply\a",InputProblem::Unsupported,true}},
         Fixture{"\xff",UnknownInput{"\xff",InputProblem::InvalidUtf8,true}},
-        Fixture{"\x1b\t",KeyPress{KeyCode::Tab,Modifiers{.alt=true}}}
+        Fixture{"\x1b\t",KeyEvent{KeyCode::Tab,Modifiers{.alt=true}}}
     };
     std::uint32_t seed=0x12345678;
     auto random=[&] { seed=seed*1664525u+1013904223u; return seed; };

@@ -4,15 +4,15 @@ using namespace esc;
 using namespace std::literals;
 TEST(PAR_QUERY_requests_have_literal_bytes_and_bounded_output)
 {
-    CHECK(escape_query(DeviceAttributesQuery{}) == "\x1b[c");
-    CHECK(escape_query(KeyboardQuery{}) == "\x1b[?u");
-    CHECK(escape_query(ModeQuery{2004}) == "\x1b[?2004$p");
+    CHECK(encode_query(DeviceAttributesQuery{}) == "\x1b[c");
+    CHECK(encode_query(KeyboardQuery{}) == "\x1b[?u");
+    CHECK(encode_query(ModeQuery{2004}) == "\x1b[?2004$p");
     std::array<char, 4> bytes{'x', 'x', 'x', 'x'};
     auto result = query_to(bytes, ModeQuery{2004});
     CHECK(!result.written && result.required == 9);
     CHECK(bytes == std::array<char, 4>{'x', 'x', 'x', 'x'});
     CHECK_THROWS(std::invalid_argument, query_to(bytes, ModeQuery{0}));
-    CHECK_THROWS(std::invalid_argument, escape_query(ModeQuery{65536}));
+    CHECK_THROWS(std::invalid_argument, encode_query(ModeQuery{65536}));
 }
 TEST(PAR_QUERY_replies_survive_every_fragment_boundary)
 {
@@ -25,8 +25,8 @@ TEST(PAR_QUERY_replies_survive_every_fragment_boundary)
             "\x1b[?2004;" + std::to_string(status) + "$y",
             {TerminalReply{ModeReply{2004, static_cast<ModeStatus>(status)}}}, p);
     contract::parses_at_every_split("a\x1b[?7u\x1b[Ab",
-                                    {KeyPress{U'a'}, TerminalReply{KeyboardReply{7}},
-                                     KeyPress{KeyCode::ArrowUp}, KeyPress{U'b'}},
+                                    {KeyEvent{U'a'}, TerminalReply{KeyboardReply{7}},
+                                     KeyEvent{KeyCode::ArrowUp}, KeyEvent{U'b'}},
                                     p);
 }
 TEST(PAR_QUERY_reply_parsing_is_explicit_and_does_not_confuse_F3)
@@ -34,7 +34,7 @@ TEST(PAR_QUERY_reply_parsing_is_explicit_and_does_not_confuse_F3)
     contract::parses_at_every_split(
         "\x1b[?7u", {UnknownInput{"\x1b[?7u", InputProblem::Malformed, true}});
     contract::parses_at_every_split(
-        "\x1b[1;2R", {KeyPress{KeyCode::F3, {.shift = true}}}, {.replies = true});
+        "\x1b[1;2R", {KeyEvent{KeyCode::F3, {.shift = true}}}, {.replies = true});
 }
 TEST(PAR_QUERY_invalid_replies_remain_owned_unknown_units)
 {
@@ -139,8 +139,8 @@ TEST(PAR_KITTY_protocol_snapshot_and_plain_text_keep_their_contracts)
     contract::feed(parser, "uX", events);
     KeyEvent key;
     key.key = Key{U'a'};
-    CHECK(events == std::vector<Event>{key, KeyPress{U'X'}});
-    contract::parses_at_every_split("x\x1b[97u", {KeyPress{U'x'}, key},
+    CHECK(events == std::vector<Event>{key, KeyEvent{U'X'}});
+    contract::parses_at_every_split("x\x1b[97u", {KeyEvent{U'x'}, key},
                                     {.keyboard = KeyboardProtocol::Kitty});
 }
 TEST(PAR_KITTY_textless_events_and_small_replies_do_not_allocate)

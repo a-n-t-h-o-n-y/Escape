@@ -32,7 +32,7 @@ calibration are separate from samples. Each case reports median and min/max
 nanoseconds per unit and byte throughput, using steady_clock.
 
 - String return, reserved append, span, and true-color profile cases encode the
-  **same 56-byte frame**: cursor position, RGB foreground, bold, and row erase.
+  **same 35-byte frame**: cursor position, RGB foreground, bold, and row erase.
   Reserved append clears and reuses its capacity; the span reuses 128 stack bytes.
   The sixteen-color case encodes **one RGB foreground command**, including
   palette approximation; compare it only against equivalent color workloads.

@@ -39,8 +39,11 @@ struct SignalGuard {
     ~SignalGuard() { std::signal(SIGINT, previous); }
 };
 enum class Action { Enter, Up, Down, Back, LeftUp, LeftDown, Other };
-auto action(Key const& key) -> Action
+auto action(std::optional<Key> const& value) -> Action
 {
+    if (!value) return Action::Other;
+    auto const& key = *value;
+    if (std::holds_alternative<KittyKey>(key)) return Action::Other;
     if (auto named = std::get_if<KeyCode>(&key)) {
         switch (*named) {
             case KeyCode::Enter: return Action::Enter;
@@ -201,16 +204,18 @@ using State = std::variant<SplashScreen, Menu, Game, PlayerSelectMenu, HowTo>;
 // std::nullopt is a quit request
 using EventResponse = std::optional<State>;
 
-[[nodiscard]] auto process(KeyPress event, SplashScreen state) -> EventResponse
+[[nodiscard]] auto process(KeyEvent event, SplashScreen state) -> EventResponse
 {
+    if (event.action == KeyAction::Release) return state;
     switch (action(event.key)) {
         case Action::Enter: return Menu{};
         default: return state;
     }
 }
 
-[[nodiscard]] auto process(KeyPress event, Menu state) -> EventResponse
+[[nodiscard]] auto process(KeyEvent event, Menu state) -> EventResponse
 {
+    if (event.action == KeyAction::Release) return state;
     switch (action(event.key)) {
         case Action::Up: {
             state.selected =
@@ -248,8 +253,9 @@ using EventResponse = std::optional<State>;
     return {dx, dy};
 }
 
-[[nodiscard]] auto process(KeyPress event, Game state) -> EventResponse
+[[nodiscard]] auto process(KeyEvent event, Game state) -> EventResponse
 {
+    if (event.action == KeyAction::Release) return state;
     constexpr auto speed_increment = 0.5f;
 
     switch (action(event.key)) {
@@ -285,8 +291,9 @@ using EventResponse = std::optional<State>;
     }
 }
 
-[[nodiscard]] auto process(KeyPress event, PlayerSelectMenu state) -> EventResponse
+[[nodiscard]] auto process(KeyEvent event, PlayerSelectMenu state) -> EventResponse
 {
+    if (event.action == KeyAction::Release) return state;
     switch (action(event.key)) {
         case Action::Back: return Menu{};
 
@@ -319,8 +326,9 @@ using EventResponse = std::optional<State>;
     }
 }
 
-[[nodiscard]] auto process(KeyPress event, HowTo state) -> EventResponse
+[[nodiscard]] auto process(KeyEvent event, HowTo state) -> EventResponse
 {
+    if (event.action == KeyAction::Release) return state;
     switch (action(event.key)) {
         case Action::Back: return Menu{};
         default: return state;
@@ -350,24 +358,25 @@ using EventResponse = std::optional<State>;
 
     auto hsl = HSL{.hue = hue, .saturation = 90, .lightness = 70};
 
-    auto bytes = escape(Cursor{.x = 0, .y = 6}, Trait::Bold);
-    bytes += escape(fg(TColor{hsl})) + padding;
+    auto bytes = encode(Cursor{.x = 0, .y = 6}, Trait::Bold);
+    append_encoded(bytes, fg(hsl_to_rgb(hsl)), padding);
     for (char c : state.display) {
         bytes += c;
         if (c == '\n') {
             hsl.hue = (hsl.hue + 20) % 360;
-            bytes += escape(fg(TColor{hsl})) + padding;
+            append_encoded(bytes, fg(hsl_to_rgb(hsl)), padding);
         }
     }
 
-    bytes += escape(Brush{});
+    append_encoded(bytes, Style{});
 
     auto const enter = std::string{"Press Enter to continue"};
-    bytes += escape(Cursor{
-        .x = (screen_dimensions.width - (int)enter.size()) / 2,
-        .y = screen_dimensions.height - 2,
-    });
-    return bytes += escape(Trait::Dim) + enter + escape(Trait::None);
+    append_encoded(bytes, Cursor{
+                              .x = (screen_dimensions.width - (int)enter.size()) / 2,
+                              .y = screen_dimensions.height - 2,
+                          });
+    append_encoded(bytes, styled(enter, dim));
+    return bytes;
 }
 
 [[nodiscard]] auto get_display_bytes(Menu const& state, Area dimensions) -> std::string
@@ -377,7 +386,7 @@ using EventResponse = std::optional<State>;
         return std::string((dimensions.width - width) / 2, ' ');
     }();
 
-    auto bytes = escape(Cursor{.x = 0, .y = 6});
+    auto bytes = encode(Cursor{.x = 0, .y = 6});
     bytes += padding;
     for (char c : logo) {
         bytes += c;
@@ -385,12 +394,13 @@ using EventResponse = std::optional<State>;
     }
 
     for (std::size_t i = 0; i < state.options.size(); ++i) {
-        bytes += escape(Cursor{
-            .x = (dimensions.width - (int)state.options[i].size()) / 2,
-            .y = 14 + (int)i,
-        });
-        if (i == state.selected) { bytes += escape(Trait::Standout); }
-        bytes += state.options[i] + escape(Trait::None);
+        append_encoded(bytes,
+                       Cursor{
+                           .x = (dimensions.width - (int)state.options[i].size()) / 2,
+                           .y = 14 + (int)i,
+                       });
+        if (i == state.selected) { append_encoded(bytes, Trait::Standout); }
+        append_encoded(bytes, state.options[i], Style{});
     }
 
     return bytes;
@@ -400,7 +410,7 @@ using EventResponse = std::optional<State>;
 {
     auto const speed = std::sqrt(velocity.dx * velocity.dx + velocity.dy * velocity.dy);
 
-    return TColor{HSL{
+    return RGB{HSL{
         .hue = std::uint16_t((90 + (int)(speed * 160)) % 360),
         .saturation = 80,
         .lightness = 70,
@@ -413,7 +423,7 @@ using EventResponse = std::optional<State>;
 
     if (dimensions.width < display_space.width ||
         dimensions.height < display_space.height) {
-        return escape(Cursor{.x = 0, .y = 0}) + "Terminal too small to display game";
+        return encode(Cursor{}, "Terminal too small to display game");
     }
 
     auto const offset = Point{
@@ -424,12 +434,12 @@ using EventResponse = std::optional<State>;
     auto bytes = std::string{};
 
     {  // Net
-        bytes += escape(Trait::Dim);
+        append_encoded(bytes, Trait::Dim);
         for (int i = 0; i < display_space.height; ++i) {
-            bytes +=
-                escape(esc::cursor(offset + Point{display_space.width / 2, i})) + "╳";
+            append_encoded(
+                bytes, esc::cursor(offset + Point{display_space.width / 2, i}), "╳");
         }
-        bytes += escape(Trait::None);
+        append_encoded(bytes, Style{});
     }
 
     {  // Ball
@@ -443,11 +453,11 @@ using EventResponse = std::optional<State>;
             esc::cursor(offset + Point{.x = (int)std::round(state.ball.at.x),
                                        .y = (int)std::round(state.ball.at.y)});
 
-        bytes += escape(fg(velocity_to_color(state.ball.velocity)));
-        bytes += escape(cursor, Trait::Inverse) + glyph;
+        append_encoded(bytes, fg(velocity_to_color(state.ball.velocity)));
+        append_encoded(bytes, cursor, Trait::Inverse, glyph);
         cursor.y -= 1;
-        bytes += escape(cursor, Trait::None) + glyph;
-        bytes += escape(Brush{});
+        append_encoded(bytes, cursor, without(inverse), glyph);
+        append_encoded(bytes, Style{});
     }
 
     {  // Paddles
@@ -457,7 +467,7 @@ using EventResponse = std::optional<State>;
                 .y = offset.y + (int)std::floor(paddle.top.y),
             };
 
-            auto bytes = escape(cursor);
+            auto bytes = encode(cursor);
 
             auto const edge = [&] {
                 auto const y = paddle.top.y;
@@ -469,11 +479,12 @@ using EventResponse = std::optional<State>;
             cursor.y += 1;
 
             for (int i = 1; i < Game::Paddle::height; ++i) {
-                bytes += escape(cursor) + "█";
+                append_encoded(bytes, cursor, "█");
                 cursor.y += 1;
             }
 
-            return bytes += escape(cursor, Trait::Inverse) + edge + escape(Trait::None);
+            append_encoded(bytes, cursor, Trait::Inverse, edge, Style{});
+            return bytes;
         };
 
         bytes += paint_paddle(state.left.paddle);
@@ -481,23 +492,23 @@ using EventResponse = std::optional<State>;
     }
 
     {  // Scores
-        bytes += escape(esc::cursor(offset - Point{.x = 0, .y = 2}));
+        append_encoded(bytes, esc::cursor(offset - Point{.x = 0, .y = 2}));
         bytes += state.left.player.name + ": ";
         bytes += std::to_string(state.left.score);
 
         auto const rhs = state.right.player.name + ": ";
-        bytes += escape(
-            esc::cursor(offset + Point{
-                                     .x = display_space.width - (int)rhs.size() - 1,
-                                     .y = -2,
-                                 }));
+        append_encoded(bytes, esc::cursor(offset + Point{
+                                                       .x = display_space.width -
+                                                            (int)rhs.size() - 1,
+                                                       .y = -2,
+                                                   }));
         bytes += rhs;
         bytes += std::to_string(state.right.score);
     }
 
     {  // Border
-        bytes += escape(esc::cursor(offset - Point{.x = 1, .y = 1})) +
-                 escape(fg(XColor::Blue), Trait::Dim);
+        append_encoded(bytes, esc::cursor(offset - Point{.x = 1, .y = 1}),
+                       fg(XColor::Blue), Trait::Dim);
         bytes += "╭";
 
         for (int i = 0; i < display_space.width; ++i) {
@@ -506,33 +517,33 @@ using EventResponse = std::optional<State>;
         bytes += "╮";
 
         for (int i = 0; i < display_space.height; ++i) {
-            bytes += escape(esc::cursor(offset + Point{.x = -1, .y = i}));
+            append_encoded(bytes, esc::cursor(offset + Point{.x = -1, .y = i}));
             bytes += "│";
 
-            bytes +=
-                escape(esc::cursor(offset + Point{.x = display_space.width, .y = i}));
+            append_encoded(
+                bytes, esc::cursor(offset + Point{.x = display_space.width, .y = i}));
             bytes += "│";
         }
 
-        bytes +=
-            escape(esc::cursor(offset + Point{.x = -1, .y = display_space.height}));
+        append_encoded(bytes,
+                       esc::cursor(offset + Point{.x = -1, .y = display_space.height}));
         bytes += "╰";
 
         for (int i = 0; i < display_space.width; ++i) {
             bytes += "─";
         }
-        bytes += "╯" + escape(Brush{});
+        append_encoded(bytes, "╯", Style{});
     }
 
-    bytes += escape(Cursor{.x = 0, .y = dimensions.height - 1});
-    bytes += escape(Trait::Dim) + "Press Esc to return to the main menu";
+    append_encoded(bytes, Cursor{.x = 0, .y = dimensions.height - 1});
+    append_encoded(bytes, Trait::Dim, "Press Esc to return to the main menu");
 
     auto const enter = std::string{"Press Enter to start next round"};
-    bytes += escape(Cursor{
-        .x = dimensions.width - (int)enter.size(),
-        .y = dimensions.height - 1,
-    });
-    bytes += enter + escape(Trait::None);
+    append_encoded(bytes, Cursor{
+                              .x = dimensions.width - (int)enter.size(),
+                              .y = dimensions.height - 1,
+                          });
+    append_encoded(bytes, enter, Style{});
 
     return bytes;
 }
@@ -540,91 +551,90 @@ using EventResponse = std::optional<State>;
 [[nodiscard]] auto get_display_bytes(PlayerSelectMenu const& state, Area dimensions)
     -> std::string
 {
-    auto bytes = escape(Cursor{
+    auto bytes = encode(Cursor{
         .x = (dimensions.width - (int)state.title.size()) / 2,
         .y = 2,
     });
 
-    bytes += escape(Trait::Bold | Trait::Underline);
+    append_encoded(bytes, Trait::Bold | Trait::Underline);
     bytes += state.title;
-    bytes += escape(Trait::None);
+    append_encoded(bytes, Style{});
 
-    bytes += escape(Cursor{.x = (dimensions.width) / 2 - 25, .y = 4});
+    append_encoded(bytes, Cursor{.x = (dimensions.width) / 2 - 25, .y = 4});
     bytes += "Left Player: ";
-    if (state.left_selected) { bytes += escape(Trait::Standout); }
+    if (state.left_selected) { append_encoded(bytes, Trait::Standout); }
     bytes += state.left_player.name;
-    bytes += escape(Trait::None);
+    append_encoded(bytes, Style{});
 
-    bytes += escape(Cursor{.x = (dimensions.width) / 2 + 10, .y = 4});
+    append_encoded(bytes, Cursor{.x = (dimensions.width) / 2 + 10, .y = 4});
     bytes += "Right Player: ";
-    if (!state.left_selected) { bytes += escape(Trait::Standout); }
+    if (!state.left_selected) { append_encoded(bytes, Trait::Standout); }
     bytes += state.right_player.name;
-    bytes += escape(Trait::None);
+    append_encoded(bytes, Style{});
 
     for (std::size_t i = 0; i < state.options.size(); ++i) {
-        bytes += escape(Cursor{
-            .x = (dimensions.width - (int)state.options[i].name.size()) / 2,
-            .y = 6 + (int)i,
-        });
-        if (i == state.selected) { bytes += escape(Trait::Standout); }
+        append_encoded(
+            bytes, Cursor{
+                       .x = (dimensions.width - (int)state.options[i].name.size()) / 2,
+                       .y = 6 + (int)i,
+                   });
+        if (i == state.selected) { append_encoded(bytes, Trait::Standout); }
         bytes += state.options[i].name;
-        bytes += escape(Trait::None);
+        append_encoded(bytes, Style{});
     }
 
-    bytes += escape(Cursor{.x = 0, .y = dimensions.height - 1});
-    bytes += escape(Trait::Dim) + "Press Esc to return to the main menu" +
-             escape(Trait::None);
+    append_encoded(bytes, Cursor{.x = 0, .y = dimensions.height - 1});
+    append_encoded(bytes, Trait::Dim, "Press Esc to return to the main menu", Style{});
 
     return bytes;
 }
 
 [[nodiscard]] auto get_display_bytes(HowTo const& state, Area dimensions) -> std::string
 {
-    auto bytes = escape(Cursor{
+    auto bytes = encode(Cursor{
         .x = (dimensions.width - (int)state.title.size()) / 2,
         .y = 2,
     });
 
-    bytes += escape(Trait::Bold | Trait::Underline) + state.title + escape(Trait::None);
+    append_encoded(bytes, Trait::Bold | Trait::Underline, state.title, Style{});
 
     for (std::size_t i = 0; i < state.instructions.size(); ++i) {
-        bytes += escape(Cursor{
-            .x = (dimensions.width - 40) / 2,
-            .y = 4 + (int)i,
-        });
-        bytes += escape(Trait::Bold) + state.instructions[i][0] + escape(Trait::None);
-        bytes += escape(Cursor{
-            .x = (dimensions.width + 8) / 2,
-            .y = 4 + (int)i,
-        });
+        append_encoded(bytes, Cursor{
+                                  .x = (dimensions.width - 40) / 2,
+                                  .y = 4 + (int)i,
+                              });
+        append_encoded(bytes, Trait::Bold, state.instructions[i][0], Style{});
+        append_encoded(bytes, Cursor{
+                                  .x = (dimensions.width + 8) / 2,
+                                  .y = 4 + (int)i,
+                              });
         bytes += state.instructions[i][1];
     }
 
     // Border
-    bytes += escape(Cursor{.x = 0, .y = 0}, Trait::Dim);
+    append_encoded(bytes, Cursor{.x = 0, .y = 0}, Trait::Dim);
     bytes += "╭";
     for (int i = 0; i < dimensions.width - 2; ++i) {
         bytes += "─";
     }
     bytes += "╮";
     for (int i = 0; i < dimensions.height - 2; ++i) {
-        bytes += escape(Cursor{.x = 0, .y = i + 1});
+        append_encoded(bytes, Cursor{.x = 0, .y = i + 1});
         bytes += "│";
-        bytes += escape(Cursor{.x = dimensions.width - 1, .y = i + 1});
+        append_encoded(bytes, Cursor{.x = dimensions.width - 1, .y = i + 1});
         bytes += "│";
     }
-    bytes += escape(Cursor{.x = 0, .y = dimensions.height - 1});
+    append_encoded(bytes, Cursor{.x = 0, .y = dimensions.height - 1});
     bytes += "╰";
     for (int i = 0; i < dimensions.width - 2; ++i) {
         bytes += "─";
     }
     bytes += "╯";
-    bytes += escape(Trait::None);
+    append_encoded(bytes, Style{});
 
     // Press Esc
-    bytes += escape(Cursor{.x = 2, .y = dimensions.height - 1});
-    bytes += escape(Trait::Dim) + "Press Esc to return to the main menu" +
-             escape(Trait::None);
+    append_encoded(bytes, Cursor{.x = 2, .y = dimensions.height - 1});
+    append_encoded(bytes, Trait::Dim, "Press Esc to return to the main menu", Style{});
 
     return bytes;
 }
@@ -785,27 +795,31 @@ auto try_main() -> int
     auto timeout = init_timeout;
 
     while (state.has_value() && sigint_flag == 0) {
-        write(escape(BlankScreen{}));
-        write(std::visit(
-            [](auto const& state) {
-                return get_display_bytes(state, screen_dimensions);
-            },
-            *state));
-        flush();
+        auto frame = terminal.frame();
+        terminal.write(BlankScreen{}, std::visit(
+                                          [](auto const& state) {
+                                              return get_display_bytes(
+                                                  state, screen_dimensions);
+                                          },
+                                          *state));
+        frame.close();
 
         auto const begin = std::chrono::steady_clock::now();
         if (auto const event =
                 terminal.read(std::max(timeout, std::chrono::milliseconds{0}));
-            event.status == ReadStatus::Event) {
+            std::holds_alternative<Event>(event)) {
             state = std::visit(
                 [](auto event, auto current_state) {
                     return process(event, std::move(current_state));
                 },
-                *event.event, std::move(*state));
+                std::get<Event>(event), std::move(*state));
             timeout -= std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - begin);
         }
-        else {  // Event Timeout
+        else if (std::holds_alternative<EndOfInput>(event)) {
+            break;
+        }
+        else {  // Timeout
             // state is guaranteed to not be std::nullopt here.
             if (std::holds_alternative<Game>(*state)) {
                 state = increment_game_state(std::get<Game>(*state));

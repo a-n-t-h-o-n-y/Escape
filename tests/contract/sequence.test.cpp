@@ -13,7 +13,7 @@ static_assert(!DrawingCommand<Point> && !DrawingCommand<int>);
 static_assert(!DrawingCommand<Color> && !DrawingCommand<std::string>);
 static_assert(Escapable<ScreenBuffer> && !DrawingCommand<ScreenBuffer>);
 static_assert(!Escapable<Echo> && !Escapable<MouseMode>);
-static_assert(std::same_as<decltype(escape(BlankRow{})), std::string>);
+static_assert(std::same_as<decltype(encode(BlankRow{})), std::string>);
 
 TEST(ENC_01_absolute_cursor_uses_row_then_column)
 {
@@ -26,8 +26,8 @@ TEST(ENC_04_cursor_extremes_do_not_overflow)
     static_assert(INT_MAX == 2147483647, "These fixtures target the supported 32-bit-int backends.");
     encodes("\x1b[2147483648;2147483648H", Cursor{INT_MAX,INT_MAX});
     encodes("\x1b[2147483648A\x1b[2147483648D", MoveCursor{INT_MIN,INT_MIN});
-    CHECK_THROWS(std::invalid_argument, escape(Cursor{-1,0}));
-    CHECK_THROWS(std::invalid_argument, escape(Cursor{0,-1}));
+    CHECK_THROWS(std::invalid_argument, encode(Cursor{-1,0}));
+    CHECK_THROWS(std::invalid_argument, encode(Cursor{0,-1}));
 }
 TEST(ENC_01_relative_cursor_is_vertical_then_horizontal)
 {
@@ -45,7 +45,7 @@ TEST(ENC_01_erase_scope_does_not_home_or_clear_history)
     encodes("\x1b[2J", BlankScreen{});
     encodes("\x1b[0J", BlankScreen{Erase::ToEnd});
     encodes("\x1b[1J", BlankScreen{Erase::ToBeginning});
-    CHECK_THROWS(std::invalid_argument, escape(BlankScreen{static_cast<Erase>(99)}));
+    CHECK_THROWS(std::invalid_argument, encode(BlankScreen{static_cast<Erase>(99)}));
 }
 TEST(ENC_01_default_and_named_colors)
 {
@@ -73,42 +73,42 @@ TEST(ENC_01_every_index_has_its_canonical_encoding)
 }
 TEST(ENC_01_true_color_preserves_channels_and_helpers)
 {
-    encodes("\x1b[38;2;0;127;255m", fg(TrueColor{RGB{0,127,255}}));
-    encodes("\x1b[48;2;240;33;39m", bg(TColor{0xF02127}));
-    CHECK(escape_fg(XColor::Red) == "\x1b[31m");
-    CHECK(escape_bg(TColor{0x010203}) == "\x1b[48;2;1;2;3m");
+    encodes("\x1b[38;2;0;127;255m", fg(RGB{RGB{0,127,255}}));
+    encodes("\x1b[48;2;240;33;39m", bg(RGB{0xF02127}));
+    CHECK(encode(fg(XColor::Red)) == "\x1b[31m");
+    CHECK(encode(bg(RGB{0x010203})) == "\x1b[48;2;1;2;3m");
 }
-TEST(ENC_03_traits_replace_only_modeled_traits)
+TEST(ENC_03_traits_enable_without_replacing_other_traits)
 {
-    encodes("\x1b[22;23;24;25;27;28;29m", Traits{});
-    encodes("\x1b[22;23;24;25;27;28;29m", Trait::None);
-    CHECK(clear_traits() == "\x1b[22;23;24;25;27;28;29m");
+    encodes("", Traits{});
+    encodes("", Trait::None);
+
     struct Case { Trait trait; char const* bytes; };
     Case const cases[] = {
-        {Trait::Bold,"\x1b[22;23;24;25;27;28;29;1m"},
-        {Trait::Dim,"\x1b[22;23;24;25;27;28;29;2m"},
-        {Trait::Italic,"\x1b[22;23;24;25;27;28;29;3m"},
-        {Trait::Underline,"\x1b[22;23;24;25;27;28;29;4m"},
-        {Trait::Blink,"\x1b[22;23;24;25;27;28;29;5m"},
-        {Trait::Inverse,"\x1b[22;23;24;25;27;28;29;7m"},
-        {Trait::Invisible,"\x1b[22;23;24;25;27;28;29;8m"},
-        {Trait::CrossedOut,"\x1b[22;23;24;25;27;28;29;9m"},
-        {Trait::DoubleUnderline,"\x1b[22;23;24;25;27;28;29;21m"},
-        {Trait::Standout,"\x1b[22;23;24;25;27;28;29;1;7m"},
+        {Trait::Bold,"\x1b[1m"},
+        {Trait::Dim,"\x1b[2m"},
+        {Trait::Italic,"\x1b[3m"},
+        {Trait::Underline,"\x1b[4m"},
+        {Trait::Blink,"\x1b[5m"},
+        {Trait::Inverse,"\x1b[7m"},
+        {Trait::Invisible,"\x1b[8m"},
+        {Trait::CrossedOut,"\x1b[9m"},
+        {Trait::DoubleUnderline,"\x1b[21m"},
+        {Trait::Standout,"\x1b[1;7m"},
     };
     for (auto const& c : cases) encodes(c.bytes,c.trait);
 }
 TEST(ENC_03_trait_normalization_and_double_underline_precedence)
 {
-    encodes("\x1b[22;23;24;25;27;28;29;1;7m", Trait::Standout | Trait::Bold | Trait::Inverse);
-    encodes("\x1b[22;23;24;25;27;28;29;21m", Trait::Underline | Trait::DoubleUnderline);
-    encodes("\x1b[22;23;24;25;27;28;29;1;2;3;21;5;7;8;9m", contract::full_traits());
+    encodes("\x1b[1;7m", Trait::Standout | Trait::Bold | Trait::Inverse);
+    encodes("\x1b[21m", Trait::Underline | Trait::DoubleUnderline);
+    encodes("\x1b[1;2;3;21;5;7;8;9m", contract::full_traits());
 }
-TEST(ENC_03_brush_order_and_full_reset_are_distinct)
+TEST(ENC_03_style_order_and_full_reset_are_distinct)
 {
-    encodes("\x1b[49m\x1b[39m\x1b[22;23;24;25;27;28;29m", Brush{});
+    encodes("\x1b[49m\x1b[39m\x1b[22;23;24;25;27;28;29m", Style{});
     encodes("\x1b[44m\x1b[97m\x1b[22;23;24;25;27;28;29;1m",
-            Brush{.background=XColor::Blue,.foreground=XColor::BrightWhite,.traits=Trait::Bold});
+            Style{.background=XColor::Blue,.foreground=XColor::BrightWhite,.traits=Trait::Bold});
     encodes("\x1b[0m", ResetStyle{});
 }
 TEST(ENC_02_composition_retains_order_and_repeated_commands)
@@ -136,39 +136,39 @@ TEST(ENC_01_mouse_replacement_clears_all_owned_modes_first)
     encodes(std::string{off}+"\x1b[?1006h\x1b[?1000h",MouseReporting{MouseMode::Basic,MouseProtocol::Sgr});
     encodes(std::string{off}+"\x1b[?1015h\x1b[?1002h",MouseReporting{MouseMode::Drag,MouseProtocol::Urxvt});
     encodes(std::string{off}+"\x1b[?1003h",MouseReporting{MouseMode::Move,MouseProtocol::Legacy});
-    CHECK_THROWS(std::invalid_argument,escape(MouseReporting{MouseMode::Basic,MouseProtocol::None}));
+    CHECK_THROWS(std::invalid_argument,encode(MouseReporting{MouseMode::Basic,MouseProtocol::None}));
 }
 TEST(BUF_01_late_invalid_command_never_changes_destination)
 {
     std::string output{"prefix"};
-    CHECK_THROWS(std::invalid_argument,append_escape(output,Cursor{},Cursor{-1,0}));
+    CHECK_THROWS(std::invalid_argument,append_encoded(output,Cursor{},Cursor{-1,0}));
     CHECK(output == "prefix");
     std::array<char,128> buffer;
     buffer.fill('#');
     auto const before = buffer;
-    CHECK_THROWS(std::invalid_argument,escape_to(buffer,Cursor{},BlankRow{static_cast<Erase>(99)}));
+    CHECK_THROWS(std::invalid_argument,encode_to(buffer,Cursor{},BlankRow{static_cast<Erase>(99)}));
     CHECK(buffer == before);
 }
 TEST(BUF_02_empty_span_reports_required_size_without_writing)
 {
-    auto result = escape_to(std::span<char>{},Cursor{});
+    auto result = encode_to(std::span<char>{},Cursor{});
     CHECK(result.written == 0 && result.required == 6);
-    auto empty = escape_to(std::span<char>{});
+    auto empty = encode_to(std::span<char>{});
     CHECK(empty.written == 0 && empty.required == 0);
 }
 TEST(BUF_03_owned_results_are_independent_of_later_encodings)
 {
-    auto first = escape(fg(XColor::Red));
-    auto second = escape(fg(XColor::Blue));
-    static_cast<void>(escape(Brush{}));
+    auto first = encode(fg(XColor::Red));
+    auto second = encode(fg(XColor::Blue));
+    static_cast<void>(encode(Style{}));
     CHECK(first == "\x1b[31m");
     CHECK(second == "\x1b[34m");
 }
 
 TEST(ENC_04_invalid_enum_values_are_not_silently_treated_as_defaults)
 {
-    CHECK_THROWS(std::invalid_argument,escape(fg(static_cast<TermColor>(true))));
-    CHECK_THROWS(std::invalid_argument,escape(static_cast<ScreenBuffer>(99)));
-    CHECK_THROWS(std::invalid_argument,escape(static_cast<CursorMode>(99)));
-    CHECK_THROWS(std::invalid_argument,escape(MouseReporting{MouseMode::Off,static_cast<MouseProtocol>(99)}));
+    CHECK_THROWS(std::invalid_argument,encode(fg(static_cast<TermColor>(true))));
+    CHECK_THROWS(std::invalid_argument,encode(static_cast<ScreenBuffer>(99)));
+    CHECK_THROWS(std::invalid_argument,encode(static_cast<CursorMode>(99)));
+    CHECK_THROWS(std::invalid_argument,encode(MouseReporting{MouseMode::Off,static_cast<MouseProtocol>(99)}));
 }

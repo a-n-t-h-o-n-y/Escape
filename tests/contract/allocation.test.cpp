@@ -17,7 +17,7 @@ TEST(PAR_01_normal_key_and_mouse_parsing_allocate_nothing_after_setup)
         allocations=scope.count();
     }
     CHECK(allocations==0);
-    CHECK(key.event==std::optional<Event>{KeyPress{U'a'}});
+    CHECK(key.event==std::optional<Event>{KeyEvent{U'a'}});
     CHECK(mouse.event==std::optional<Event>{MousePress{{0,0},MouseButton::Left}});
 }
 

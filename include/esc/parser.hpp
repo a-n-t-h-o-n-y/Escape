@@ -18,10 +18,8 @@ struct ParserOptions {
     std::chrono::milliseconds escape_timeout{25}, sequence_timeout{250};
     std::size_t sequence_limit = 256, paste_chunk_size = 4096;
 };
-enum class ParseStatus { Event, NeedInput };
 struct ParseResult {
     std::size_t consumed;
-    ParseStatus status;
     std::optional<Event> event;
 };
 enum class PendingTimeout { Escape, Sequence };

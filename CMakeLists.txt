@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(Escape VERSION 0.2.0 LANGUAGES CXX)
+project(Escape VERSION 0.3.0 LANGUAGES CXX)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)

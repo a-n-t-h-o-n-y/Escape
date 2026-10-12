@@ -21,7 +21,7 @@ void validate_protocols(InputProtocols p)
     }
     throw std::invalid_argument{"Parser: invalid mouse protocol"};
 }
-auto scalar_key(char32_t scalar, bool alt = false) -> KeyPress
+auto scalar_key(char32_t scalar, bool alt = false) -> KeyEvent
 {
     Key key = scalar;
     switch (scalar) {
@@ -301,7 +301,7 @@ auto Parser::complete_sequence() -> Event
         return unknown(InputProblem::Unsupported);
     }
     if (!ss3 && final == 'Z' && p.size == 0)
-        return succeed(KeyPress{KeyCode::Tab, Modifiers{.shift = true}});
+        return succeed(KeyEvent{KeyCode::Tab, Modifiers{.shift = true}});
     auto key = final == '~' && !ss3 && p.size
                    ? tilde_key(p.values[0], native_function_keys_)
                    : named_key(final, ss3);
@@ -315,14 +315,14 @@ auto Parser::complete_sequence() -> Event
             return unknown(InputProblem::Malformed);
         mods = modifiers(p.values[1]);
     }
-    return succeed(KeyPress{*key, mods});
+    return succeed(KeyEvent{*key, mods});
 }
 auto Parser::next(std::span<char const> input) -> ParseResult
 {
     if (eof_) throw std::logic_error{"Parser: reset required after finish"};
     std::size_t consumed = 0;
     auto event = [&](Event value) -> ParseResult {
-        return {consumed, ParseStatus::Event, std::move(value)};
+        return {consumed, std::move(value)};
     };
     constexpr std::string_view end_paste = "\x1b[201~";
     while (true) {
@@ -331,7 +331,7 @@ auto Parser::next(std::span<char const> input) -> ParseResult
         if (state_ == State::Paste &&
             buffer_.size() >= options_.paste_chunk_size + end_paste.size())
             return event(paste_chunk(false));
-        if (consumed == input.size()) return {consumed, ParseStatus::NeedInput, {}};
+        if (consumed == input.size()) return {consumed, {}};
         auto byte = static_cast<unsigned char>(input[consumed]);
         if (state_ == State::Ground) {
             buffer_.clear();

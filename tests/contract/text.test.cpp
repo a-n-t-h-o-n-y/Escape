@@ -109,29 +109,29 @@ TEST(GLY_01_glyphs_represent_scalars_not_screen_cells)
 }
 TEST(GLY_01_glyph_construction_and_append_use_the_supplied_brush)
 {
-    Brush brush{.foreground=XColor::Red,.traits=Trait::Bold};
-    CHECK(glyphs("ab",brush)==GlyphString{{U'a',brush},{U'b',brush}});
+    Style style{.foreground=XColor::Red,.traits=Trait::Bold};
+    CHECK(glyphs("ab",style)==GlyphString{{U'a',style},{U'b',style}});
     GlyphString result{{U'x'}};
-    append_glyphs(result,U"界",brush);
-    append_glyphs(result,"\xf0\x9f\x91\xbd"sv,brush);
-    CHECK(result==GlyphString{{U'x'},{U'界',brush},{U'👽',brush}});
+    append_glyphs(result,U"界",style);
+    append_glyphs(result,"\xf0\x9f\x91\xbd"sv,style);
+    CHECK(result==GlyphString{{U'x'},{U'界',style},{U'👽',style}});
     auto before=result;
-    CHECK_THROWS(UnicodeError,append_glyphs(result,"ok\xc2"sv,brush));
-    CHECK_THROWS(UnicodeError,append_glyphs(result,std::u32string{U'a',0xD800},brush));
+    CHECK_THROWS(UnicodeError,append_glyphs(result,"ok\xc2"sv,style));
+    CHECK_THROWS(UnicodeError,append_glyphs(result,std::u32string{U'a',0xD800},style));
     CHECK(result==before);
 }
-TEST(GLY_01_glyph_pipes_and_brush_replacement_are_pure)
+TEST(GLY_01_glyph_pipes_and_style_replacement_are_pure)
 {
-    Glyph original{U'x',Brush{.foreground=XColor::Red,.traits=Trait::Bold}};
+    Glyph original{U'x',Style{.foreground=XColor::Red,.traits=Trait::Bold}};
     auto changed=original | bg(XColor::Blue) | Trait::Italic;
-    CHECK(original.brush.background==Color{TermColor::Default});
-    CHECK(original.brush.traits==Traits{Trait::Bold});
-    CHECK(changed.brush.background==Color{XColor::Blue});
-    CHECK(changed.brush.foreground==Color{XColor::Red});
-    CHECK(changed.brush.traits==(Trait::Bold | Trait::Italic));
-    auto removed=changed | remove_trait(Trait::Bold);
-    CHECK(removed.brush.traits==Traits{Trait::Italic});
-    CHECK((changed | Brush{})==Glyph{U'x'});
+    CHECK(original.style.background==Color{TermColor::Default});
+    CHECK(original.style.traits==Traits{Trait::Bold});
+    CHECK(changed.style.background==Color{XColor::Blue});
+    CHECK(changed.style.foreground==Color{XColor::Red});
+    CHECK(changed.style.traits==(Trait::Bold | Trait::Italic));
+    auto removed=changed | without(Trait::Bold);
+    CHECK(removed.style.traits==Traits{Trait::Italic});
+    CHECK((changed | Style{})==Glyph{U'x'});
 }
 TEST(GLY_01_lvalue_and_const_ranges_are_not_modified_by_styling)
 {
@@ -139,35 +139,35 @@ TEST(GLY_01_lvalue_and_const_ranges_are_not_modified_by_styling)
     auto expected=input;
     auto piped=input | fg(XColor::Red);
     CHECK(input==expected);
-    CHECK(piped==glyphs("ab",Brush{.foreground=XColor::Red}));
+    CHECK(piped==glyphs("ab",Style{.foreground=XColor::Red}));
     GlyphString const immutable=input;
-    CHECK(styled(immutable,Trait::Bold)==glyphs("ab",Brush{.traits=Trait::Bold}));
+    CHECK(styled(immutable,Trait::Bold)==glyphs("ab",Style{.traits=Trait::Bold}));
     CHECK(immutable==expected);
     auto moved=std::move(piped) | Trait::Italic;
-    CHECK(moved==glyphs("ab",Brush{.foreground=XColor::Red,.traits=Trait::Italic}));
+    CHECK(moved==glyphs("ab",Style{.foreground=XColor::Red,.traits=Trait::Italic}));
 }
 TEST(GLY_01_named_in_place_styling_supports_mutable_ranges)
 {
     GlyphString input{{U'a'},{U'b'}};
     style_in_place(input,Trait::Bold | Trait::Italic);
-    CHECK(input==glyphs("ab",Brush{.traits=Trait::Bold | Trait::Italic}));
-    style_in_place(input,remove_trait(Trait::Bold));
-    CHECK(input==glyphs("ab",Brush{.traits=Trait::Italic}));
+    CHECK(input==glyphs("ab",Style{.traits=Trait::Bold | Trait::Italic}));
+    style_in_place(input,without(Trait::Bold));
+    CHECK(input==glyphs("ab",Style{.traits=Trait::Italic}));
     std::list<Glyph> list{{U'a'},{U'b'}};
     style_in_place(list,bg(XColor::Blue));
-    CHECK(styled(list,fg(XColor::Red))==glyphs("ab",Brush{.background=XColor::Blue,.foreground=XColor::Red}));
+    CHECK(styled(list,fg(XColor::Red))==glyphs("ab",Style{.background=XColor::Blue,.foreground=XColor::Red}));
 }
 TEST(GLY_01_ascii_and_scalar_pipes_have_explicit_encoding_rules)
 {
-    CHECK(('A' | fg(XColor::Red))==Glyph{U'A',Brush{.foreground=XColor::Red}});
-    CHECK((U'界' | Trait::Bold)==Glyph{U'界',Brush{.traits=Trait::Bold}});
+    CHECK(('A' | fg(XColor::Red))==Glyph{U'A',Style{.foreground=XColor::Red}});
+    CHECK((U'界' | Trait::Bold)==Glyph{U'界',Style{.traits=Trait::Bold}});
     CHECK_THROWS(std::invalid_argument,(static_cast<unsigned char>(128) | Trait::Bold));
     CHECK_THROWS(std::invalid_argument,(static_cast<signed char>(-1) | Trait::Bold));
-    CHECK(("\xe7\x95\x8c"sv | Trait::Bold)==glyphs(U"界",Brush{.traits=Trait::Bold}));
+    CHECK(("\xe7\x95\x8c"sv | Trait::Bold).content == "界");
 }
 TEST(GLY_01_concatenation_preserves_order_and_inputs)
 {
-    Glyph a{U'a',Brush{.foreground=XColor::Red}};
+    Glyph a{U'a',Style{.foreground=XColor::Red}};
     Glyph b{U'b'};
     CHECK((a+b)==GlyphString{a,b});
     CHECK((a+"界"sv)==GlyphString{a,Glyph{U'界'}});
@@ -193,9 +193,9 @@ TEST(GLY_01_self_and_overlapping_append_duplicate_original_values_once)
 TEST(GLY_01_iterator_append_returns_the_advanced_iterator)
 {
     std::array<Glyph,3> output;
-    auto end=append_glyphs_to(output.begin(),"a界👽"sv,Brush{.foreground=XColor::Red});
+    auto end=append_glyphs_to(output.begin(),"a界👽"sv,Style{.foreground=XColor::Red});
     CHECK(end==output.end());
-    CHECK(GlyphString(output.begin(),output.end())==glyphs(U"a界👽",Brush{.foreground=XColor::Red}));
+    CHECK(GlyphString(output.begin(),output.end())==glyphs(U"a界👽",Style{.foreground=XColor::Red}));
     auto before=output;
     CHECK_THROWS(UnicodeError,append_glyphs_to(output.begin(),"a\xc2"sv));
     CHECK(output==before);
@@ -210,10 +210,10 @@ TEST(GLY_01_invalid_late_scalar_is_rejected_before_in_place_styling)
 }
 TEST(GLY_01_attribute_none_does_not_clear_existing_glyph_traits)
 {
-    Glyph original{U'a',Brush{.traits=Trait::Bold}};
+    Glyph original{U'a',Style{.traits=Trait::Bold}};
     CHECK((original | Trait::None)==original);
     CHECK((original | Traits{})==original);
-    CHECK((original | remove_trait(Trait::Standout)).brush.traits==Traits{});
+    CHECK((original | without(Trait::Standout)).style.traits==Traits{});
 }
 
 TEST(TXT_01_error_offsets_count_bytes_after_valid_multibyte_prefixes)
@@ -233,11 +233,11 @@ TEST(GLY_01_invalid_attributes_are_rejected_before_any_mutation)
     auto invalid=fg(static_cast<TermColor>(true));
     CHECK_THROWS(std::invalid_argument,style_in_place(values,invalid));
     CHECK_THROWS(std::invalid_argument,styled(values,invalid));
-    CHECK_THROWS(std::invalid_argument,append_glyphs(values,"",Brush{.foreground=static_cast<TermColor>(true)}));
+    CHECK_THROWS(std::invalid_argument,append_glyphs(values,"",Style{.foreground=static_cast<TermColor>(true)}));
     CHECK(values==before);
     std::array<Glyph,2> output;
     auto original=output;
-    CHECK_THROWS(std::invalid_argument,append_glyphs_to(output.begin(),"ab",Brush{.foreground=static_cast<TermColor>(true)}));
+    CHECK_THROWS(std::invalid_argument,append_glyphs_to(output.begin(),"ab",Style{.foreground=static_cast<TermColor>(true)}));
     CHECK(output==original);
 }
 TEST(GLY_01_noncontiguous_aliases_are_snapshotted_before_append)

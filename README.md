@@ -2,8 +2,9 @@
 
 Escape is a C++20 library for terminal byte encoding, Unicode text, incremental
 input parsing, and scoped terminal sessions for Linux, macOS, and Windows. The refactor on this branch
-is a breaking interface revision; the complete contract is in
-[docs/interface-proposal.md](docs/interface-proposal.md).
+is a breaking interface revision; start with the
+[functional API contract](docs/functional-api.md) and the
+[session/protocol contract](docs/interface-proposal.md).
 
 ## Encoding
 
@@ -12,13 +13,15 @@ Raw encoding is pure and does not read the environment or retain drawing state:
 ```cpp
 #include <esc/esc.hpp>
 
-auto bytes = esc::escape(esc::Cursor{0, 0}, esc::fg(esc::XColor::Cyan));
+auto warning = esc::fg(esc::XColor::Yellow) | esc::bold;
+auto label = esc::styled("Warning 👽", warning);
+auto bytes = esc::encode(esc::Cursor{0, 0}, label);
 std::string frame;
 frame.reserve(4096);
-esc::append_escape(frame, esc::Cursor{4, 2}, esc::Trait::Bold);
+esc::append_encoded(frame, esc::Cursor{4, 2}, label, "\n");
 
 std::array<char, 128> buffer;
-auto result = esc::escape_to(buffer, esc::Cursor{4, 2});
+auto result = esc::encode_to(buffer, esc::Cursor{4, 2});
 // result.required reports the complete size. An undersized span is unchanged.
 ```
 
@@ -33,14 +36,15 @@ TERM matches use the documented heuristic table and return per-feature evidence.
 
 ```cpp
 auto terminal = esc::Terminal::open(esc::TerminalOptions::interactive());
-terminal.send(esc::BlankScreen{}, esc::Cursor{});
-terminal.write("Hello 👽");
+terminal.write(esc::BlankScreen{}, esc::Cursor{},
+               esc::styled("Hello 👽", esc::fg(esc::XColor::Cyan) | esc::bold));
 terminal.flush();
 
 auto result = terminal.read(std::chrono::milliseconds{100});
-if (result.status == esc::ReadStatus::Event) {
-    // Visit *result.event: keys, mouse, resize, focus, paste, or unknown input.
-}
+esc::match(result,
+    [](esc::Event const& event) { /* Visit keys, mouse, resize, focus, paste, replies. */ },
+    [](esc::Timeout) { /* No event before the deadline. */ },
+    [](esc::EndOfInput) { /* Input is exhausted. */ });
 terminal.close(); // Reports cleanup errors; destruction also attempts cleanup.
 ```
 
@@ -73,7 +77,7 @@ adds separators, newlines, private buffering, or automatic flushing.
 
 `Parser` owns bounded incomplete input and performs no I/O or clock access.
 `Reader` combines it with descriptor reads, monotonic deadlines, and explicit
-Event/Timeout/EndOfInput results. A Reader's input must not have unread stdio
+Event/Timeout/EndOfInput variant results. A Reader's input must not have unread stdio
 buffering or concurrent fread/getchar/iostreams users. Parser protocol changes
 apply only to new sequence beginnings. Unknown input stays owned and bounded;
 paste preserves original bytes. Ordinary keys and mouse events allocate nothing
@@ -89,9 +93,13 @@ explicit capability selection or an explicit synchronization probe. See
 
 ```cpp
 auto scalars = esc::utf8_to_utf32("Hello 👽");
-auto text = esc::glyphs("Hello 👽");
-auto highlighted = text | esc::fg(esc::XColor::Cyan); // text is unchanged
-esc::style_in_place(text, esc::Trait::Bold);
+auto text = esc::styled("Hello 👽", esc::fg(esc::XColor::Cyan));
+auto highlighted = text | esc::bold; // text is unchanged
+esc::write(highlighted);
+
+auto glyphs = esc::glyphs("Hello 👽"); // Explicit per-scalar storage.
+esc::style_in_place(glyphs, esc::bold);
+esc::write(glyphs);
 ```
 
 Conversions are strict. `UnicodeError::offset()` identifies invalid input.
@@ -130,7 +138,7 @@ cmake --install build-install --config Release
 
 Consumers use `Escape::escape` after either `add_subdirectory(Escape)` or
 `find_package(Escape CONFIG REQUIRED)`. The development package version is
-0.2.0; this branch has not been published as a release.
+0.3.0; this branch has not been published as a release.
 
 See [contract tests](tests/contract/README.md) for verification and
 [the acceptance matrix](tests/contract/live-terminals.md) for real terminal

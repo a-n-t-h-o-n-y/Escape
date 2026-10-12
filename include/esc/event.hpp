@@ -8,11 +8,6 @@
 #include <string>
 #include <variant>
 namespace esc {
-struct KeyPress {
-    Key key;
-    Modifiers modifiers = {};
-    friend auto operator==(KeyPress const&, KeyPress const&) -> bool = default;
-};
 struct MousePress {
     Point at;
     MouseButton button;
@@ -59,7 +54,7 @@ struct UnknownInput {
     bool final = true;
     friend auto operator==(UnknownInput const&, UnknownInput const&) -> bool = default;
 };
-using Event = std::variant<KeyPress,
+using Event = std::variant<KeyEvent,
                            MousePress,
                            MouseRelease,
                            MouseMove,
@@ -68,6 +63,5 @@ using Event = std::variant<KeyPress,
                            Focus,
                            PasteChunk,
                            UnknownInput,
-                           TerminalReply,
-                           KeyEvent>;
+                           TerminalReply>;
 }  // namespace esc

@@ -11,9 +11,14 @@
 #include <tuple>
 #include <type_traits>
 
-#include <esc/brush.hpp>
+#include <algorithm>
+#include <array>
 #include <esc/detail/any_of.hpp>
+#include <esc/glyph.hpp>
 #include <esc/point.hpp>
+#include <esc/style.hpp>
+#include <esc/styled_text.hpp>
+#include <memory>
 
 namespace esc {
 
@@ -104,7 +109,9 @@ concept DrawingCommand = detail::AnyOf<std::remove_cvref_t<T>,
                                        Traits,
                                        ColorFG,
                                        ColorBG,
-                                       Brush,
+                                       Style,
+                                       StylePatch,
+                                       WithoutTraits,
                                        CursorStyle,
                                        SaveCursor,
                                        RestoreCursor,
@@ -141,14 +148,20 @@ namespace detail {
 class SequenceWriter {
    public:
     explicit SequenceWriter(char* output = nullptr) : output_{output} {}
+    using Sink = void (*)(void*, std::string_view);
+    SequenceWriter(void* context, Sink sink)
+        : output_{nullptr}, context_{context}, sink_{sink}
+    {}
     void text(std::string_view bytes);
     void number(std::uint64_t value);
     [[nodiscard]] auto size() const noexcept -> std::size_t { return size_; }
-    [[nodiscard]] auto measuring() const noexcept -> bool { return !output_; }
+    [[nodiscard]] auto measuring() const noexcept -> bool { return !output_ && !sink_; }
 
    private:
     void add_size(std::size_t count);
     char* output_;
+    void* context_ = nullptr;
+    Sink sink_ = nullptr;
     std::size_t size_ = 0;
 };
 void encode(SequenceWriter&, Cursor);
@@ -160,7 +173,7 @@ void encode(SequenceWriter&, Trait);
 void encode(SequenceWriter&, Traits);
 void encode(SequenceWriter&, ColorFG const&);
 void encode(SequenceWriter&, ColorBG const&);
-void encode(SequenceWriter&, Brush const&);
+void encode(SequenceWriter&, Style const&);
 void encode(SequenceWriter&, ScreenBuffer);
 void encode(SequenceWriter&, CursorMode);
 void encode(SequenceWriter&, MouseReporting);
@@ -182,13 +195,13 @@ void encode(SequenceWriter&, BeginHyperlink);
 void encode(SequenceWriter&, EndHyperlink);
 void encode(SequenceWriter&, SynchronizedOutput);
 
-// Adapt once, on the stack, so quantization is not repeated by the two passes.
-struct PreparedBrush {
+// A complete style adapted to the selected profile, using stack storage.
+struct PreparedStyle {
     std::optional<ColorBG> background;
     std::optional<ColorFG> foreground;
     std::optional<Traits> traits;
 };
-void encode(SequenceWriter&, PreparedBrush const&);
+void encode(SequenceWriter&, PreparedStyle const&);
 template <class Command>
 void encode(SequenceWriter& output, std::optional<Command> const& command)
 {
@@ -213,7 +226,7 @@ auto prepare(TerminalProfile const&, FocusReporting const&)
 auto prepare(TerminalProfile const&, BracketedPaste const&)
     -> std::optional<BracketedPaste>;
 auto prepare(TerminalProfile const&, Trait) -> std::optional<Traits>;
-auto prepare(TerminalProfile const&, Brush const&) -> PreparedBrush;
+auto prepare(TerminalProfile const&, Style const&) -> PreparedStyle;
 auto prepare(TerminalProfile const&, CursorStyle const&) -> std::optional<CursorStyle>;
 auto prepare(TerminalProfile const&, SaveCursor const&) -> std::optional<SaveCursor>;
 auto prepare(TerminalProfile const&, RestoreCursor const&)
@@ -238,149 +251,281 @@ auto prepare(TerminalProfile const&, EndHyperlink const&)
 auto prepare(TerminalProfile const&, SynchronizedOutput const&)
     -> std::optional<SynchronizedOutput>;
 
-template <Escapable... Commands>
-auto prepare_pack(TerminalProfile const& profile, Commands const&... commands)
-{
-    validate_profile(profile);
-    return std::tuple{prepare(profile, commands)...};
-}
-template <class Tuple>
-void encode_pack(SequenceWriter& output, Tuple const& commands)
-{
-    std::apply([&](auto const&... command) { (encode(output, command), ...); },
-               commands);
-}
+// These are borrowed command payloads; their overlap checks are also used by
+// the recursive encoder for text and nested compositions.
 auto overlaps(std::string_view input, char const* storage, std::size_t size) noexcept
     -> bool;
-template <class Command>
-auto payload_overlaps(Command const&, char const*, std::size_t) noexcept -> bool
-{ return false; }
 auto payload_overlaps(WindowTitle const&, char const*, std::size_t) noexcept -> bool;
 auto payload_overlaps(BeginHyperlink const&, char const*, std::size_t) noexcept -> bool;
-template <class Command>
-auto payload_overlaps(std::optional<Command> const& command,
-                      char const* data,
-                      std::size_t size) noexcept -> bool
-{ return command && payload_overlaps(*command, data, size); }
-template <class Command>
-void relocate_payload(Command&, char const*, std::size_t, char const*)
-{}
 void relocate_payload(WindowTitle&, char const*, std::size_t, char const*);
 void relocate_payload(BeginHyperlink&, char const*, std::size_t, char const*);
-template <class Command>
-void relocate_payload(std::optional<Command>& command,
-                      char const* data,
-                      std::size_t size,
-                      char const* copy)
+
+// Full styles replace all modeled traits. Patches enable/disable selected traits.
+void replace_traits(SequenceWriter&, Traits);
+void encode_patch(SequenceWriter&, TerminalProfile const*, Style&, StylePatch const&);
+void encode_style(SequenceWriter&, TerminalProfile const*, Style const&);
+
+// A single concept controls all sinks; composition is checked recursively.
+template <class T, bool DrawingOnly = false>
+inline constexpr bool encodable = [] {
+    using V = std::remove_cvref_t<T>;
+    if constexpr (IsSequence<V>::value) {
+        return []<class... U>(Sequence<U...> const*) {
+            return (encodable<U, DrawingOnly> && ...);
+        }(static_cast<V const*>(nullptr));
+    }
+    else if constexpr (IsStyledText<V>::value) {
+        return encodable<decltype(std::declval<V>().content), DrawingOnly>;
+    }
+    else
+        return (DrawingOnly ? DrawingCommand<V> : Escapable<V>) || ByteText<V> ||
+               ScalarText<V> || AnyOf<V, char, char32_t, Glyph> || GlyphRange<V const>;
+}();
+
+template <class T>
+auto byte_view(T const& value) -> std::string_view
 {
-    if (command) relocate_payload(*command, data, size, copy);
+    if constexpr (std::is_pointer_v<std::remove_cvref_t<T>>)
+        if (!value) throw std::invalid_argument{"Output: null string"};
+    return std::string_view{value};
 }
-template <class Tuple>
-auto pack_overlaps(Tuple const& commands, char const* data, std::size_t size) noexcept
-    -> bool
+template <class T>
+auto scalar_view(T const& value) -> std::u32string_view
 {
-    return std::apply(
-        [&](auto const&... command) {
-            return (payload_overlaps(command, data, size) || ...);
-        },
-        commands);
+    if constexpr (std::is_pointer_v<std::remove_cvref_t<T>>)
+        if (!value) throw std::invalid_argument{"Output: null string"};
+    return std::u32string_view{value};
 }
-template <class Tuple>
-void append_encoded(std::string& output, Tuple commands)
+
+template <class T>
+void encode_value(SequenceWriter& output,
+                  TerminalProfile const* profile,
+                  Style& current,
+                  T const& value)
 {
+    using V = std::remove_cvref_t<T>;
+    if constexpr (IsSequence<V>::value) {
+        std::apply(
+            [&](auto const&... child) {
+                (encode_value(output, profile, current, child), ...);
+            },
+            value.values);
+    }
+    else if constexpr (IsStyledText<V>::value) {
+        validate_attribute(value.appearance);
+        auto saved = current;
+        current = current | value.appearance;
+        encode_style(output, profile, current);
+        // Styled byte strings are Unicode text; bare byte strings remain raw.
+        if constexpr (ByteText<decltype(value.content)>)
+            static_cast<void>(utf8_scalar_count(byte_view(value.content)));
+        encode_value(output, profile, current, value.content);
+        encode_style(output, profile, saved);
+        current = saved;
+    }
+    else if constexpr (std::same_as<V, Glyph> || GlyphRange<V const>) {
+        auto saved = current;
+        bool first = true;
+        std::size_t offset = 0;
+        auto emit = [&](Glyph const& glyph) {
+            validate_glyph(glyph, offset++);
+            if (first || current != glyph.style)
+                encode_style(output, profile, glyph.style);
+            current = glyph.style;
+            first = false;
+            auto bytes = encode_utf8(glyph.symbol);
+            output.text(bytes.view());
+        };
+        if constexpr (std::same_as<V, Glyph>)
+            emit(value);
+        else
+            for (auto const& glyph : value)
+                emit(glyph);
+        if (!first) encode_style(output, profile, saved);
+        current = saved;
+    }
+    else if constexpr (std::same_as<V, char>)
+        output.text({&value, 1});
+    else if constexpr (std::same_as<V, char32_t>) {
+        auto bytes = encode_utf8(value);
+        output.text(bytes.view());
+    }
+    else if constexpr (ByteText<V>)
+        output.text(byte_view(value));
+    else if constexpr (ScalarText<V>) {
+        auto text = scalar_view(value);
+        validate_utf32(text);
+        for (auto scalar : text) {
+            auto bytes = encode_utf8(scalar);
+            output.text(bytes.view());
+        }
+    }
+    else if constexpr (std::same_as<V, Style>) {
+        validate_style(value);
+        encode_style(output, profile, value);
+        current = value;
+    }
+    else if constexpr (PatchAttribute<V>) {
+        encode_patch(output, profile, current, patch(value));
+    }
+    else {
+        if constexpr (std::same_as<V, ResetStyle>) current = {};
+        if (profile)
+            encode(output, prepare(*profile, value));
+        else
+            encode(output, value);
+    }
+}
+
+template <class T>
+auto value_overlaps(T const& value, char const* storage, std::size_t size) -> bool
+{
+    using V = std::remove_cvref_t<T>;
+    if constexpr (IsSequence<V>::value)
+        return std::apply(
+            [&](auto const&... child) {
+                return (value_overlaps(child, storage, size) || ...);
+            },
+            value.values);
+    else if constexpr (IsStyledText<V>::value)
+        return value_overlaps(value.content, storage, size);
+    else if constexpr (ByteText<V>)
+        return overlaps(byte_view(value), storage, size);
+    else if constexpr (ScalarText<V>) {
+        auto view = scalar_view(value);
+        return overlaps({reinterpret_cast<char const*>(view.data()),
+                         view.size() * sizeof(char32_t)},
+                        storage, size);
+    }
+    else if constexpr (std::same_as<V, WindowTitle> || std::same_as<V, BeginHyperlink>)
+        return payload_overlaps(value, storage, size);
+    else if constexpr (GlyphRange<V const>) {
+        if constexpr (std::ranges::contiguous_range<V const>)
+            return overlaps({reinterpret_cast<char const*>(std::ranges::data(value)),
+                             std::ranges::size(value) * sizeof(Glyph)},
+                            storage, size);
+        else {
+            // Real glyph references can be inspected even in a list/filter view.
+            if constexpr (std::is_lvalue_reference_v<
+                              std::ranges::range_reference_t<V const>>)
+                for (auto const& glyph : value)
+                    if (overlaps({reinterpret_cast<char const*>(std::addressof(glyph)),
+                                  sizeof(Glyph)},
+                                 storage, size))
+                        return true;
+            return false;
+        }
+    }
+    else
+        return false;
+}
+
+template <class T>
+auto requires_snapshot(T const& value) -> bool
+{
+    using V = std::remove_cvref_t<T>;
+    if constexpr (IsSequence<V>::value)
+        return std::apply(
+            [](auto const&... child) { return (requires_snapshot(child) || ...); },
+            value.values);
+    else if constexpr (IsStyledText<V>::value)
+        return requires_snapshot(value.content);
+    else if constexpr (GlyphRange<V const>)
+        return !std::ranges::contiguous_range<V const>;
+    else
+        return false;
+}
+
+template <class... Values>
+void encode_values(SequenceWriter& writer,
+                   TerminalProfile const* profile,
+                   Values const&... values)
+{
+    Style current;
+    (encode_value(writer, profile, current, values), ...);
+}
+template <class... Values>
+void append_values(std::string& output,
+                   TerminalProfile const* profile,
+                   Values const&... values)
+{
+    if (profile) validate_profile(*profile);
     SequenceWriter measure;
-    encode_pack(measure, commands);
+    encode_values(measure, profile, values...);
     auto required = measure.size(), prefix = output.size();
     if (required > output.max_size() - prefix)
-        throw std::length_error{"escape: encoded output exceeds string size limit"};
+        throw std::length_error{"encode: output exceeds string size limit"};
     if (!required) return;
-    std::string snapshot;
-    if (pack_overlaps(commands, output.data(), prefix + 1)) {
-        snapshot = output;
-        std::apply(
-            [&](auto&... command) {
-                (relocate_payload(command, output.data(), prefix + 1, snapshot.data()),
-                 ...);
-            },
-            commands);
+    if (((requires_snapshot(values) ||
+          value_overlaps(values, output.data(), prefix + 1)) ||
+         ...)) {
+        // Encode before growth: aliases and opaque ranges may depend on the
+        // destination.
+        std::string suffix(required, '\0');
+        SequenceWriter writer{suffix.data()};
+        encode_values(writer, profile, values...);
+        output.append(suffix);
     }
-    output.resize(prefix + required);
-    SequenceWriter writer{output.data() + prefix};
-    encode_pack(writer, commands);
+    else {
+        output.resize(prefix + required);
+        SequenceWriter writer{output.data() + prefix};
+        encode_values(writer, profile, values...);
+    }
+}
+template <class... Values>
+auto bounded_values(std::span<char> output,
+                    TerminalProfile const* profile,
+                    Values const&... values) -> EncodeResult
+{
+    if (profile) validate_profile(*profile);
+    SequenceWriter measure;
+    encode_values(measure, profile, values...);
+    auto required = measure.size();
+    if (required > output.size()) return {0, required};
+    if ((value_overlaps(values, output.data(), required) || ...))
+        throw std::invalid_argument{"encode_to: output overlaps borrowed payload"};
+    SequenceWriter writer{output.data()};
+    encode_values(writer, profile, values...);
+    return {required, required};
 }
 }  // namespace detail
 
-// Preserve the prefix on validation, size, or allocation failure. A reserved
-// destination needs no allocation unless a borrowed payload aliases the string.
-template <Escapable... Commands>
-void append_escape(std::string& output, Commands const&... commands)
-{ detail::append_encoded(output, std::tuple{commands...}); }
+template <class T>
+concept Encodable = detail::encodable<T>;
+template <class T>
+concept Drawable = detail::encodable<T, true>;
 
-template <Escapable... Commands>
-[[nodiscard]] auto escape(Commands const&... commands) -> std::string
+template <Encodable... Values>
+void append_encoded(std::string& output, Values const&... values)
+{ detail::append_values(output, nullptr, values...); }
+template <Encodable... Values>
+void append_encoded(std::string& output,
+                    TerminalProfile const& profile,
+                    Values const&... values)
+{ detail::append_values(output, &profile, values...); }
+template <Encodable... Values>
+[[nodiscard]] auto encode(Values const&... values) -> std::string
 {
     std::string output;
-    append_escape(output, commands...);
+    append_encoded(output, values...);
     return output;
 }
-
-// All-or-nothing encoding; no terminator and no heap allocation. Insufficient
-// capacity returns the exact required size and leaves every destination byte intact.
-template <Escapable... Commands>
-[[nodiscard]] auto escape_to(std::span<char> output, Commands const&... commands)
-    -> EncodeResult
-{
-    detail::SequenceWriter measure;
-    (detail::encode(measure, commands), ...);
-    auto const required = measure.size();
-    if (required > output.size()) return {0, required};
-    if (detail::pack_overlaps(std::tuple{commands...}, output.data(), required))
-        throw std::invalid_argument{"escape_to: output overlaps borrowed payload"};
-    detail::SequenceWriter writer{output.data()};
-    (detail::encode(writer, commands), ...);
-    return {required, required};
-}
-
-// Explicit capability-aware overloads. The prepared pack is local storage;
-// neither validation/adaptation nor bounded/reserved encoding allocates.
-template <Escapable... Commands>
-void append_escape(std::string& output,
-                   TerminalProfile const& profile,
-                   Commands const&... commands)
-{
-    auto prepared = detail::prepare_pack(profile, commands...);
-    detail::append_encoded(output, std::move(prepared));
-}
-template <Escapable... Commands>
-[[nodiscard]] auto escape(TerminalProfile const& profile, Commands const&... commands)
+template <Encodable... Values>
+[[nodiscard]] auto encode(TerminalProfile const& profile, Values const&... values)
     -> std::string
 {
     std::string output;
-    append_escape(output, profile, commands...);
+    append_encoded(output, profile, values...);
     return output;
 }
-template <Escapable... Commands>
-[[nodiscard]] auto escape_to(std::span<char> output,
+// All-or-nothing, no terminator, no allocation, untouched on insufficient space.
+template <Encodable... Values>
+[[nodiscard]] auto encode_to(std::span<char> output, Values const&... values)
+    -> EncodeResult
+{ return detail::bounded_values(output, nullptr, values...); }
+template <Encodable... Values>
+[[nodiscard]] auto encode_to(std::span<char> output,
                              TerminalProfile const& profile,
-                             Commands const&... commands) -> EncodeResult
-{
-    auto const prepared = detail::prepare_pack(profile, commands...);
-    detail::SequenceWriter measure;
-    detail::encode_pack(measure, prepared);
-    auto const required = measure.size();
-    if (required > output.size()) return {0, required};
-    if (detail::pack_overlaps(prepared, output.data(), required))
-        throw std::invalid_argument{"escape_to: output overlaps borrowed payload"};
-    detail::SequenceWriter writer{output.data()};
-    detail::encode_pack(writer, prepared);
-    return {required, required};
-}
-
-// Existing convenience spellings remain pure wrappers.
-[[nodiscard]] inline auto clear_traits() -> std::string { return escape(Traits{}); }
-[[nodiscard]] inline auto escape_fg(Color color) -> std::string
-{ return escape(fg(color)); }
-[[nodiscard]] inline auto escape_bg(Color color) -> std::string
-{ return escape(bg(color)); }
-
+                             Values const&... values) -> EncodeResult
+{ return detail::bounded_values(output, &profile, values...); }
 }  // namespace esc

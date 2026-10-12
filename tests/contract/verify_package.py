@@ -10,23 +10,30 @@ import tempfile
 CONSUMER = r'''#include <esc/esc.hpp>
 #include <esc/text.hpp>
 int main() {
-    if (esc::escape(esc::Cursor{}) != "\x1b[1;1H") return 1;
+    if (esc::encode(esc::Cursor{}) != "\x1b[1;1H") return 1;
     if (esc::utf32_to_utf8(U"界") != "\xe7\x95\x8c") return 2;
     esc::Parser parser;
     auto result=parser.next(std::span<char const>{"\x1b[A",3});
-    if(result.event != std::optional<esc::Event>{esc::KeyPress{esc::KeyCode::ArrowUp}}) return 3;
+    if(result.event != std::optional<esc::Event>{esc::KeyEvent{esc::KeyCode::ArrowUp}}) return 3;
     auto options=esc::TerminalOptions::interactive();
     if(options.echo != std::optional{esc::Echo::Off}) return 4;
     esc::Output{}.write(std::string_view{});
-    if (esc::escape(esc::CursorStyle::SteadyBar, esc::ScrollUp{2}) != "\x1b[6 q\x1b[2S") return 5;
-    if (esc::escape(esc::WindowTitle{"title"}, esc::BeginHyperlink{"https://example.org", "a"}, esc::EndHyperlink{}) != "\x1b]2;title\x1b\\\x1b]8;id=a;https://example.org\x1b\\\x1b]8;;\x1b\\") return 6;
+    if (esc::encode(esc::CursorStyle::SteadyBar, esc::ScrollUp{2}) != "\x1b[6 q\x1b[2S") return 5;
+    if (esc::encode(esc::WindowTitle{"title"}, esc::BeginHyperlink{"https://example.org", "a"}, esc::EndHyperlink{}) != "\x1b]2;title\x1b\\\x1b]8;id=a;https://example.org\x1b\\\x1b]8;;\x1b\\") return 6;
     auto* input=std::tmpfile();
     if (!input) return 7;
     {
         esc::Reader reader{input};
-        if (!reader.wait_state().ready || reader.read(std::chrono::milliseconds{0}).status != esc::ReadStatus::EndOfInput) return 8;
+        if (!reader.wait_state().ready || !std::holds_alternative<esc::EndOfInput>(reader.read(std::chrono::milliseconds{0}))) return 8;
     }
     std::fclose(input);
+    auto label = esc::styled("ok", esc::fg(esc::XColor::Cyan) | esc::bold);
+    if (label.content != "ok" || (esc::Style{} | label.appearance).traits != esc::Traits{esc::bold}) return 9;
+    if (esc::encode(esc::sequence("a", 'b')) != "ab") return 10;
+    esc::ReadResult timeout = esc::Timeout{};
+    if (esc::match(timeout, [](esc::Event const&) { return 1; },
+                   [](esc::Timeout) { return 2; }, [](esc::EndOfInput) { return 3; }) != 2) return 11;
+    if (!esc::KeyEvent{U'q'}.matches(U'q')) return 12;
     return 0;
 }
 '''

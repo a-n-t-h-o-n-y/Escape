@@ -13,7 +13,8 @@
 Status: baseline contract for the `refactor/terminal-api` branch. The core
 interface is implemented; the linked extension contracts specify subsequent
 additions and supersede the original deferrals below. The signatures here describe
-the baseline rather than an exhaustive current header listing. Implementation,
+the core contract rather than an exhaustive current header listing. The functional
+API revision is detailed in [functional-api.md](functional-api.md). Implementation,
 benchmark, and platform validation evidence is recorded separately in the README,
 implementation review, and contract tests.
 
@@ -49,13 +50,13 @@ The public value model must not depend on POSIX or Windows console headers.
 
 int main()
 {
-    esc::write(esc::escape(esc::fg(esc::XColor::Cyan)), "Hello", esc::escape(esc::ResetStyle{}), "\n");
+    esc::write(esc::fg(esc::XColor::Cyan), "Hello", esc::ResetStyle{}, "\n");
     esc::flush();
 }
 ```
 
 No terminal initialization is necessary to encode commands or write bytes.
-`escape` is a pure encoder. This example deliberately requests terminal control
+`encode` is a pure encoder. This example deliberately requests terminal control
 bytes; applications wanting automatic capability handling use a terminal profile.
 
 ### An interactive program
@@ -64,14 +65,15 @@ bytes; applications wanting automatic capability handling use a terminal profile
 using namespace std::chrono_literals;
 
 auto terminal = esc::Terminal::open(esc::TerminalOptions::interactive());
-terminal.send(esc::Cursor{0, 0}, esc::Brush{.foreground = esc::XColor::Cyan});
+terminal.write(esc::Cursor{0, 0}, esc::Style{.foreground = esc::XColor::Cyan});
 terminal.write("Hello");
 terminal.flush();
 
 auto result = terminal.read(100ms);
-if (result.status == esc::ReadStatus::Event) {
-    std::visit(handle_event, *result.event);
-}
+esc::match(result,
+    [&](esc::Event const& event) { std::visit(handle_event, event); },
+    [](esc::Timeout) {},
+    [](esc::EndOfInput) {});
 terminal.close(); // Optional, but reports cleanup errors; destructor is best effort.
 ```
 
@@ -88,9 +90,9 @@ frame.reserve(16 * 1024);
 
 // Each frame:
 frame.clear();
-esc::append_escape(frame, terminal.profile(), esc::Cursor{0, 0}, brush);
+esc::append_encoded(frame, terminal.profile(), esc::Cursor{0, 0}, style);
 frame.append("Hello");
-esc::append_escape(frame, terminal.profile(), esc::ResetStyle{});
+esc::append_encoded(frame, terminal.profile(), esc::ResetStyle{});
 terminal.write(frame);
 terminal.flush();
 ```
@@ -101,12 +103,11 @@ is explicit. No API borrows a hidden scratch string or consults global style sta
 ## 3. Names, headers, and common conventions
 
 Public types use the existing `PascalCase` convention; functions use `snake_case`.
-Keep `fg`, `bg`, `foreground`, and `background` as equivalent helpers. Avoid new
-aliases unless they preserve an established, useful spelling.
+Use `fg` and `bg` as the channel helpers; compatibility aliases are removed.
 
 | Header | Responsibility |
 | --- | --- |
-| `esc/color.hpp`, `esc/trait.hpp`, `esc/brush.hpp` | Style values |
+| `esc/color.hpp`, `esc/trait.hpp`, `esc/style.hpp` | Style values |
 | `esc/point.hpp`, `esc/area.hpp` | Coordinates and dimensions |
 | `esc/sequence.hpp` | Command values and encoding |
 | `esc/text.hpp`, `esc/glyph.hpp` | Unicode conversion and styled code points |
@@ -176,72 +177,52 @@ and text layout beyond these values are outside this refactor.
 
 ### Colors
 
-Retain `RGB`, `HSL`, `TrueColor`, `TColor`, `XColor`, `TermColor`, `Color`,
-`ColorFG`, `ColorBG`, `fg`, and `bg`. Preserve named indexed colors.
+`RGB` is the single RGB color value. It accepts three byte channels, a checked
+packed 24-bit integer, or an explicit HSL conversion. `hsl_to_rgb` and `rgb_to_hsl`
+are pure conversion helpers. HSL ranges are hue 0..359 and saturation/lightness
+0..100; invalid values throw. Conversions round to the nearest channel, ties up;
+achromatic hue is zero, negative computed hues normalize into 0..359.
+
+`Color = std::variant<XColor, RGB, TermColor>`. `XColor` is a palette index with
+named system colors. Its first sixteen slots may be customized by the terminal;
+remaining slots use the conventional cube and grayscale palette when selected.
+`fg(Color)` and `bg(Color)` select the channel. There are no duplicate color types
+or long-form channel helper aliases. Invalid default-color enum values and
+valueless variants are rejected before destination mutation.
+
+### Traits, styles, and patches
+
+`Traits` is a validated set with equality, `contains`, pure `|`, and explicit
+`insert`/`remove` mutation. None is empty; inserting/removing it does nothing.
+Standout is Bold|Inverse. Lowercase constants (`bold`, `italic`, `underline`,
+`dim`, `double_underline`, etc.) name the corresponding Trait values.
+
+`Style{background, foreground, traits}` is a complete appearance. Applying it
+replaces both colors and all modeled traits. `Style{}` restores the defaults for
+those components. `ResetStyle{}` performs the terminal's full SGR reset.
+
+`StylePatch{background?, foreground?, enabled, disabled}` is a partial change.
+Unspecified colors preserve their channel; an explicit Default resets it.
+`fg`, `bg`, Trait, Traits, and `without(Traits)` are patch attributes. Encoding
+Trait/Traits enables them; None and an empty set emit nothing. Pipe composition
+is pure, with the last supplied color or enable/disable decision winning. A patch
+that directly contains overlapping enabled/disabled sets is invalid.
 
 ```cpp
-enum class TermColor : bool { Default };
-struct XColor { std::uint8_t value; /* existing named constants */ };
-struct RGB { std::uint8_t red, green, blue; /* constructors below */ };
-struct HSL { std::uint16_t hue; std::uint8_t saturation, lightness; };
-struct TrueColor { std::uint8_t red, green, blue; /* constructors below */ };
-using TColor = TrueColor;
-using Color = std::variant<XColor, TrueColor, TermColor>;
-struct ColorFG { Color value; };
-struct ColorBG { Color value; };
+auto warning = esc::fg(esc::XColor::Yellow) | esc::bold;
+auto urgent = warning | esc::underline;
+auto appearance = esc::Style{} | urgent;
+auto quieter = appearance | esc::without(esc::bold);
 ```
 
-The byte fields hold exactly 0..255. Braced construction must reject narrowing;
-do not add an integer overload that silently wraps. `RGB` accepts three bytes or
-an explicit packed `std::uint32_t` of 0x000000..0xFFFFFF; larger packed values are
-invalid. `TrueColor` accepts `RGB`, `HSL`, or an explicit packed RGB integer,
-preserving the convenient `TColor{0xF02127}` spelling. HSL ranges are hue 0..359 and saturation/
-lightness 0..100. Conversion validates input, normalizes the computed hue into
-0..359, and rounds channels to the nearest representable integer, ties upward.
-Hue is zero for achromatic RGB. RGB/HSL round trips are approximate and tested
-with documented tolerances; exact RGB bytes are preserved by RGB construction.
+The same attribute semantics apply to styles, glyphs, and output. Double underline
+takes precedence when both underline flags are requested. SGR shares the bold/dim
+and underline/double-underline disable codes; disabling either clears that wire
+group and then re-enables peers known within the current encoding operation.
+Escape cannot preserve an unknown peer left by an earlier operation.
 
-`XColor` identifies a palette slot, not a universally fixed RGB value. Slots
-0..15 are configurable system colors; 16..231 are the conventional 216-color
-cube and 232..255 the conventional grayscale ramp when the selected profile
-uses the xterm palette. No promise is made about a terminal's customized palette.
-
-All these value types support value equality. Invalid casted enum values and
-valueless color variants are rejected by encoding before modifying a destination.
-
-### Traits and brushes
-
-Retain the existing trait names. Define `Standout` as the semantic combination
-of `Bold | Inverse`, rather than a separate wire attribute. `Traits` stores a
-canonical bitmask with value equality. `None` is the empty set. Construction and
-combination reject unknown bits. `contains(None)` means the set is empty;
-`contains(Standout)` means both component bits are present.
-
-`Traits` exposes a default constructor, construction from `Trait`, `contains`,
-`data`, equality, and pure `operator|` combination. Named mutating `insert` and
-`remove` operations remain for explicit mutation and return `Traits&`.
-Inserting or removing None is a no-op. `remove_trait(Standout)` removes both
-components. If both underline forms are
-requested, double underline takes precedence during encoding; the value retains
-the requested flags so capability fallback can select single underline.
-
-```cpp
-struct Brush {
-    Color background = TermColor::Default;
-    Color foreground = TermColor::Default;
-    Traits traits = {};
-};
-```
-
-`Brush` is a complete style value. Encoding it sets both colors and replaces the
-set of traits modeled by this library. Encoding `fg` or `bg` changes only that
-channel. Encoding a `Trait` or `Traits` replaces the modeled traits while
-preserving both colors. Trait encoding is not additive. `ResetStyle` requests
-the terminal's full SGR reset and can reset attributes outside Escape's model.
-
-No `traits()`, `foreground_color()`, or `background_color()` global getters remain.
-Generated output is not evidence of output being written, and written output is
-not evidence of the terminal's actual current state.
+Style tracking starts at the default at each encode/append/write call and is local
+to that call. There is no global style state or attempt to query existing style.
 
 ## 5. Commands and byte encoding
 
@@ -257,7 +238,7 @@ struct ResetStyle {};
 ```
 
 Drawing commands are `Cursor`, `MoveCursor`, `BlankRow`, `BlankScreen`, `Trait`,
-`Traits`, `ColorFG`, `ColorBG`, `Brush`, and `ResetStyle`. `DrawingCommand<T>`
+`Traits`, `ColorFG`, `ColorBG`, `Style`, and `ResetStyle`. `DrawingCommand<T>`
 checks the unqualified type against this closed set. Bare `Color`, integers,
 `Point`, strings, and unrelated implicitly convertible types are not commands.
 
@@ -287,56 +268,38 @@ settings and have no escape-string overload.
 ### Public encoding functions
 
 ```cpp
-template<Escapable... Commands>
-auto escape(Commands const&... commands) -> std::string;
-
-template<Escapable... Commands>
-void append_escape(std::string& output, Commands const&... commands);
-
-struct EncodeResult {
-    std::size_t written;
-    std::size_t required;
-};
-
-template<Escapable... Commands>
-auto escape_to(std::span<char> output, Commands const&... commands) -> EncodeResult;
+template<Encodable... Values> auto encode(Values const&...) -> std::string;
+template<Encodable... Values> void append_encoded(std::string&, Values const&...);
+template<Encodable... Values> auto encode_to(std::span<char>, Values const&...) -> EncodeResult;
+// Each also has an overload with TerminalProfile before the values.
+struct EncodeResult { std::size_t written; std::size_t required; };
 ```
 
-All three permit zero commands: empty string, no append, or `{0, 0}` respectively.
-They support const values, lvalues, and temporaries with the same behavior.
-Composition is left to right and equals concatenation of the canonical encoding
-of each command. Do not implicitly reorder, merge, or omit repeated commands.
+All destinations accept commands, raw byte strings, Unicode scalars/UTF-32 text,
+styles/patches, styled text, glyphs, and recursively composed `sequence(...)`
+values. Integral/bool values and arbitrary Point values are rejected. Text has
+no separators or implicit newline. Commands remain ordered; repeated explicit
+commands are retained. Scoped styling uses the preceding style from the same call.
 
-`escape` always returns an owning `std::string`, even for literal sequences.
-There is no inconsistent string/view return family. Small-string optimization
-is implementation-dependent and is not the allocation guarantee.
+Zero values encode nothing. `encode` returns an owning string. `append_encoded`
+preserves its prefix on validation, unsupported-feature, size, or allocation
+failure. Ordinary reserved appends allocate nothing. If borrowed text/OSC payloads
+alias the destination, the suffix is encoded separately before growth and may
+allocate. Nested compositions are checked recursively for aliases. General glyph ranges
+use a separate suffix because their iteration may depend on the destination.
+Opaque/lazy ranges supplied to encode_to must be independent of its output.
 
-`append_escape` preserves the existing prefix. It validates the entire pack,
-checks total size, and obtains capacity before changing logical contents. Invalid
-input, unsupported requests, overflow, or allocation failure leaves contents
-unchanged. There are no intermediate heap-allocated strings; no allocation occurs
-when destination capacity suffices. A two-pass size/write implementation is
-acceptable; do not encode an entire frame into a second temporary buffer.
+`encode_to` validates before writing, adds no terminator, and preserves trailing
+bytes. Insufficient space returns `{0, required}` with the entire span unchanged.
+Success returns `{required, required}`. Overlap with the region to be written is
+rejected before mutation; disjoint regions are permitted. Valid bounded encoding
+allocates nothing, including styled views and glyph ranges.
 
-`escape_to` writes at offset zero without a null terminator. It validates first.
-On insufficient capacity it returns `{0, required}` and leaves every byte
-unchanged. On success it returns `{required, required}` and preserves trailing
-bytes. A zero-length encoding succeeds in an empty span. Invalid commands throw
-`std::invalid_argument`; size overflow throws `std::length_error` before writes.
-It performs no heap allocations on successful valid input or capacity failure.
-
-```cpp
-std::array<char, 128> storage;
-auto result = esc::escape_to(storage, esc::Cursor{4, 2}, brush);
-if (result.written == result.required) {
-    esc::write(std::string_view{storage.data(), result.written});
-}
-```
-
-No public fixed-capacity sequence return type is introduced in this proposal.
-The bounded destination API supplies the allocation-free path without a capacity
-constant spreading through caller code. A future owning small-buffer value must
-justify itself with actual usage and measurements.
+`sequence(values...)` owns copies/moves of its children and copies string views
+into strings. Commands whose fields are views and explicitly supplied borrowed
+views retain their documented borrowing. Every borrowed source must remain valid
+and unchanged throughout both sizing and writing passes. Generic forward ranges
+must provide stable, repeatable iteration for the duration of the call.
 
 ### Canonical encodings
 
@@ -358,11 +321,11 @@ the API and serialization choices below are Escape's proposed contract.
 | True color | `ESC [ {38/48} ; 2 ; {r} ; {g} ; {b} m` |
 | `ResetStyle{}` | `ESC [ 0 m` |
 
-Trait replacement emits `ESC[22;23;24;25;27;28;29` followed by the enabled
+Complete Style trait replacement emits `ESC[22;23;24;25;27;28;29` followed by the enabled
 parameters and `m`. Parameters are emitted once, in this order: Bold=1, Dim=2,
 Italic=3, Underline=4 or DoubleUnderline=21, Blink=5, Inverse=7, Invisible=8,
 CrossedOut=9. An empty set emits only the clearing parameters. This clears the
-modeled traits, not every possible SGR attribute. `Brush` concatenates background,
+modeled traits, not every possible SGR attribute. `Style` concatenates background,
 foreground, and trait encodings in that order.
 
 Mode commands serialize each private-mode change as its own sequence. Screen
@@ -376,9 +339,9 @@ it cannot be mixed with another mouse-mode controller.
 Raw encoding never checks environment or capabilities. For example, requesting
 true color emits true-color bytes regardless of which terminal might receive them.
 
-Retain `clear_traits()` as a pure compatibility wrapper for `escape(Traits{})`.
-Retain `escape_fg` and `escape_bg` as thin wrappers for `escape(fg(...))` and
-`escape(bg(...))`; they have no independent state or serialization rules.
+Trait/Traits patches emit only enabled parameters. `without` emits the applicable
+disabling parameters (22, 23, 24, 25, 27, 28, 29) and restores known peers for shared
+groups. The former compatibility helpers are removed.
 
 ## 6. Capability-aware encoding
 
@@ -419,15 +382,15 @@ requires maximum_mouse_mode=Off; a non-None protocol requires at least Basic.
 Capability-aware counterparts take the profile explicitly:
 
 ```cpp
-template<Escapable... Commands>
-auto escape(TerminalProfile const& profile, Commands const&... commands) -> std::string;
+template<Encodable... Commands>
+auto encode(TerminalProfile const& profile, Commands const&... commands) -> std::string;
 
-template<Escapable... Commands>
-void append_escape(std::string& output, TerminalProfile const& profile,
+template<Encodable... Commands>
+void append_encoded(std::string& output, TerminalProfile const& profile,
                    Commands const&... commands);
 
-template<Escapable... Commands>
-auto escape_to(std::span<char> output, TerminalProfile const& profile,
+template<Encodable... Commands>
+auto encode_to(std::span<char> output, TerminalProfile const& profile,
                Commands const&... commands) -> EncodeResult;
 ```
 
@@ -457,7 +420,7 @@ feature is supported, Off disables the owned modes without selecting an encoding
 Default colors are not an approximation and never become black or white. Within
 a control profile without color support, default color commands emit nothing;
 nondefault colors are dropped under BestEffort and rejected under Strict.
-Trait replacement emits the usual clearing sequence when traits are supported;
+Complete Style trait replacement emits the usual clearing sequence when traits are supported;
 when no traits are supported it emits nothing under BestEffort. Strict rejects
 requested traits absent from the supported set. Clearing parameters for absent
 traits may be harmlessly ignored by the selected profile; profiles with known
@@ -478,8 +441,9 @@ slots are converted using the conventional cube/ramp, then quantized. TrueColor
 is retained only with TrueColor support. Approximating to None drops the color
 command. Profiles cannot infer the actual display color of an unknown custom slot.
 
-No stateful style deduplication occurs. A future renderer may compare explicit
-style values, but it must account for raw writes and failed writes. Such a renderer
+There is no persistent style deduplication across calls. Equal neighboring glyph
+styles are coalesced locally; a future persistent renderer must account for raw
+writes and failed writes. Such a renderer
 is outside this first interface contract.
 
 ### Environment resolution
@@ -577,13 +541,13 @@ iterators are deferred until there is a concrete need.
 ### Styled code points
 
 ```cpp
-struct Glyph { char32_t symbol = U' '; Brush brush = {}; };
+struct Glyph { char32_t symbol = U' '; Style style = {}; };
 using GlyphString = std::vector<Glyph>;
 
-auto glyphs(std::string_view utf8, Brush brush = {}) -> GlyphString;
-auto glyphs(std::u32string_view utf32, Brush brush = {}) -> GlyphString;
-void append_glyphs(GlyphString&, std::string_view utf8, Brush brush = {});
-void append_glyphs(GlyphString&, std::u32string_view utf32, Brush brush = {});
+auto glyphs(std::string_view utf8, Style style = {}) -> GlyphString;
+auto glyphs(std::u32string_view utf32, Style style = {}) -> GlyphString;
+void append_glyphs(GlyphString&, std::string_view utf8, Style style = {});
+void append_glyphs(GlyphString&, std::u32string_view utf32, Style style = {});
 ```
 
 Glyph is a styled Unicode scalar, not a promise of one terminal cell. Construction
@@ -595,14 +559,13 @@ Do not expose a misleading universal width() function.
 The existing GlyphString concept becomes `GlyphRange`: a forward range of Glyph.
 `GlyphString` now names the ordinary owning vector. Keep efficient customization
 through ranges and a named iterator-based `append_glyphs_to(output_iterator,
-input_view, brush={})` for both UTF-8 and UTF-32. It returns the advanced iterator,
+input_view, style={})` for both UTF-8 and UTF-32. It returns the advanced iterator,
 validates all input first, and may leave a partial destination only if insertion
 itself throws. There is no implicit allocation by the iterator API.
 
-Attributes are ColorFG, ColorBG, Trait, Traits, RemoveTrait, and Brush. Attribute
+Attributes are ColorFG, ColorBG, Trait, Traits, WithoutTraits, StylePatch, and Style. Attribute
 application replaces the selected color, adds/removes traits, or replaces the
-complete brush. This differs deliberately from encoding Traits, which replaces
-the terminal's modeled traits. `Brush` and `Glyph` pipe operations return values.
+complete style. These semantics are identical during encoding. `Style` and `Glyph` pipe operations return values.
 `U'x' | fg(...)` produces a Glyph; narrow character pipes accept ASCII only,
 including signed/unsigned char ASCII, and reject bytes above 127. Isolated
 char8_t/char16_t code units are not accepted as Unicode scalars. Use strings for
@@ -617,7 +580,10 @@ void style_in_place(GlyphRange auto& input, Attribute auto attribute);
 requires mutable glyph references, performs no allocation, validates the
 attribute and input scalars before applying it, and names the mutation. GlyphString pipes return a
 value even for an lvalue; they never silently modify an lvalue range. Rvalues may
-reuse owned storage. String-view pipes decode strictly and return GlyphString.
+reuse owned storage. String-view pipes validate strictly and return owning StyledText. Use `glyphs`
+explicitly when per-scalar storage is needed. Glyphs and glyph ranges are directly
+encodable/writable, with adjacent equal styles coalesced and the preceding style
+from the same output operation restored afterward.
 
 Retain concatenation for GlyphString, Glyph, ASCII char, char32_t, UTF-8 views,
 and UTF-32 views: `+` returns an owned vector in left-to-right order; `+=` appends
@@ -645,9 +611,16 @@ enum class KeyCode {
     Keypad5, Keypad6, Keypad7, Keypad8, Keypad9,
     KeypadDecimal, KeypadPlus, KeypadMinus, KeypadMultiply, KeypadDivide
 };
-using Key = std::variant<char32_t, KeyCode>;
+using Key = std::variant<char32_t, KeyCode, KittyKey>;
 struct Modifiers { bool shift=false, ctrl=false, alt=false, meta=false; };
-struct KeyPress { Key key; Modifiers modifiers={}; };
+enum class KeyAction { Press, Repeat, Release };
+struct KeyEvent {
+    std::optional<Key> key;
+    Modifiers modifiers = {};
+    KeyAction action = KeyAction::Press;
+    std::optional<char32_t> shifted_key, base_layout_key;
+    std::u32string text;
+};
 
 enum class MouseButton { Left, Middle, Right, Button4, Button5,
                          Button6, Button7, Button8, Button9, Button10, Button11 };
@@ -662,8 +635,8 @@ struct PasteChunk { std::string bytes; bool first; bool last; bool aborted=false
 enum class InputProblem { Unsupported, Malformed, TooLong, Truncated, InvalidUtf8 };
 struct UnknownInput { std::string bytes; InputProblem problem; bool final=true; };
 
-using Event = std::variant<KeyPress, MousePress, MouseRelease, MouseMove,
-                           MouseWheel, Resize, Focus, PasteChunk, UnknownInput>;
+using Event = std::variant<KeyEvent, MousePress, MouseRelease, MouseMove,
+                           MouseWheel, Resize, Focus, PasteChunk, UnknownInput, TerminalReply>;
 ```
 
 All event types support value equality. Positions are zero-based cell coordinates,
@@ -672,12 +645,15 @@ wheel ticks are +/-1. Release.button can be empty for protocols that do not
 identify the released button. Motion reports only the held button represented
 by the protocol, not a reconstructed full physical button state.
 
-For legacy input, ASCII characters and valid UTF-8 produce KeyPress with a scalar.
+For legacy input, ASCII characters and valid UTF-8 produce KeyEvent with a scalar.
 TAB produces KeyCode::Tab, CR produces Enter, bytes BS and DEL produce Backspace,
 and standalone ESC produces Escape. Other C0 bytes, including LF and NUL, remain
 literal scalar values with no invented modifier flags. Legacy uppercase text
-does not imply Shift; Ctrl-I cannot be distinguished from Tab. Applications
-needing physical identity require a future explicitly enabled keyboard protocol.
+does not imply Shift; Ctrl-I cannot be distinguished from Tab. Explicit Kitty negotiation can supply additional identity/action/text information.
+Legacy and enhanced input both produce KeyEvent; legacy action is Press and
+unreported text/alternate identities stay empty. `KeyEvent::matches(key, modifiers={},
+action=Press)` checks exact identity, modifier set, and action. IME events without
+a key never match.
 Legacy autorepeat produces more presses and cannot be identified as repeat.
 
 Named key values are unique, independent of Unicode code points. Named keys do
@@ -698,8 +674,8 @@ final=false means another chunk of that same unit follows. A final empty chunk
 is allowed to close an already-emitted unit. Unknown sequences are never written
 back to the terminal by the library.
 
-Linux console scancode access, elevated keyboard modes, release events, physical
-modifier keys, and enhanced keyboard protocols are deferred. Remove the current
+Linux console scancode access and elevated keyboard modes are deferred.
+Enhanced keyboard events are described in queries-and-keyboard.md. Remove the current
 KeyMode::Raw path from the portable interface rather than implying emulator
 support for Linux console behavior.
 
@@ -722,10 +698,8 @@ struct ParserOptions {
     std::size_t sequence_limit = 256;
     std::size_t paste_chunk_size = 4096;
 };
-enum class ParseStatus { Event, NeedInput };
 struct ParseResult {
     std::size_t consumed;
-    ParseStatus status;
     std::optional<Event> event;
 };
 enum class PendingTimeout { Escape, Sequence };
@@ -749,10 +723,10 @@ and mouse parsing then allocate nothing. Owned paste/unknown events may allocate
 Do not impose an unbounded internal event queue or retain an entire large paste.
 
 `next` returns at most one event. consumed counts bytes taken from the supplied
-span, never bytes already buffered. Event status has a populated event; NeedInput
-has none and has consumed all supplied bytes. Empty input can drain a pending
+span, never bytes already buffered. A populated event reports one event; an empty
+event requests more input and has consumed all supplied bytes. Empty input can drain a pending
 event. An Event with consumed=0 is valid when releasing buffered work, but repeated
-calls must make progress and eventually NeedInput. Caller advances the span by
+calls must make progress and eventually request more input. Caller advances the span by
 consumed and calls again. Only consumed bytes become owned by Parser; the input
 span can otherwise be destroyed immediately after the call.
 
@@ -823,11 +797,6 @@ expiry or discard partially received input.
 class Output {
 public:
     explicit Output(std::FILE* stream=stdout);
-    void write(char byte);
-    void write(char32_t scalar);
-    void write(std::string_view bytes);
-    void write(std::u32string_view text);
-    void write(char const* null_terminated);
     template<Writable... Values> void write(Values const&... values);
     void flush();
 };
@@ -836,17 +805,14 @@ template<Writable... Values> void write(Values const&... values); // stdout
 void flush();                                                   // stdout
 ```
 
-`Writable` is restricted to char, char32_t, string/string_view, u32string/
-u32string_view, and null-terminated char pointers/arrays or UTF-32 literal arrays. UTF-32
-arrays use null-terminated semantics; an explicit u32string_view preserves embedded
-nulls. No arbitrary integer
-or bool becomes a character through implicit convertibility. String and u32string
-arguments use their full sizes via views. Pointer/array overloads have conventional
-C-string semantics; use an explicit view to include embedded nulls in an array.
+`Writable` accepts the same values as Encodable: commands, bytes, Unicode,
+styles, styled runs, glyphs, and compositions. It rejects arbitrary integers and
+bool. String/view arguments preserve their full size, including NUL; pointers
+and arrays use null-terminated semantics. An explicit view includes embedded NUL.
 Zero arguments are a no-op.
 
-Output borrows a non-null FILE*, never closes it, and adds no private output
-buffer. It is a lightweight copyable stream reference. Use the application's
+Output borrows a non-null FILE*, never closes it, and retains no private output
+buffer between calls. One write uses a bounded stack buffer to batch fragments. It is a lightweight copyable stream reference. Use the application's
 existing stdio buffering; do not call setvbuf behind its back. On platforms with
 text/binary stream translation, byte-exact use requires a binary stream supplied
 by the application. No global terminal initialization is necessary.
@@ -855,7 +821,8 @@ write(view) writes exactly size() bytes, including embedded nulls, using length-
 based block output. write(string) has identical semantics. char writes one raw
 byte; char32_t and u32 views strictly encode Unicode through small bounded
 chunks, without an entire intermediate string. write(nullptr) is invalid.
-Validate all UTF-32 arguments before beginning a variadic write. Arguments are
+Validate the entire mixed value pack, including all nested Unicode and commands,
+before beginning output. Arguments are
 written in order with no separators, newline insertion, or automatic flush.
 
 A successful write means bytes were accepted by the C stream, possibly buffered;
@@ -879,11 +846,7 @@ a separately named sanitizer could be added later without changing byte output.
 ### Reader
 
 ```cpp
-enum class ReadStatus { Event, Timeout, EndOfInput };
-struct ReadResult {
-    ReadStatus status;
-    std::optional<Event> event;
-};
+using ReadResult = std::variant<Event, Timeout, EndOfInput>;
 
 class Reader {
 public:
@@ -909,7 +872,8 @@ Caller timeouts do not reset the parser, shorten its own ambiguity deadlines,
 or force an incomplete sequence into a key event. Repeated timed reads preserve
 all pending input. Expired parser deadlines are serviced before blocking again.
 
-ReadStatus::Event has an event; the other statuses have none. EOF drains Parser
+ReadResult carries exactly one alternative. `match(result, handlers...)` is an
+exhaustive std::visit convenience with normal reference/return semantics. EOF drains Parser
 via finish before EndOfInput, which is then returned persistently. EINTR retries
 with the original caller deadline; no deadline restarts. Other I/O errors throw
 system_error. A hangup drains available bytes before final EOF. No implicit
@@ -981,8 +945,7 @@ public:
     auto profile() const -> TerminalProfile const&;
     auto profile_report() const -> ProfileReport const&;
     auto output() -> Output&;
-    template<Writable... Values> void write(Values const&... values);
-    template<DrawingCommand... Commands> void send(Commands const&... commands);
+    template<Drawable... Values> void write(Values const&... values);
     void flush();
     template<Setting... Settings> void set(Settings const&... settings);
     auto area() const -> Area;
@@ -1058,10 +1021,10 @@ ignored. An unusable session remains is_open()==true until cleanup is attempted;
 other operations throw logic_error. set makes no promise of atomic terminal observation across OS and byte
 operations.
 
-send accepts drawing commands only and encodes using profile(), validates the
-entire command pack before output, and uses bounded chunks with no intermediate
-heap string. It does not deduplicate style or flush. Zero commands is a no-op.
-write forwards the byte/text output contract, without capability filtering.
+write accepts Drawable values and encodes using profile(), validates the
+entire mixed value pack before output, and uses bounded chunks with no intermediate
+heap string. It applies the session profile to commands and styles, coalesces
+adjacent glyph styles locally, and does not flush. Zero values are a no-op.
 output exposes the underlying Output for integration; raw protocol bytes written
 through it are the caller's responsibility and cannot update session knowledge.
 
@@ -1214,7 +1177,7 @@ Terminfo-backed adapters are outside the project's scope.
 
 ## 13. Build and dependency interface
 
-Retain the local CMake target `escape` and add an exported `Escape::escape` target.
+Retain the local CMake target `encode` and add an exported `Escape::escape` target.
 The installed public headers require C++20. Public includes do not expose zzz
 coroutines, ICU types, termios, or platform console headers. The implementation
 requires no third-party library; the installed CMake target supplies required
@@ -1241,7 +1204,7 @@ from the interface contract and must acknowledge these breaks.
 
 | Current interface/behavior | Proposed replacement |
 | --- | --- |
-| `escape(...) -> std::string` | Same convenient return, now pure |
+| `encode(...) -> std::string` | Same convenient return, now pure |
 | Variadic concatenation of temporary strings | Shared size/encode path; append and bounded output |
 | `Cursor` alias for `Point` | Distinct Cursor command; cursor(point) helper |
 | Global traits/color getters | Remove; callers own their desired style values |
@@ -1278,7 +1241,7 @@ Avoid golden tests generated by the same code under test.
 | --- | --- |
 | ENC-01 | Exact canonical bytes for every command/color/trait; no hidden state |
 | ENC-02 | Zero/one/many commands; left-to-right composition; repeated commands retained |
-| ENC-03 | Trait replacement preserves colors; brush replaces modeled style; full reset distinct |
+| ENC-03 | Trait patches preserve colors and unrelated traits; complete style replaces modeled style; full reset distinct |
 | ENC-04 | Coordinate extremes avoid overflow; invalid casted values rejected before mutation |
 | BUF-01 | Append preserves prefix and strong content guarantee, including a late invalid command |
 | BUF-02 | Exact-fit/oversized/undersized/empty spans; no terminator; untouched trailing bytes |
@@ -1328,7 +1291,7 @@ checks: a PTY transports bytes but does not render them.
 4. Refactor glyph operations into value transformations and named mutation.
 5. Introduce the event model and parser independent of live terminal I/O.
 6. Implement Reader and scoped Terminal with PTY/failure tests.
-7. Implement profiles/fallback resolution and connect session send to profiles.
+7. Implement profiles/fallback resolution and connect session writes to profiles.
    A raw encoder and explicitly supplied profile can be used during earlier work;
    no temporary global capability API is needed.
 8. Migrate examples, complete package exports, and build the live-terminal matrix.
@@ -1343,10 +1306,10 @@ exists and there is a concrete performance question.
 These are concrete defaults in this proposal, not unresolved holes in its behavior.
 Changing one means updating the contract and its tests before implementation.
 
-- Keep std::string returns; expose append_escape and all-or-nothing escape_to
+- Keep std::string returns; expose append_encoded and all-or-nothing encode_to
   instead of introducing an owning small-buffer string type immediately.
 - Make Cursor distinct from Point, and keep byte commands separate from text.
-- Preserve trait-replacement semantics but remove generation-time global state.
+- Preserve complete-style replacement and additive trait semantics but remove generation-time global state.
 - Make range styling pure; put mutation behind a clearly named function.
 - Use explicit profiles with a BestEffort style policy and strict interaction modes.
 - Return semantic key/modifier values, expose unknown bytes, and distinguish EOF

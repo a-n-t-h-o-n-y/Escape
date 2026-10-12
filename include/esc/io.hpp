@@ -1,10 +1,13 @@
 #pragma once
+#include <algorithm>
+#include <array>
 #include <chrono>
 #include <concepts>
 #include <cstdint>
 #include <cstdio>
 #include <esc/detail/unicode.hpp>
 #include <esc/parser.hpp>
+#include <esc/sequence.hpp>
 #include <memory>
 #include <optional>
 #include <string>
@@ -13,79 +16,63 @@
 
 namespace esc {
 template <class T>
-concept Writable =
-    std::same_as<std::remove_cvref_t<T>, char> ||
-    std::same_as<std::remove_cvref_t<T>, char32_t> ||
-    std::same_as<std::remove_cvref_t<T>, std::string> ||
-    std::same_as<std::remove_cvref_t<T>, std::string_view> ||
-    std::same_as<std::remove_cvref_t<T>, std::u32string> ||
-    std::same_as<std::remove_cvref_t<T>, std::u32string_view> ||
-    std::same_as<std::remove_cvref_t<T>, char*> ||
-    std::same_as<std::remove_cvref_t<T>, char const*> ||
-    (std::is_array_v<std::remove_reference_t<T>> &&
-     (std::same_as<std::remove_cv_t<std::remove_extent_t<std::remove_reference_t<T>>>,
-                   char> ||
-      std::same_as<std::remove_cv_t<std::remove_extent_t<std::remove_reference_t<T>>>,
-                   char32_t>));
+concept Writable = Encodable<T>;
 
 class Output {
    public:
     explicit Output(std::FILE* stream = stdout);
     template <Writable... Values>
     void write(Values const&... values)
-    {
-        (validate(values), ...);
-        (write_one(values), ...);
-    }
+    { write_values(nullptr, values...); }
     void flush();
 
    private:
+    friend class Terminal;
     std::FILE* stream_;
-    static void validate(char) noexcept {}
-    static void validate(char32_t value) { detail::validate_scalar(value, 0); }
-    static void validate(std::string_view) noexcept {}
-    static void validate(std::u32string_view value) { detail::validate_utf32(value); }
-    static void validate(char const* value)
-    {
-        if (!value) throw std::invalid_argument{"Output: null string"};
-    }
-    void write_one(char byte);
-    void write_one(char32_t scalar);
     void write_one(std::string_view bytes);
-    void write_one(std::u32string_view text);
-    void write_one(char const* text) { write_one(std::string_view{text}); }
+    struct Batch {
+        Output& output;
+        std::array<char, 1024> bytes;
+        std::size_t used = 0;
+        void drain()
+        {
+            output.write_one({bytes.data(), used});
+            used = 0;
+        }
+        static void accept(void* context, std::string_view input)
+        {
+            auto& batch = *static_cast<Batch*>(context);
+            while (!input.empty()) {
+                if (!batch.used && input.size() >= batch.bytes.size()) {
+                    batch.output.write_one(input);
+                    return;
+                }
+                auto count = std::min(input.size(), batch.bytes.size() - batch.used);
+                std::copy_n(input.data(), count, batch.bytes.data() + batch.used);
+                batch.used += count;
+                input.remove_prefix(count);
+                if (batch.used == batch.bytes.size()) batch.drain();
+            }
+        }
+    };
+    template <Writable... Values>
+    void write_values(TerminalProfile const* profile, Values const&... values)
+    {
+        if (profile) detail::validate_profile(*profile);
+        detail::SequenceWriter measure;
+        detail::encode_values(measure, profile, values...);
+        Batch batch{*this, {}, 0};
+        detail::SequenceWriter writer{&batch, Batch::accept};
+        detail::encode_values(writer, profile, values...);
+        batch.drain();
+    }
 };
-namespace detail {
-void send_encoded(Output&, WindowTitle const&);
-void send_encoded(Output&, BeginHyperlink const&);
-template <class Command>
-void send_encoded(Output& stream, Command const& command)
-{
-    std::array<char, 256> bytes;
-    SequenceWriter measure;
-    encode(measure, command);
-    if (measure.size() > bytes.size())
-        throw std::length_error{"Terminal: numeric command exceeds encoder bound"};
-    SequenceWriter writer{bytes.data()};
-    encode(writer, command);
-    stream.write(std::string_view{bytes.data(), writer.size()});
-}
-template <class Command>
-void send_encoded(Output& stream, std::optional<Command> const& command)
-{
-    if (command) send_encoded(stream, *command);
-}
-}  // namespace detail
 template <Writable... Values>
 void write(Values const&... values)
 { Output{}.write(values...); }
 void flush();
 
-enum class ReadStatus { Event, Timeout, EndOfInput };
-struct ReadResult {
-    ReadStatus status;
-    std::optional<Event> event;
-};
+using ReadResult = std::variant<Event, Timeout, EndOfInput>;
 enum class WaitSourceKind { None, FileDescriptor, WindowsHandle };
 struct WaitSource {
     WaitSourceKind kind = WaitSourceKind::None;

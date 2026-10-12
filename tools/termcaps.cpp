@@ -4,19 +4,40 @@
 
 using namespace esc;
 
+auto describe(QueryResult const& result) -> std::string_view
+{
+    return match(
+        result, [](Reply const&) -> std::string_view { return "reply"; },
+        [](Timeout) -> std::string_view { return "timeout"; },
+        [](EndOfInput) -> std::string_view { return "end of input"; },
+        [](InputPending) -> std::string_view { return "input pending"; },
+        [](Rejected) -> std::string_view { return "rejected"; });
+}
+
 void display_event(Terminal& terminal, Event const& event)
 {
     std::visit(
         [&](auto const& value) {
             using T = std::decay_t<decltype(value)>;
-            if constexpr (std::same_as<T, KeyPress>) {
+            if constexpr (std::same_as<T, KeyEvent>) {
                 terminal.write("Key: ");
-                if (auto scalar = text_scalar(value.key))
+                if (auto scalar = value.key ? text_scalar(*value.key) : std::nullopt)
                     terminal.write("scalar ",
                                    std::to_string(static_cast<unsigned>(*scalar)));
-                else
-                    terminal.write("named ", std::to_string(static_cast<unsigned>(
-                                                 std::get<KeyCode>(value.key))));
+                else if (value.key) {
+                    match(
+                        *value.key, [&](char32_t) {},
+                        [&](KeyCode code) {
+                            terminal.write("named ",
+                                           std::to_string(static_cast<unsigned>(code)));
+                        },
+                        [&](KittyKey key) {
+                            terminal.write("Kitty code ", std::to_string(key.code));
+                        });
+                }
+                terminal.write(
+                    " action=", std::to_string(static_cast<unsigned>(value.action)),
+                    " text scalars=", std::to_string(value.text.size()));
                 terminal.write(" shift=", value.modifiers.shift ? "yes" : "no",
                                " ctrl=", value.modifiers.ctrl ? "yes" : "no",
                                " alt=", value.modifiers.alt ? "yes" : "no");
@@ -42,11 +63,6 @@ void display_event(Terminal& terminal, Event const& event)
                 terminal.write("Terminal reply kind: ",
                                std::to_string(value.value.index()));
             }
-            else if constexpr (std::same_as<T, KeyEvent>) {
-                terminal.write("Enhanced key action: ",
-                               std::to_string(static_cast<unsigned>(value.action)),
-                               " text scalars: ", std::to_string(value.text.size()));
-            }
             else {
                 terminal.write("Mouse at ", std::to_string(value.at.x), ",",
                                std::to_string(value.at.y));
@@ -68,16 +84,16 @@ int main(int argc, char** argv)
                 throw std::invalid_argument{"Usage: termcaps [--probe] [--kitty]"};
         }
         auto terminal = Terminal::open(TerminalOptions::interactive());
-        terminal.send(BlankScreen{}, Cursor{});
+        terminal.write(BlankScreen{}, Cursor{});
         terminal.write("Escape capability/input inspector — press q to quit\r\n");
         for (auto const& decision : terminal.profile_report().decisions)
             terminal.write(decision.explanation, "\r\n");
         terminal.write("System palette: ");
         for (unsigned i = 0; i < 16; ++i) {
-            terminal.send(fg(XColor{static_cast<std::uint8_t>(i)}));
+            terminal.write(fg(XColor{static_cast<std::uint8_t>(i)}));
             terminal.write("██");
         }
-        terminal.send(ResetStyle{});
+        terminal.write(ResetStyle{});
         terminal.write("\r\n");
         // Opt into optional input features only when the selected profile supports
         // them.
@@ -89,32 +105,26 @@ int main(int argc, char** argv)
         terminal.flush();
         if (probing)
             for (auto const& observation : terminal.probe().observations)
-                terminal.write(
-                    "Probe status: ",
-                    std::to_string(static_cast<unsigned>(observation.result.status)),
-                    "\r\n");
+                terminal.write("Probe status: ", describe(observation.result), "\r\n");
         if (kitty) {
             auto result = terminal.enable_keyboard(
                 KittyFlags::Disambiguate | KittyFlags::EventTypes |
                 KittyFlags::AlternateKeys | KittyFlags::AllKeys |
                 KittyFlags::AssociatedText);
-            terminal.write("Keyboard negotiation status: ",
-                           std::to_string(static_cast<unsigned>(result.status)),
-                           "\r\n");
+            terminal.write("Keyboard negotiation status: ", describe(result), "\r\n");
         }
         terminal.flush();
         while (true) {
             auto result = terminal.read();
-            if (result.status == ReadStatus::EndOfInput) break;
-            if (auto key = std::get_if<KeyPress>(&*result.event);
-                key && text_scalar(key->key) == std::optional<char32_t>{U'q'})
-                break;
-            if (auto key = std::get_if<KeyEvent>(&*result.event);
+            if (std::holds_alternative<EndOfInput>(result)) break;
+            auto event = std::get_if<Event>(&result);
+            if (!event) continue;
+            if (auto key = std::get_if<KeyEvent>(event);
                 key && key->action != KeyAction::Release && key->key &&
                 text_scalar(*key->key) == std::optional<char32_t>{U'q'})
                 break;
-            terminal.send(Cursor{0, 13}, BlankRow{});
-            display_event(terminal, *result.event);
+            terminal.write(Cursor{0, 13}, BlankRow{});
+            display_event(terminal, *event);
             terminal.flush();
         }
         terminal.close();

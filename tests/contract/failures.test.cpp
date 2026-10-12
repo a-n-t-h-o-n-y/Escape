@@ -1,3 +1,4 @@
+#include "support/results.hpp"
 #include "support/fixtures.hpp"
 #include "support/posix.hpp"
 #include "support/faults.hpp"
@@ -42,7 +43,7 @@ TEST(IO_01_interrupted_read_retries_and_preserves_events)
     Reader reader{pipe.reader.get()};
     pipe.write("x");
     FaultScope faults{{.operation=Operation::Read,.error=error(std::errc::interrupted)}};
-    CHECK(reader.read(100ms).event==std::optional<Event>{KeyPress{U'x'}});
+    CHECK(contract::event(reader.read(100ms))==std::optional<Event>{KeyEvent{U'x'}});
     CHECK(faults.calls(Operation::Read)>=2);
 }
 TEST(IO_01_repeated_poll_interruptions_do_not_restart_deadline)
@@ -51,7 +52,7 @@ TEST(IO_01_repeated_poll_interruptions_do_not_restart_deadline)
     Reader reader{pipe.reader.get()};
     FaultScope faults{{.operation=Operation::Poll,.error=error(std::errc::interrupted),.persistent=true,.delay=1ms}};
     // CTest bounds the process: restarting the timeout would never finish.
-    CHECK(reader.read(10ms).status==ReadStatus::Timeout);
+    CHECK(contract::status(reader.read(10ms))==contract::Status::Timeout);
 }
 TEST(IO_01_zero_timeout_interruptions_leave_ready_input_for_the_next_call)
 {
@@ -63,10 +64,10 @@ TEST(IO_01_zero_timeout_interruptions_leave_ready_input_for_the_next_call)
             FaultScope faults{{.operation = operation,
                                .error = error(std::errc::interrupted),
                                .persistent = true}};
-            CHECK(reader.read(0ms).status == ReadStatus::Timeout);
+            CHECK(contract::status(reader.read(0ms)) == contract::Status::Timeout);
             CHECK(faults.calls(operation) == 1);
         }
-        CHECK(reader.read(0ms).event == std::optional<Event>{KeyPress{U'x'}});
+        CHECK(contract::event(reader.read(0ms)) == std::optional<Event>{KeyEvent{U'x'}});
     }
 }
 TEST(IO_01_read_failure_keeps_original_error_code)

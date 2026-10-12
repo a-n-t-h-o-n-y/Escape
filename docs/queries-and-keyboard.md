@@ -10,8 +10,8 @@ off. `TerminalOptions::interactive()` supplies these input settings.
 ```cpp
 auto terminal = esc::Terminal::open(esc::TerminalOptions::interactive());
 auto result = terminal.query(esc::ModeQuery{2004}, std::chrono::milliseconds{100});
-if (result.status == esc::QueryStatus::Reply) {
-    auto reply = std::get<esc::ModeReply>(*result.reply);
+if (auto value = std::get_if<esc::Reply>(&result)) {
+    auto reply = std::get<esc::ModeReply>(*value);
     // reply.status distinguishes unrecognized, set/reset, and permanent states.
 }
 ```
@@ -28,7 +28,7 @@ if (result.status == esc::QueryStatus::Reply) {
 - `KeyboardQuery`: Kitty enhancement flags (`CSI ? u`); `KeyboardReply` preserves
   the complete unsigned flags value, including future bits.
 
-`query_to(span, Query)` and `escape_query(Query)` are pure request encoders.
+`query_to(span, Query)` and `encode_query(Query)` are pure request encoders.
 Bounded encoding is all-or-nothing, reports the exact size, and allocates nothing.
 Invalid mode requests throw before modifying storage or writing bytes.
 
@@ -40,7 +40,9 @@ one matching reply and returns `QueryResult`. Replies match type and, for mode
 queries, the mode number. Unrelated replies and ordinary input remain ordered.
 Late replies remain typed events instead of being silently discarded.
 
-QueryStatus is Reply, Timeout, EndOfInput, InputPending, or Rejected. Rejected is
+`QueryResult = std::variant<Reply, Timeout, EndOfInput, InputPending, Rejected>`.
+Exactly one outcome is represented, with no separate optional payload.
+`Rejected{Reply reply}` preserves the actual acknowledgment for diagnostics. Rejected is
 used by keyboard negotiation when a returned flags value differs from the request.
 A timeout is lack of confirmation, not proof of unsupported functionality.
 Negative timeouts throw before output. Zero permits a non-sleeping poll. Deadlines
@@ -85,7 +87,7 @@ auto result = terminal.enable_keyboard(
     esc::KittyFlags::AlternateKeys | esc::KittyFlags::AllKeys |
     esc::KittyFlags::AssociatedText,
     std::chrono::milliseconds{250});
-// Only QueryStatus::Reply confirms the requested flags.
+// Only the Reply alternative confirms the requested flags.
 ```
 
 `enable_keyboard` queries existing flags, writes `CSI = flags ; 1 u`, and queries
@@ -110,8 +112,8 @@ parsing remains Kitty after disable; otherwise it returns to legacy. Close and
 the destructor restore keyboard flags before restoring screen modes and OS state.
 No support claim is inferred merely from TERM or the operating system.
 
-Legacy events remain `KeyPress`. When Kitty is selected, its CSI u and enhanced
-navigation/function-key forms produce `KeyEvent`:
+Both legacy and Kitty input produce `KeyEvent`. When Kitty is selected, CSI u and
+enhanced navigation/function-key forms populate additional fields:
 
 - optional `key`: a Unicode scalar, named KeyCode, or KittyKey for an unknown
   reserved functional identifier; a text-only IME event has no key;
@@ -131,7 +133,8 @@ parser construction. Text allocation is bounded by the configured sequence limit
 Standalone `Parser`/`Reader` users opt in through InputProtocols.replies and
 InputProtocols.keyboard. Configuration changes affect new sequences, preserving
 an already-started unit's protocol snapshot. Parser reset retains configuration.
-Applications with exhaustive Event visitors must handle TerminalReply and KeyEvent.
+Applications with exhaustive Event visitors handle TerminalReply and one KeyEvent
+alternative. `matches` checks key, modifiers, and action; its default action is Press.
 
 ## Windows transport
 

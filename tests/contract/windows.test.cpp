@@ -1,3 +1,4 @@
+#include "support/results.hpp"
 #include <fcntl.h>
 #include <io.h>
 #include <windows.h>
@@ -119,9 +120,9 @@ struct Fixture {
 auto key(esc::Reader& reader, esc::Key expected, esc::Modifiers modifiers = {}) -> void
 {
     auto result = reader.read(100ms);
-    CHECK(result.status == esc::ReadStatus::Event);
-    CHECK(result.event ==
-          std::optional<esc::Event>{esc::KeyPress{expected, modifiers}});
+    CHECK(contract::status(result) == contract::Status::Event);
+    CHECK(contract::event(result) ==
+          std::optional<esc::Event>{esc::KeyEvent{expected, modifiers}});
 }
 auto immediate(Fixture& fixture) -> esc::Terminal
 {
@@ -222,7 +223,7 @@ TEST(WIN_SESSION_explicit_profile_does_not_override_drawing_limits)
     options.profile = esc::TerminalProfile{};
     auto terminal = esc::Terminal::open(fixture.streams(), options);
     CHECK(!terminal.profile().control);
-    CHECK_THROWS(esc::UnsupportedFeature, terminal.send(esc::Cursor{}));
+    CHECK_THROWS(esc::UnsupportedFeature, terminal.write(esc::Cursor{}));
 }
 TEST(WIN_SESSION_conservative_default_rejects_unverified_protocols)
 {
@@ -314,7 +315,7 @@ TEST(WIN_INPUT_canonical_echo_uses_session_buffer_without_leaking_handles)
     CHECK(::GetProcessHandleCount(::GetCurrentProcess(), &before));
     for (int i = 0; i < 32; ++i) {
         fixture.key(L'x');
-        CHECK(terminal.read(0ms).status == esc::ReadStatus::Timeout);
+        CHECK(contract::status(terminal.read(0ms)) == contract::Status::Timeout);
     }
     CHECK(::GetProcessHandleCount(::GetCurrentProcess(), &after));
     CHECK(after == before);
@@ -336,7 +337,7 @@ TEST(WIN_INPUT_repeats_do_not_require_more_os_records)
     key(reader, U'x');
     key(reader, U'x');
     key(reader, U'x');
-    CHECK(reader.read(0ms).status == esc::ReadStatus::Timeout);
+    CHECK(contract::status(reader.read(0ms)) == contract::Status::Timeout);
 }
 TEST(WIN_INPUT_keyup_and_window_events_do_not_block)
 {
@@ -348,7 +349,7 @@ TEST(WIN_INPUT_keyup_and_window_events_do_not_block)
     record.EventType = WINDOW_BUFFER_SIZE_EVENT;
     fixture.record(record);
     auto start = std::chrono::steady_clock::now();
-    CHECK(reader.read(10ms).status == esc::ReadStatus::Timeout);
+    CHECK(contract::status(reader.read(10ms)) == contract::Status::Timeout);
     CHECK(std::chrono::steady_clock::now() - start < 500ms);
 }
 TEST(WIN_INPUT_canonical_waits_for_enter_and_edits_backspace)
@@ -358,7 +359,7 @@ TEST(WIN_INPUT_canonical_waits_for_enter_and_edits_backspace)
     fixture.key(L'a');
     fixture.key(L'b');
     fixture.key(L'\b', VK_BACK);
-    CHECK(reader.read(10ms).status == esc::ReadStatus::Timeout);
+    CHECK(contract::status(reader.read(10ms)) == contract::Status::Timeout);
     fixture.key(L'\r', VK_RETURN);
     key(reader, U'a');
     key(reader, esc::KeyCode::Enter);
@@ -367,12 +368,12 @@ TEST(WIN_INPUT_pipe_timeout_then_data_then_eof)
 {
     auto pipe = Pipe::make();
     esc::Reader reader{pipe.input.stream};
-    CHECK(reader.read(5ms).status == esc::ReadStatus::Timeout);
+    CHECK(contract::status(reader.read(5ms)) == contract::Status::Timeout);
     pipe.write("\x1b[A");
     key(reader, esc::KeyCode::ArrowUp);
     pipe.close();
-    CHECK(reader.read(100ms).status == esc::ReadStatus::EndOfInput);
-    CHECK(reader.read(0ms).status == esc::ReadStatus::EndOfInput);
+    CHECK(contract::status(reader.read(100ms)) == contract::Status::EndOfInput);
+    CHECK(contract::status(reader.read(0ms)) == contract::Status::EndOfInput);
 }
 TEST(WIN_INPUT_pipe_deadline_wakes_on_later_data)
 {
@@ -391,10 +392,10 @@ TEST(WIN_INPUT_pipe_eof_finishes_incomplete_utf8)
     pipe.close();
     esc::Reader reader{pipe.input.stream};
     auto result = reader.read(100ms);
-    CHECK(result.status == esc::ReadStatus::Event);
-    CHECK(std::get<esc::UnknownInput>(*result.event).problem ==
+    CHECK(contract::status(result) == contract::Status::Event);
+    CHECK(std::get<esc::UnknownInput>(*contract::event(result)).problem ==
           esc::InputProblem::Truncated);
-    CHECK(reader.read(0ms).status == esc::ReadStatus::EndOfInput);
+    CHECK(contract::status(reader.read(0ms)) == contract::Status::EndOfInput);
 }
 TEST(WIN_OUTPUT_binary_file_preserves_bytes_and_unicode)
 {
@@ -422,17 +423,17 @@ TEST(WIN_INPUT_enabled_focus_and_sgr_mouse)
     focus.EventType = FOCUS_EVENT;
     focus.Event.FocusEvent.bSetFocus = TRUE;
     fixture.record(focus);
-    CHECK(reader.read(100ms).event == std::optional<esc::Event>{esc::Focus{true}});
+    CHECK(contract::event(reader.read(100ms)) == std::optional<esc::Event>{esc::Focus{true}});
     INPUT_RECORD mouse{};
     mouse.EventType = MOUSE_EVENT;
     mouse.Event.MouseEvent.dwMousePosition = {4, 2};
     mouse.Event.MouseEvent.dwButtonState = FROM_LEFT_1ST_BUTTON_PRESSED;
     fixture.record(mouse);
-    CHECK(reader.read(100ms).event ==
+    CHECK(contract::event(reader.read(100ms)) ==
           std::optional<esc::Event>{esc::MousePress{{4, 2}, esc::MouseButton::Left}});
     mouse.Event.MouseEvent.dwButtonState = 0;
     fixture.record(mouse);
-    CHECK(reader.read(100ms).event ==
+    CHECK(contract::event(reader.read(100ms)) ==
           std::optional<esc::Event>{esc::MouseRelease{{4, 2}, esc::MouseButton::Left}});
 }
 
@@ -443,7 +444,7 @@ TEST(WIN_INPUT_zero_poll_drains_already_available_records)
     esc::Reader reader{fixture.input.stream};
     fixture.key(L'x', 0, 0, 1, false);
     fixture.key(L'z');
-    CHECK(reader.read(0ms).event == std::optional<esc::Event>{esc::KeyPress{U'z'}});
+    CHECK(contract::event(reader.read(0ms)) == std::optional<esc::Event>{esc::KeyEvent{U'z'}});
 }
 TEST(WIN_INPUT_zero_poll_combines_available_surrogates)
 {
@@ -452,8 +453,8 @@ TEST(WIN_INPUT_zero_poll_combines_available_surrogates)
     esc::Reader reader{fixture.input.stream};
     fixture.key(0xd83d);
     fixture.key(0xdc7d);
-    CHECK(reader.read(0ms).event ==
-          std::optional<esc::Event>{esc::KeyPress{char32_t{0x1f47d}}});
+    CHECK(contract::event(reader.read(0ms)) ==
+          std::optional<esc::Event>{esc::KeyEvent{char32_t{0x1f47d}}});
 }
 
 TEST(WIN_HEADERS_preserve_host_RGB_macro)
@@ -582,18 +583,18 @@ TEST(WIN_INPUT_mouse_tracking_filters_hover_and_drag)
     event.Event.MouseEvent.dwMousePosition = {2, 1};
     event.Event.MouseEvent.dwEventFlags = MOUSE_MOVED;
     fixture.record(event);
-    CHECK(terminal.read(5ms).status == esc::ReadStatus::Timeout);
+    CHECK(contract::status(terminal.read(5ms)) == contract::Status::Timeout);
     terminal.set(esc::MouseMode::Drag);
     fixture.record(event);
-    CHECK(terminal.read(5ms).status == esc::ReadStatus::Timeout);
+    CHECK(contract::status(terminal.read(5ms)) == contract::Status::Timeout);
     event.Event.MouseEvent.dwButtonState = FROM_LEFT_1ST_BUTTON_PRESSED;
     fixture.record(event);
-    CHECK(terminal.read(100ms).event ==
+    CHECK(contract::event(terminal.read(100ms)) ==
           std::optional<esc::Event>{esc::MouseMove{{2, 1}, esc::MouseButton::Left}});
     terminal.set(esc::MouseMode::Move);
     event.Event.MouseEvent.dwButtonState = 0;
     fixture.record(event);
-    CHECK(terminal.read(100ms).event ==
+    CHECK(contract::event(terminal.read(100ms)) ==
           std::optional<esc::Event>{esc::MouseMove{{2, 1}, {}}});
 }
 TEST(WIN_SESSION_resize_reports_visible_viewport)
@@ -612,7 +613,7 @@ TEST(WIN_SESSION_resize_reports_visible_viewport)
     --window.Right;
     CHECK(::SetConsoleWindowInfo(fixture.output.handle(), TRUE, &window));
     CHECK(terminal.area() == esc::Area{before.width - 1, before.height});
-    CHECK(terminal.read(100ms).event ==
+    CHECK(contract::event(terminal.read(100ms)) ==
           std::optional<esc::Event>{esc::Resize{{before.width - 1, before.height}}});
 }
 TEST(WIN_INPUT_disk_file_reports_eof_without_polling_forever)
@@ -629,7 +630,7 @@ TEST(WIN_INPUT_disk_file_reports_eof_without_polling_forever)
     {
         esc::Reader reader{stream};
         key(reader, U'z');
-        CHECK(reader.read(0ms).status == esc::ReadStatus::EndOfInput);
+        CHECK(contract::status(reader.read(0ms)) == contract::Status::EndOfInput);
     }
     CHECK(std::fclose(stream) == 0);
 }
@@ -645,7 +646,7 @@ TEST(WIN_QUERY_transport_is_explicit_and_restores_native_modes_and_codepages)
     CHECK(fixture.input_mode() & ENABLE_VIRTUAL_TERMINAL_INPUT);
     CHECK(::GetConsoleCP() == CP_UTF8);
     fixture.key(L'x');
-    CHECK(terminal.read(500ms).event == std::optional<esc::Event>{esc::KeyPress{U'x'}});
+    CHECK(contract::event(terminal.read(500ms)) == std::optional<esc::Event>{esc::KeyEvent{U'x'}});
     terminal.close();
     CHECK(fixture.input_mode() == mode);
     CHECK(::GetConsoleCP() == codepage);
@@ -676,8 +677,8 @@ TEST(WIN_QUERY_vt_reply_bytes_are_typed_and_user_input_is_preserved)
     fixture.key(L'x');
     for (auto c : std::wstring_view{L"\x1b[?3u"})
         fixture.key(c);
-    CHECK(terminal.read(500ms).event == std::optional<esc::Event>{esc::KeyPress{U'x'}});
-    CHECK(terminal.read(500ms).event ==
+    CHECK(contract::event(terminal.read(500ms)) == std::optional<esc::Event>{esc::KeyEvent{U'x'}});
+    CHECK(contract::event(terminal.read(500ms)) ==
           std::optional<esc::Event>{esc::TerminalReply{esc::KeyboardReply{3}}});
 }
 TEST(WIN_QUERY_failed_transport_change_rolls_back_and_remains_usable)
@@ -691,7 +692,7 @@ TEST(WIN_QUERY_failed_transport_change_rolls_back_and_remains_usable)
     CHECK_THROWS(std::system_error, terminal.request(esc::KeyboardQuery{}));
     CHECK(fixture.input_mode() == mode && ::GetConsoleCP() == codepage);
     fixture.key(L'z');
-    CHECK(terminal.read(500ms).event == std::optional<esc::Event>{esc::KeyPress{U'z'}});
+    CHECK(contract::event(terminal.read(500ms)) == std::optional<esc::Event>{esc::KeyEvent{U'z'}});
 }
 
 TEST(WIN_QUERY_partial_native_surrogate_is_preserved_before_transport_switch)
@@ -699,13 +700,13 @@ TEST(WIN_QUERY_partial_native_surrogate_is_preserved_before_transport_switch)
     Fixture fixture;
     auto terminal = immediate(fixture);
     fixture.key(0xd83d);
-    CHECK(terminal.read(0ms).status == esc::ReadStatus::Timeout);
+    CHECK(contract::status(terminal.read(0ms)) == contract::Status::Timeout);
     auto mode = fixture.input_mode();
     CHECK_THROWS(std::logic_error, terminal.request(esc::KeyboardQuery{}));
     CHECK(fixture.input_mode() == mode);
     fixture.key(0xdc7d);
-    CHECK(terminal.read(500ms).event ==
-          std::optional<esc::Event>{esc::KeyPress{U'👽'}});
+    CHECK(contract::event(terminal.read(500ms)) ==
+          std::optional<esc::Event>{esc::KeyEvent{U'👽'}});
     terminal.request(esc::KeyboardQuery{});
     CHECK(fixture.input_mode() & ENABLE_VIRTUAL_TERMINAL_INPUT);
 }
@@ -723,7 +724,7 @@ TEST(WIN_WAIT_native_console_handle_and_buffered_event_are_preserved)
           WAIT_OBJECT_0);
     CHECK(terminal.wait_state().ready);
     CHECK(terminal.wait_state().ready);
-    CHECK(terminal.read(0ms).event == std::optional<esc::Event>{esc::KeyPress{U'x'}});
+    CHECK(contract::event(terminal.read(0ms)) == std::optional<esc::Event>{esc::KeyEvent{U'x'}});
 }
 TEST(WIN_WAIT_vt_transport_exposes_completion_event)
 {
@@ -737,7 +738,7 @@ TEST(WIN_WAIT_vt_transport_exposes_completion_event)
     CHECK(::WaitForSingleObject(reinterpret_cast<HANDLE>(idle.source.value), 500) ==
           WAIT_OBJECT_0);
     CHECK(terminal.wait_state().ready);
-    CHECK(terminal.read(0ms).event == std::optional<esc::Event>{esc::KeyPress{U'z'}});
+    CHECK(contract::event(terminal.read(0ms)) == std::optional<esc::Event>{esc::KeyEvent{U'z'}});
     terminal.close();  // completion source is borrowed, closed by Escape.
 }
 TEST(WIN_WAIT_synchronous_pipe_has_timer_fallback_and_reports_eof)
@@ -755,11 +756,11 @@ TEST(WIN_WAIT_synchronous_pipe_has_timer_fallback_and_reports_eof)
     stream.write("a");
     stream.flush();
     CHECK(reader.wait_state().ready);
-    CHECK(reader.read(0ms).event == std::optional<esc::Event>{esc::KeyPress{U'a'}});
+    CHECK(contract::event(reader.read(0ms)) == std::optional<esc::Event>{esc::KeyEvent{U'a'}});
     CHECK(std::fclose(writer_file.stream) == 0);
     writer_file.stream = nullptr;
     CHECK(reader.wait_state().ready);
-    CHECK(reader.read(0ms).status == esc::ReadStatus::EndOfInput);
+    CHECK(contract::status(reader.read(0ms)) == contract::Status::EndOfInput);
 }
 TEST(WIN_FRAME_scopes_preserve_console_modes_and_cleanup_after_move)
 {

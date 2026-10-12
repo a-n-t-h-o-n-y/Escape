@@ -35,25 +35,6 @@ void Output::write_one(std::string_view bytes)
         io_error("Output: write");
     }
 }
-void Output::write_one(char byte) { write_one(std::string_view{&byte, 1}); }
-void Output::write_one(char32_t scalar)
-{
-    auto bytes = encode_utf8(scalar);
-    write_one(bytes.view());
-}
-void Output::write_one(std::u32string_view text)
-{
-    std::array<char, 1024> bytes;
-    std::size_t used = 0;
-    for (auto scalar : text) {
-        if (bytes.size() - used < 4) {
-            write_one(std::string_view{bytes.data(), used});
-            used = 0;
-        }
-        used += detail::encode_utf8_to(bytes.data() + used, scalar);
-    }
-    write_one(std::string_view{bytes.data(), used});
-}
 void Output::flush()
 {
     while (true) {
@@ -119,28 +100,29 @@ struct Reader::Impl {
         bool attempted_poll = false;
         while (true) {
             if (eof) {
-                if (auto event = parser.finish())
-                    return {ReadStatus::Event, std::move(event)};
-                return {ReadStatus::EndOfInput, {}};
+                if (auto event = parser.finish()) return std::move(*event);
+                return EndOfInput{};
             }
             auto parsed =
                 parser.next(std::span<char const>{bytes.data() + begin, end - begin});
             begin += parsed.consumed;
             update_deadline();
-            if (parsed.event) return {ReadStatus::Event, std::move(parsed.event)};
+            if (parsed.event) return std::move(*parsed.event);
             if (deadline && detail::Clock::now() >= *deadline) {
                 auto event = parser.expire();
                 update_deadline();
-                if (event) return {ReadStatus::Event, std::move(event)};
+                if (event) return std::move(*event);
             }
             if (attempted_poll &&
                 (polling || (caller != detail::Clock::time_point::max() &&
                              detail::Clock::now() >= caller)))
-                return {ReadStatus::Timeout, {}};
+                return Timeout{};
             auto until = deadline ? std::min(caller, *deadline) : caller;
             attempted_poll = true;
-            auto delay = polling ? 0 : until == detail::Clock::time_point::max()
-                                      ? -1 : detail::poll_delay(until);
+            auto delay = polling ? 0
+                         : until == detail::Clock::time_point::max()
+                             ? -1
+                             : detail::poll_delay(until);
             auto ready = detail::poll_input(input, delay);
             if (ready < 0) {
                 if (errno == EINTR) continue;
@@ -197,7 +179,7 @@ auto Reader::wait_state() -> WaitState
     if (!impl_) throw std::logic_error{"Reader: moved from"};
     if (!impl_->ready) {
         auto result = impl_->read(std::chrono::milliseconds{0});
-        if (result.status != ReadStatus::Timeout) impl_->ready = std::move(result);
+        if (!std::holds_alternative<Timeout>(result)) impl_->ready = std::move(result);
     }
     bool ready = impl_->ready.has_value();
     if (!ready) {
@@ -251,14 +233,3 @@ void Reader::configure_session(InputProtocols protocols,
 #endif
 }
 }  // namespace esc
-
-namespace esc::detail {
-void send_encoded(Output& stream, WindowTitle const& value)
-{ stream.write("\x1b]2;", value.text, "\x1b\\"); }
-void send_encoded(Output& stream, BeginHyperlink const& value)
-{
-    stream.write("\x1b]8;");
-    if (!value.id.empty()) stream.write("id=", value.id);
-    stream.write(";", value.uri, "\x1b\\");
-}
-}  // namespace esc::detail

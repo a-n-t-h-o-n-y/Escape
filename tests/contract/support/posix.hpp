@@ -108,7 +108,7 @@ struct Pty {
         checked(::fcntl(master.get(),F_SETFL,::fcntl(master.get(),F_GETFL)|O_NONBLOCK)==0);
         resize(80,24);
     }
-    void send(std::string_view bytes) { write_fd(master.get(),bytes); }
+    void write(std::string_view bytes) { write_fd(master.get(),bytes); }
     auto drain() -> std::string
     {
         std::string result;

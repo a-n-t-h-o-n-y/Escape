@@ -28,11 +28,10 @@ inline void feed(esc::Parser& parser, std::string_view bytes, std::vector<esc::E
         auto result = parser.next(remaining);
         CHECK(result.consumed <= remaining.size());
         remaining = remaining.subspan(result.consumed);
-        if (result.status == esc::ParseStatus::Event) {
+        if (result.event.has_value()) {
             CHECK(result.event.has_value());
             events.push_back(std::move(*result.event));
         } else {
-            CHECK(result.status == esc::ParseStatus::NeedInput);
             CHECK(!result.event.has_value());
             CHECK(remaining.empty());
             return;

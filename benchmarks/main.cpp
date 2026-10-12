@@ -68,7 +68,7 @@ struct Sink {
 };
 auto frame() -> std::string
 {
-    return esc::escape(esc::Cursor{123, 45}, esc::fg(esc::RGB{0x38a9df}),
+    return esc::encode(esc::Cursor{123, 45}, esc::fg(esc::RGB{0x38a9df}),
                        esc::Trait::Bold, esc::BlankRow{});
 }
 auto parse(esc::Parser& parser,
@@ -143,16 +143,16 @@ int main(int argc, char** argv)
             throw std::invalid_argument{"Milliseconds must be between 1 and 10000"};
         auto expected = frame();
         require(expected ==
-                "\x1b[46;124H\x1b[38;2;56;169;223m\x1b[22;23;24;25;27;28;29;1m\x1b[2K");
+                "\x1b[46;124H\x1b[38;2;56;169;223m\x1b[1m\x1b[2K");
         std::string reused;
         reused.reserve(128);
         std::array<char, 128> storage{};
         auto encoded =
-            esc::escape_to(storage, esc::Cursor{123, 45}, esc::fg(esc::RGB{0x38a9df}),
+            esc::encode_to(storage, esc::Cursor{123, 45}, esc::fg(esc::RGB{0x38a9df}),
                            esc::Trait::Bold, esc::BlankRow{});
         require(encoded.written == expected.size() &&
                 std::string_view{storage.data(), encoded.written} == expected);
-        esc::append_escape(reused, esc::Cursor{123, 45}, esc::fg(esc::RGB{0x38a9df}),
+        esc::append_encoded(reused, esc::Cursor{123, 45}, esc::fg(esc::RGB{0x38a9df}),
                            esc::Trait::Bold, esc::BlankRow{});
         require(reused == expected);
         std::array<std::string, 2> layout_inputs = {
@@ -181,13 +181,13 @@ int main(int argc, char** argv)
         std::string title(4096, 't');
         std::string title_output;
         title_output.reserve(title.size() + 6);
-        require(esc::escape(esc::WindowTitle{title}) == "\x1b]2;" + title + "\x1b\\");
+        require(esc::encode(esc::WindowTitle{title}) == "\x1b]2;" + title + "\x1b\\");
         cases.push_back({"encode/title-4KiB", title.size() + 6, 1,
                          [&](std::size_t n) {
                              std::uint64_t total = 0;
                              while (n--) {
                                  title_output.clear();
-                                 esc::append_escape(title_output, esc::WindowTitle{title});
+                                 esc::append_encoded(title_output, esc::WindowTitle{title});
                                  observe(title_output.data(), title_output.size());
                                  total += title_output.size();
                              }
@@ -241,7 +241,7 @@ int main(int argc, char** argv)
                  std::uint64_t total = 0;
                  while (n--) {
                      reused.clear();
-                     esc::append_escape(reused, esc::Cursor{123, 45},
+                     esc::append_encoded(reused, esc::Cursor{123, 45},
                                         esc::fg(esc::RGB{0x38a9df}), esc::Trait::Bold,
                                         esc::BlankRow{});
                      observe(reused.data(), reused.size());
@@ -253,7 +253,7 @@ int main(int argc, char** argv)
                              std::uint64_t total = 0;
                              while (n--) {
                                  auto r =
-                                     esc::escape_to(storage, esc::Cursor{123, 45},
+                                     esc::encode_to(storage, esc::Cursor{123, 45},
                                                     esc::fg(esc::RGB{0x38a9df}),
                                                     esc::Trait::Bold, esc::BlankRow{});
                                  observe(storage.data(), r.written);
@@ -263,13 +263,13 @@ int main(int argc, char** argv)
                          }});
         auto profile =
             esc::resolve_profile({"xterm-256color", "truecolor", false}, true).profile;
-        require(esc::escape(profile, esc::Cursor{123, 45}, esc::fg(esc::RGB{0x38a9df}),
+        require(esc::encode(profile, esc::Cursor{123, 45}, esc::fg(esc::RGB{0x38a9df}),
                             esc::Trait::Bold, esc::BlankRow{}) == expected);
         cases.push_back(
             {"encode/profile-truecolor", expected.size(), 1, [&](std::size_t n) {
                  std::uint64_t total = 0;
                  while (n--) {
-                     auto r = esc::escape_to(storage, profile, esc::Cursor{123, 45},
+                     auto r = esc::encode_to(storage, profile, esc::Cursor{123, 45},
                                              esc::fg(esc::RGB{0x38a9df}),
                                              esc::Trait::Bold, esc::BlankRow{});
                      observe(storage.data(), r.written);
@@ -280,11 +280,11 @@ int main(int argc, char** argv)
         auto basic = profile;
         auto indexed = profile;
         indexed.colors = esc::ColorSupport::Indexed256;
-        require(esc::escape(indexed, esc::fg(esc::RGB{0x38a9df})) == "\x1b[38;5;74m");
+        require(esc::encode(indexed, esc::fg(esc::RGB{0x38a9df})) == "\x1b[38;5;74m");
         cases.push_back({"encode/profile-256-color", 10, 1, [&](std::size_t n) {
                              std::uint64_t total = 0;
                              while (n--) {
-                                 auto r = esc::escape_to(
+                                 auto r = esc::encode_to(
                                      storage, indexed, esc::fg(esc::RGB{0x38a9df}));
                                  observe(storage.data(), r.written);
                                  total += r.written;
@@ -300,7 +300,7 @@ int main(int argc, char** argv)
             "\x1b[91m", "\x1b[96m", "\x1b[38;5;224m", "\x1b[38;5;22m"};
         std::size_t varied_bytes = 0;
         for (std::size_t i = 0; i < varied_colors.size(); ++i) {
-            require(esc::escape(indexed, esc::fg(varied_colors[i])) == varied_expected[i]);
+            require(esc::encode(indexed, esc::fg(varied_colors[i])) == varied_expected[i]);
             varied_bytes += varied_expected[i].size();
         }
         cases.push_back({"encode/profile-256-varied", varied_bytes, varied_colors.size(),
@@ -308,20 +308,20 @@ int main(int argc, char** argv)
                              std::uint64_t total = 0;
                              while (n--)
                                  for (auto color : varied_colors) {
-                                     auto r = esc::escape_to(storage, indexed, esc::fg(color));
+                                     auto r = esc::encode_to(storage, indexed, esc::fg(color));
                                      observe(storage.data(), r.written);
                                      total += r.written;
                                  }
                              return total;
                          }});
         basic.colors = esc::ColorSupport::Basic16;
-        auto basic_bytes = esc::escape(basic, esc::fg(esc::RGB{0x38a9df}));
+        auto basic_bytes = esc::encode(basic, esc::fg(esc::RGB{0x38a9df}));
         cases.push_back(
             {"encode/profile-16-color", basic_bytes.size(), 1, [&](std::size_t n) {
                  std::uint64_t total = 0;
                  while (n--) {
                      auto r =
-                         esc::escape_to(storage, basic, esc::fg(esc::RGB{0x38a9df}));
+                         esc::encode_to(storage, basic, esc::fg(esc::RGB{0x38a9df}));
                      observe(storage.data(), r.written);
                      total += r.written;
                  }
@@ -336,10 +336,10 @@ int main(int argc, char** argv)
             std::vector<esc::Event> captured;
             require(parse(parser, mixed, fragment, &captured) == 7);
             std::vector<esc::Event> golden{
-                esc::KeyPress{U'a'},
-                esc::KeyPress{U'界'},
-                esc::KeyPress{esc::KeyCode::ArrowUp},
-                esc::KeyPress{esc::KeyCode::ArrowLeft, {.ctrl = true}},
+                esc::KeyEvent{U'a'},
+                esc::KeyEvent{U'界'},
+                esc::KeyEvent{esc::KeyCode::ArrowUp},
+                esc::KeyEvent{esc::KeyCode::ArrowLeft, {.ctrl = true}},
                 esc::MousePress{{3, 1}, esc::MouseButton::Left},
                 esc::MouseRelease{{3, 1}, esc::MouseButton::Left},
                 esc::Focus{true}};
@@ -394,7 +394,7 @@ int main(int argc, char** argv)
         {
             esc::Reader reader{input.get()};
             auto result = reader.read(std::chrono::milliseconds{0});
-            require(result.event == std::optional<esc::Event>{esc::KeyPress{U'x'}});
+            require(result == esc::ReadResult{esc::Event{esc::KeyEvent{U'x'}}});
         }
         cases.push_back(
             {"reader/ready-file-ASCII", 1, 1, [&](std::size_t n) {
@@ -403,15 +403,15 @@ int main(int argc, char** argv)
                  std::uint64_t total = 0;
                  while (n) {
                      auto result = reader.read(std::chrono::milliseconds{0});
-                     if (result.status == esc::ReadStatus::EndOfInput) {
+                     if (std::holds_alternative<esc::EndOfInput>(result)) {
                          std::rewind(input.get());
                          reader = esc::Reader{input.get()};
                          continue;
                      }
-                     if (result.status != esc::ReadStatus::Event)
+                     if (!std::holds_alternative<esc::Event>(result))
                          throw std::runtime_error{"Ready file did not produce input"};
                      total += static_cast<std::uint64_t>(std::get<char32_t>(
-                         std::get<esc::KeyPress>(*result.event).key));
+                         *std::get<esc::KeyEvent>(std::get<esc::Event>(result)).key));
                      --n;
                  }
                  return total;

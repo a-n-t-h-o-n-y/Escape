@@ -1,5 +1,6 @@
 #pragma once
 #include <chrono>
+#include <esc/result.hpp>
 #include <esc/sequence.hpp>
 #include <optional>
 #include <variant>
@@ -34,12 +35,13 @@ struct TerminalReply {
     friend auto operator==(TerminalReply const&, TerminalReply const&)
         -> bool = default;
 };
-enum class QueryStatus { Reply, Timeout, EndOfInput, InputPending, Rejected };
-struct QueryResult {
-    QueryStatus status;
-    std::optional<Reply> reply;
+// A negative acknowledgment keeps the actual response for diagnostics.
+struct Rejected {
+    Reply reply;
+    friend auto operator==(Rejected const&, Rejected const&) -> bool = default;
 };
+using QueryResult = std::variant<Reply, Timeout, EndOfInput, InputPending, Rejected>;
 // No hidden I/O. Validate before modifying caller storage.
 auto query_to(std::span<char> output, Query const& query) -> EncodeResult;
-auto escape_query(Query const& query) -> std::string;
+auto encode_query(Query const& query) -> std::string;
 }  // namespace esc

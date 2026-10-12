@@ -22,27 +22,39 @@ enum class Trait : std::uint16_t {
 // Only modeled attributes can enter the mask. Standout is a combination,
 // and None is empty; there is no separate redundant Standout bit.
 class Traits {
-public:
+   public:
     constexpr Traits() = default;
     constexpr Traits(Trait trait) : flags_{bits(trait)} {}
-    [[nodiscard]] constexpr auto data() const noexcept -> std::uint16_t { return flags_; }
+    [[nodiscard]] constexpr auto data() const noexcept -> std::uint16_t
+    { return flags_; }
     [[nodiscard]] constexpr auto contains(Trait trait) const -> bool
     {
         auto const requested = bits(trait);
         return requested == 0 ? flags_ == 0 : (flags_ & requested) == requested;
     }
-    constexpr auto insert(Trait trait) -> Traits& { flags_ |= bits(trait); return *this; }
-    constexpr auto insert(Traits traits) -> Traits& { flags_ |= traits.flags_; return *this; }
+    constexpr auto insert(Trait trait) -> Traits&
+    {
+        flags_ |= bits(trait);
+        return *this;
+    }
+    constexpr auto insert(Traits traits) -> Traits&
+    {
+        flags_ |= traits.flags_;
+        return *this;
+    }
     constexpr auto remove(Trait trait) -> Traits&
     {
-        flags_ &= static_cast<std::uint16_t>(~bits(trait)); return *this;
+        flags_ &= static_cast<std::uint16_t>(~bits(trait));
+        return *this;
     }
     constexpr auto remove(Traits traits) -> Traits&
     {
-        flags_ &= static_cast<std::uint16_t>(~traits.flags_); return *this;
+        flags_ &= static_cast<std::uint16_t>(~traits.flags_);
+        return *this;
     }
     [[nodiscard]] constexpr auto operator==(Traits const&) const -> bool = default;
-private:
+
+   private:
     static constexpr auto bits(Trait trait) -> std::uint16_t
     {
         auto const value = static_cast<std::uint16_t>(trait);
@@ -53,12 +65,28 @@ private:
     std::uint16_t flags_ = 0;
 };
 
-struct RemoveTrait { Trait trait; };
-[[nodiscard]] constexpr auto remove_trait(Trait trait) -> RemoveTrait { return {trait}; }
-[[nodiscard]] constexpr auto operator|(Trait a, Trait b) -> Traits { return Traits{a}.insert(b); }
-[[nodiscard]] constexpr auto operator|(Traits a, Trait b) -> Traits { return a.insert(b); }
-[[nodiscard]] constexpr auto operator|(Trait a, Traits b) -> Traits { return b.insert(a); }
-[[nodiscard]] constexpr auto operator|(Traits a, Traits b) -> Traits { return a.insert(b); }
-[[nodiscard]] constexpr auto operator|(Traits a, RemoveTrait b) -> Traits { return a.remove(b.trait); }
+struct WithoutTraits {
+    Traits traits;
+};
+[[nodiscard]] constexpr auto without(Traits traits) -> WithoutTraits
+{ return {traits}; }
+inline constexpr Trait bold = Trait::Bold;
+inline constexpr Trait dim = Trait::Dim;
+inline constexpr Trait italic = Trait::Italic;
+inline constexpr Trait underline = Trait::Underline;
+inline constexpr Trait blink = Trait::Blink;
+inline constexpr Trait inverse = Trait::Inverse;
+inline constexpr Trait invisible = Trait::Invisible;
+inline constexpr Trait crossed_out = Trait::CrossedOut;
+inline constexpr Trait double_underline = Trait::DoubleUnderline;
+inline constexpr Trait standout = Trait::Standout;
+[[nodiscard]] constexpr auto operator|(Trait a, Trait b) -> Traits
+{ return Traits{a}.insert(b); }
+[[nodiscard]] constexpr auto operator|(Traits a, Trait b) -> Traits
+{ return a.insert(b); }
+[[nodiscard]] constexpr auto operator|(Trait a, Traits b) -> Traits
+{ return b.insert(a); }
+[[nodiscard]] constexpr auto operator|(Traits a, Traits b) -> Traits
+{ return a.insert(b); }
 
-} // namespace esc
+}  // namespace esc

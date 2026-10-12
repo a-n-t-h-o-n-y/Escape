@@ -10,7 +10,7 @@
 #include <utility>
 #include <vector>
 
-#include <esc/brush.hpp>
+#include <esc/style.hpp>
 #include <esc/detail/unicode.hpp>
 
 namespace esc {
@@ -18,7 +18,7 @@ namespace esc {
 // A styled Unicode scalar, without an implied terminal cell width.
 struct Glyph {
     char32_t symbol = U' ';
-    Brush brush = {};
+    Style style = {};
     [[nodiscard]] constexpr auto operator==(Glyph const&) const -> bool = default;
 };
 using GlyphString = std::vector<Glyph>;
@@ -29,16 +29,16 @@ concept GlyphRange = std::ranges::forward_range<T> &&
 template<class T>
 concept Character = detail::AnyOf<std::remove_cvref_t<T>, char, signed char, unsigned char, char32_t>;
 
-[[nodiscard]] auto glyphs(std::string_view utf8, Brush brush = {}) -> GlyphString;
-[[nodiscard]] auto glyphs(std::u32string_view utf32, Brush brush = {}) -> GlyphString;
-void append_glyphs(GlyphString& output, std::string_view utf8, Brush brush = {});
-void append_glyphs(GlyphString& output, std::u32string_view utf32, Brush brush = {});
+[[nodiscard]] auto glyphs(std::string_view utf8, Style style = {}) -> GlyphString;
+[[nodiscard]] auto glyphs(std::u32string_view utf32, Style style = {}) -> GlyphString;
+void append_glyphs(GlyphString& output, std::string_view utf8, Style style = {});
+void append_glyphs(GlyphString& output, std::u32string_view utf32, Style style = {});
 
 namespace detail {
 constexpr void validate_glyph(Glyph const& glyph, std::size_t offset)
 {
     validate_scalar(glyph.symbol, offset);
-    validate_brush(glyph.brush);
+    validate_style(glyph.style);
 }
 [[nodiscard]] constexpr auto character_scalar(Character auto character) -> char32_t
 {
@@ -69,22 +69,22 @@ template<class Range> requires GlyphRange<Range const>
 }
 } // namespace detail
 
-// No intermediate container. Input and brush are validated before any insertion;
+// No intermediate container. Input and style are validated before any insertion;
 // insertion failures are allowed to leave the caller's destination partially filled.
 template<std::output_iterator<Glyph> Output>
-auto append_glyphs_to(Output output, std::string_view utf8, Brush brush = {}) -> Output
+auto append_glyphs_to(Output output, std::string_view utf8, Style style = {}) -> Output
 {
-    detail::validate_brush(brush);
+    detail::validate_style(style);
     static_cast<void>(detail::text_count(utf8));
-    detail::for_each_scalar(utf8, [&](char32_t scalar) { *output++ = Glyph{scalar, brush}; });
+    detail::for_each_scalar(utf8, [&](char32_t scalar) { *output++ = Glyph{scalar, style}; });
     return output;
 }
 template<std::output_iterator<Glyph> Output>
-auto append_glyphs_to(Output output, std::u32string_view utf32, Brush brush = {}) -> Output
+auto append_glyphs_to(Output output, std::u32string_view utf32, Style style = {}) -> Output
 {
-    detail::validate_brush(brush);
+    detail::validate_style(style);
     detail::validate_utf32(utf32);
-    for (auto scalar : utf32) *output++ = Glyph{scalar, brush};
+    for (auto scalar : utf32) *output++ = Glyph{scalar, style};
     return output;
 }
 
@@ -93,7 +93,7 @@ template<Attribute A>
 {
     detail::validate_glyph(glyph, 0);
     detail::validate_attribute(attribute);
-    detail::apply_attribute(glyph.brush, attribute);
+    detail::apply_attribute(glyph.style, attribute);
     return glyph;
 }
 template<Character C, Attribute A>
@@ -107,7 +107,7 @@ void style_in_place(Range& input, A const& attribute)
     detail::validate_attribute(attribute);
     std::size_t offset = 0;
     for (auto const& glyph : input) detail::validate_glyph(glyph, offset++);
-    for (auto& glyph : input) detail::apply_attribute(glyph.brush, attribute);
+    for (auto& glyph : input) detail::apply_attribute(glyph.style, attribute);
 }
 template<class Range, Attribute A> requires GlyphRange<Range const>
 [[nodiscard]] auto styled(Range const& input, A const& attribute) -> GlyphString
@@ -118,7 +118,7 @@ template<class Range, Attribute A> requires GlyphRange<Range const>
     result.reserve(count);
     for (auto const& value : input) {
         Glyph glyph = value;
-        detail::apply_attribute(glyph.brush, attribute);
+        detail::apply_attribute(glyph.style, attribute);
         result.push_back(std::move(glyph));
     }
     return result;
@@ -129,19 +129,6 @@ template<class Range, Attribute A> requires GlyphRange<Range const>
 template<Attribute A>
 [[nodiscard]] auto operator|(GlyphString&& input, A const& attribute) -> GlyphString
 { style_in_place(input, attribute); return std::move(input); }
-template<Attribute A>
-[[nodiscard]] auto operator|(std::string_view utf8, A const& attribute) -> GlyphString
-{
-    detail::validate_attribute(attribute);
-    return glyphs(utf8, Brush{} | attribute);
-}
-template<Attribute A>
-[[nodiscard]] auto operator|(std::u32string_view utf32, A const& attribute) -> GlyphString
-{
-    detail::validate_attribute(attribute);
-    return glyphs(utf32, Brush{} | attribute);
-}
-
 // Contiguous sources need only the destination allocation, including self-append
 // and overlapping spans. General forward ranges are snapshotted before mutation:
 // their iterators or lazy projections may depend on the destination's storage.

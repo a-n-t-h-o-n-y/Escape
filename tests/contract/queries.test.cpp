@@ -1,3 +1,4 @@
+#include "support/results.hpp"
 #include <esc/esc.hpp>
 #include <thread>
 #include <vector>
@@ -35,7 +36,7 @@ struct Responder {
                       }
                       auto at = pending.find(stage.first);
                       pending.erase(0, at + stage.first.size());
-                      pty.send(stage.second);
+                      pty.write(stage.second);
                   }
               }
               catch (...) {
@@ -61,37 +62,37 @@ TEST(SES_QUERY_matches_reply_and_preserves_interleaved_input)
     Responder responder{pty, {{"\x1b[?2004$p", "a\x1b[?25;2$y\x1b[?2004;1$yb"}}};
     auto result = terminal.query(ModeQuery{2004}, 500ms);
     responder.check();
-    CHECK(result.status == QueryStatus::Reply);
-    CHECK(result.reply == std::optional<Reply>{ModeReply{2004, ModeStatus::Set}});
-    CHECK(terminal.read(0ms).event == std::optional<Event>{KeyPress{U'a'}});
-    CHECK(terminal.read(0ms).event ==
+    CHECK(contract::status(result) == contract::Status::Reply);
+    CHECK(contract::reply(result) == std::optional<Reply>{ModeReply{2004, ModeStatus::Set}});
+    CHECK(contract::event(terminal.read(0ms)) == std::optional<Event>{KeyEvent{U'a'}});
+    CHECK(contract::event(terminal.read(0ms)) ==
           std::optional<Event>{TerminalReply{ModeReply{25, ModeStatus::Reset}}});
-    CHECK(terminal.read(0ms).event == std::optional<Event>{KeyPress{U'b'}});
+    CHECK(contract::event(terminal.read(0ms)) == std::optional<Event>{KeyEvent{U'b'}});
 }
 TEST(SES_QUERY_timeout_keeps_input_and_late_replies_visible)
 {
     contract::Pty pty;
     auto terminal = open(pty);
-    pty.send("abc");
+    pty.write("abc");
     auto before = std::chrono::steady_clock::now();
-    CHECK(terminal.query(KeyboardQuery{}, 10ms).status == QueryStatus::Timeout);
+    CHECK(contract::status(terminal.query(KeyboardQuery{}, 10ms)) == contract::Status::Timeout);
     CHECK(std::chrono::steady_clock::now() - before < 500ms);
     for (auto c : U"abc"sv)
-        CHECK(terminal.read(0ms).event == std::optional<Event>{KeyPress{c}});
-    pty.send("\x1b[?0u");
-    CHECK(terminal.read(100ms).event ==
+        CHECK(contract::event(terminal.read(0ms)) == std::optional<Event>{KeyEvent{c}});
+    pty.write("\x1b[?0u");
+    CHECK(contract::event(terminal.read(100ms)) ==
           std::optional<Event>{TerminalReply{KeyboardReply{0}}});
 }
 TEST(SES_QUERY_preservation_storage_is_bounded_without_dropping_input)
 {
     contract::Pty pty;
     auto terminal = open(pty);
-    pty.send(std::string(65, 'x') + "\x1b[?1u");
-    CHECK(terminal.query(KeyboardQuery{}, 100ms).status == QueryStatus::InputPending);
-    CHECK(terminal.query(KeyboardQuery{}, 100ms).status == QueryStatus::InputPending);
+    pty.write(std::string(65, 'x') + "\x1b[?1u");
+    CHECK(contract::status(terminal.query(KeyboardQuery{}, 100ms)) == contract::Status::InputPending);
+    CHECK(contract::status(terminal.query(KeyboardQuery{}, 100ms)) == contract::Status::InputPending);
     for (unsigned i = 0; i < 65; ++i)
-        CHECK(terminal.read(100ms).event == std::optional<Event>{KeyPress{U'x'}});
-    CHECK(terminal.read(100ms).event ==
+        CHECK(contract::event(terminal.read(100ms)) == std::optional<Event>{KeyEvent{U'x'}});
+    CHECK(contract::event(terminal.read(100ms)) ==
           std::optional<Event>{TerminalReply{KeyboardReply{1}}});
 }
 TEST(SES_QUERY_request_is_explicit_and_validates_before_writes)
@@ -104,8 +105,8 @@ TEST(SES_QUERY_request_is_explicit_and_validates_before_writes)
     CHECK(pty.drain().empty());
     terminal.request(DeviceAttributesQuery{});
     CHECK(pty.drain() == "\x1b[c");
-    pty.send("\x1b[?1;2c");
-    CHECK(terminal.read(100ms).event ==
+    pty.write("\x1b[?1;2c");
+    CHECK(contract::event(terminal.read(100ms)) ==
           std::optional<Event>{TerminalReply{DeviceAttributesReply{{1, 2}}}});
 }
 TEST(SES_QUERY_canonical_input_is_rejected_before_output)
@@ -129,15 +130,15 @@ TEST(SES_QUERY_probe_batches_requests_and_keeps_evidence_separate)
     CHECK(operations.calls(testing::Operation::Flush) == 1);
     responder.check();
     CHECK(report.observations.size() == 10);
-    CHECK(report.observations[0].result.status == QueryStatus::Timeout);
-    CHECK(report.observations[1].result.reply ==
+    CHECK(contract::status(report.observations[0].result) == contract::Status::Timeout);
+    CHECK(contract::reply(report.observations[1].result) ==
           std::optional<Reply>{ModeReply{25, ModeStatus::Reset}});
-    CHECK(report.observations[8].result.reply ==
+    CHECK(contract::reply(report.observations[8].result) ==
           std::optional<Reply>{ModeReply{2004, ModeStatus::Unrecognized}});
     for (auto const& observation : report.observations)
         CHECK(observation.source == EvidenceSource::Probe);
     CHECK(terminal.profile().colors == before);
-    CHECK(terminal.read(0ms).event == std::optional<Event>{KeyPress{U'x'}});
+    CHECK(contract::event(terminal.read(0ms)) == std::optional<Event>{KeyEvent{U'x'}});
 }
 TEST(SES_KITTY_negotiates_events_and_restores_prior_flags_on_close)
 {
@@ -148,12 +149,12 @@ TEST(SES_KITTY_negotiates_events_and_restores_prior_flags_on_close)
     auto result = terminal.enable_keyboard(
         KittyFlags::Disambiguate | KittyFlags::EventTypes, 500ms);
     responder.check();
-    CHECK(result.status == QueryStatus::Reply);
+    CHECK(contract::status(result) == contract::Status::Reply);
     CHECK(terminal.keyboard_protocol() == KeyboardProtocol::Kitty);
     KeyEvent key;
     key.key = Key{U'a'};
     key.action = KeyAction::Repeat;
-    CHECK(terminal.read(0ms).event == std::optional<Event>{key});
+    CHECK(contract::event(terminal.read(0ms)) == std::optional<Event>{key});
     CHECK_THROWS(std::logic_error, terminal.set(ScreenBuffer::Alternate));
     terminal.close();
     CHECK(pty.drain() == "\x1b[=0;1u");
@@ -169,10 +170,11 @@ TEST(SES_KITTY_rejected_or_missing_confirmation_rolls_back)
         auto result = terminal.enable_keyboard(
             KittyFlags::Disambiguate | KittyFlags::EventTypes, 50ms);
         responder.check();
-        CHECK(result.status ==
-              (timeout ? QueryStatus::Timeout : QueryStatus::Rejected));
+        CHECK(contract::status(result) ==
+              (timeout ? contract::Status::Timeout : contract::Status::Rejected));
+        if (!timeout) CHECK(std::get<Rejected>(result).reply == Reply{KeyboardReply{1}});
         CHECK(terminal.keyboard_protocol() == KeyboardProtocol::Legacy);
-        CHECK(terminal.read(0ms).event == std::optional<Event>{KeyPress{U'x'}});
+        CHECK(contract::event(terminal.read(0ms)) == std::optional<Event>{KeyEvent{U'x'}});
         CHECK(pty.drain() == "\x1b[=0;1u");
         terminal.close();
         CHECK(pty.drain().empty());
@@ -184,9 +186,7 @@ TEST(SES_KITTY_disable_restores_inherited_flags_and_allows_screen_changes)
     auto terminal = open(pty);
     Responder responder{pty,
                         {{"\x1b[?u", "\x1b[?1u"}, {"\x1b[=3;1u\x1b[?u", "\x1b[?3u"}}};
-    CHECK(terminal
-              .enable_keyboard(KittyFlags::Disambiguate | KittyFlags::EventTypes, 500ms)
-              .status == QueryStatus::Reply);
+    CHECK(contract::status(terminal.enable_keyboard(KittyFlags::Disambiguate | KittyFlags::EventTypes, 500ms)) == contract::Status::Reply);
     responder.check();
     terminal.disable_keyboard();
     CHECK(pty.drain() == "\x1b[=1;1u");
@@ -207,8 +207,8 @@ TEST(SES_KITTY_invalid_flags_and_no_support_do_not_change_keyboard_modes)
     CHECK_THROWS(std::invalid_argument,
                  terminal.enable_keyboard(KittyFlags::AssociatedText));
     CHECK(pty.drain().empty());
-    CHECK(terminal.enable_keyboard(KittyFlags::Disambiguate, 1ms).status ==
-          QueryStatus::Timeout);
+    CHECK(contract::status(terminal.enable_keyboard(KittyFlags::Disambiguate, 1ms)) ==
+          contract::Status::Timeout);
     CHECK(pty.drain() == "\x1b[?u");
     CHECK(terminal.keyboard_protocol() == KeyboardProtocol::Legacy);
 }
@@ -252,11 +252,9 @@ TEST(SES_KITTY_renegotiation_restores_the_original_session_baseline)
                          {"\x1b[=1;1u\x1b[?u", "\x1b[?1u"},
                          {"\x1b[?u", "\x1b[?1u"},
                          {"\x1b[=3;1u\x1b[?u", "\x1b[?3u"}}};
-    CHECK(terminal.enable_keyboard(KittyFlags::Disambiguate, 500ms).status ==
-          QueryStatus::Reply);
-    CHECK(terminal
-              .enable_keyboard(KittyFlags::Disambiguate | KittyFlags::EventTypes, 500ms)
-              .status == QueryStatus::Reply);
+    CHECK(contract::status(terminal.enable_keyboard(KittyFlags::Disambiguate, 500ms)) ==
+          contract::Status::Reply);
+    CHECK(contract::status(terminal.enable_keyboard(KittyFlags::Disambiguate | KittyFlags::EventTypes, 500ms)) == contract::Status::Reply);
     responder.check();
     terminal.disable_keyboard();
     CHECK(pty.drain() == "\x1b[=0;1u");
@@ -269,16 +267,14 @@ TEST(SES_KITTY_rejection_preserves_inherited_protocol_interpretation)
     auto terminal = open(pty);
     Responder responder{pty,
                         {{"\x1b[?u", "\x1b[?1u"}, {"\x1b[=3;1u\x1b[?u", "\x1b[?1u"}}};
-    CHECK(terminal
-              .enable_keyboard(KittyFlags::Disambiguate | KittyFlags::EventTypes, 500ms)
-              .status == QueryStatus::Rejected);
+    CHECK(contract::status(terminal.enable_keyboard(KittyFlags::Disambiguate | KittyFlags::EventTypes, 500ms)) == contract::Status::Rejected);
     responder.check();
     CHECK(terminal.keyboard_protocol() == KeyboardProtocol::Kitty);
     CHECK(pty.drain() == "\x1b[=1;1u");
-    pty.send("\x1b[97u");
+    pty.write("\x1b[97u");
     KeyEvent key;
     key.key = Key{U'a'};
-    CHECK(terminal.read(100ms).event == std::optional<Event>{key});
+    CHECK(contract::event(terminal.read(100ms)) == std::optional<Event>{key});
     terminal.close();
     CHECK(pty.drain().empty());
 }

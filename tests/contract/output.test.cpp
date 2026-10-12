@@ -106,3 +106,47 @@ TEST(OUT_01_free_stdout_functions_need_no_terminal_initialization)
     esc::flush();
     CHECK(capture.file.contents()=="ab界\0c"sv);
 }
+
+TEST(OUT_05_mixed_commands_and_scoped_styling_stream_in_order)
+{
+    contract::File file;
+    Output output{file.get()};
+    auto label = styled("Hello 👽", fg(XColor::Cyan) | bold);
+    output.write(Cursor{4,2}, label, "\0tail"sv);
+    CHECK(file.contents() ==
+          "\x1b[3;5H\x1b[49m\x1b[36m\x1b[22;23;24;25;27;28;29;1mHello 👽"
+          "\x1b[49m\x1b[39m\x1b[22;23;24;25;27;28;29m\0tail"sv);
+}
+TEST(OUT_05_styled_views_are_streamed_in_bounded_chunks)
+{
+    contract::File file;
+    std::string source(4096, 'x');
+    source += "界👽";
+    Output{file.get()}.write(styled_view(source, bold));
+    CHECK(file.contents() ==
+          "\x1b[49m\x1b[39m\x1b[22;23;24;25;27;28;29;1m" + source +
+          "\x1b[49m\x1b[39m\x1b[22;23;24;25;27;28;29m");
+}
+TEST(OUT_05_glyph_ranges_coalesce_styles_and_restore_the_enclosing_style)
+{
+    contract::File file;
+    auto values = glyphs("a界", Style{.foreground=XColor::Red, .traits=bold});
+    Output{file.get()}.write(fg(XColor::Blue), values, "b");
+    CHECK(file.contents() ==
+          "\x1b[34m\x1b[49m\x1b[31m\x1b[22;23;24;25;27;28;29;1ma界"
+          "\x1b[49m\x1b[34m\x1b[22;23;24;25;27;28;29mb");
+    Output{file.get()}.write(GlyphString{});
+    CHECK(file.contents().ends_with("29mb"));
+}
+TEST(OUT_05_late_nested_validation_happens_before_any_output)
+{
+    contract::File file;
+    auto values = sequence(std::string(4096, 'x'), Cursor{}, Glyph{0xd800});
+    CHECK_THROWS(UnicodeError, Output{file.get()}.write(values));
+    CHECK(file.contents().empty());
+    std::string source = "valid";
+    auto label = styled_view(source, bold);
+    source[0] = static_cast<char>(0xff);
+    CHECK_THROWS(UnicodeError, Output{file.get()}.write("prefix", label));
+    CHECK(file.contents().empty());
+}

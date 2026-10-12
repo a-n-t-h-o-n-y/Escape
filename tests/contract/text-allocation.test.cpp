@@ -26,7 +26,7 @@ TEST(GLY_01_named_in_place_styling_allocates_nothing)
         allocations=scope.count();
     }
     CHECK(allocations==0);
-    CHECK(values==glyphs("hello界",Brush{.traits=Trait::Bold}));
+    CHECK(values==glyphs("hello界",Style{.traits=Trait::Bold}));
 }
 
 TEST(TXT_02_allocation_failure_leaves_append_conversion_unchanged)

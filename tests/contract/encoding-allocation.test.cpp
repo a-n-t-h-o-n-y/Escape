@@ -6,14 +6,14 @@ using namespace esc;
 TEST(BUF_02_raw_encoding_and_capacity_failure_allocate_nothing)
 {
     std::array<char,256> bytes;
-    Brush brush{.background=TColor{0x010203},.foreground=XColor::BrightRed,.traits=contract::full_traits()};
+    Style style{.background=RGB{0x010203},.foreground=XColor::BrightRed,.traits=contract::full_traits()};
     std::size_t allocations=0;
     EncodeResult result{};
     EncodeResult short_result{};
     {
         contract::AllocationScope scope;
-        result=escape_to(bytes,Cursor{4,2},brush);
-        short_result=escape_to(std::span<char>{},Cursor{4,2},brush);
+        result=encode_to(bytes,Cursor{4,2},style);
+        short_result=encode_to(std::span<char>{},Cursor{4,2},style);
         allocations=scope.count();
     }
     CHECK(allocations==0 && result.written==result.required);
@@ -26,7 +26,7 @@ TEST(BUF_01_reserved_raw_append_allocates_nothing)
     std::size_t allocations=0;
     {
         contract::AllocationScope scope;
-        append_escape(frame,Cursor{4,2},Brush{.foreground=TColor{0x010203}},ResetStyle{});
+        append_encoded(frame,Cursor{4,2},Style{.foreground=RGB{0x010203}},ResetStyle{});
         allocations=scope.count();
     }
     CHECK(allocations==0);
@@ -39,7 +39,7 @@ TEST(BUF_01_raw_append_allocation_failure_preserves_contents)
     auto const before=frame;
     {
         contract::AllocationScope scope{true};
-        CHECK_THROWS(std::bad_alloc,append_escape(frame,Cursor{},contract::full_traits(),Brush{}));
+        CHECK_THROWS(std::bad_alloc,append_encoded(frame,Cursor{},contract::full_traits(),Style{}));
     }
     CHECK(frame==before);
 }
@@ -50,29 +50,29 @@ TEST(BUF_01_raw_append_uses_one_destination_allocation_for_a_pack)
     std::size_t allocations=0;
     {
         contract::AllocationScope scope;
-        append_escape(frame,traits,traits,traits,traits,traits,traits,traits,traits);
+        append_encoded(frame,traits,traits,traits,traits,traits,traits,traits,traits);
         allocations=scope.count();
     }
     CHECK(allocations==1);
-    CHECK(frame==escape(traits)+escape(traits)+escape(traits)+escape(traits)+
-                 escape(traits)+escape(traits)+escape(traits)+escape(traits));
+    CHECK(frame==encode(traits)+encode(traits)+encode(traits)+encode(traits)+
+                 encode(traits)+encode(traits)+encode(traits)+encode(traits));
 }
 TEST(ENC_04_invalid_values_validate_the_whole_pack_before_mutation)
 {
     auto invalid=fg(static_cast<TermColor>(true));
     std::string output="unchanged";
-    CHECK_THROWS(std::invalid_argument,append_escape(output,ResetStyle{},invalid));
+    CHECK_THROWS(std::invalid_argument,append_encoded(output,ResetStyle{},invalid));
     CHECK(output=="unchanged");
     std::array<char,512> bytes;
     bytes.fill('#');
     auto before=bytes;
-    CHECK_THROWS(std::invalid_argument,escape_to(bytes,MouseReporting{MouseMode::Move,MouseProtocol::Sgr},invalid));
+    CHECK_THROWS(std::invalid_argument,encode_to(bytes,MouseReporting{MouseMode::Move,MouseProtocol::Sgr},invalid));
     CHECK(bytes==before);
-    CHECK_THROWS(std::invalid_argument,escape_to(std::span<char>{},invalid));
-    CHECK_THROWS(std::invalid_argument,escape(static_cast<FocusReporting>(99)));
-    CHECK_THROWS(std::invalid_argument,escape(static_cast<BracketedPaste>(99)));
-    CHECK_THROWS(std::invalid_argument,escape(MouseReporting{static_cast<MouseMode>(99),MouseProtocol::Sgr}));
-    CHECK_THROWS(std::invalid_argument,escape(static_cast<Trait>(1)));
+    CHECK_THROWS(std::invalid_argument,encode_to(std::span<char>{},invalid));
+    CHECK_THROWS(std::invalid_argument,encode(static_cast<FocusReporting>(99)));
+    CHECK_THROWS(std::invalid_argument,encode(static_cast<BracketedPaste>(99)));
+    CHECK_THROWS(std::invalid_argument,encode(MouseReporting{static_cast<MouseMode>(99),MouseProtocol::Sgr}));
+    CHECK_THROWS(std::invalid_argument,encode(static_cast<Trait>(1)));
 }
 TEST(ENC_03_every_trait_subset_has_canonical_order_and_no_duplicates)
 {
@@ -82,12 +82,15 @@ TEST(ENC_03_every_trait_subset_has_canonical_order_and_no_duplicates)
     for (unsigned subset=0;subset<(1u<<9);++subset) {
         Traits value;
         for (unsigned i=0;i<9;++i) if (subset & (1u<<i)) value.insert(traits[i]);
-        std::string expected="\x1b[22;23;24;25;27;28;29";
+        std::string expected;
         for (unsigned i=0;i<8;++i) {
             if (i==3 && (subset & (1u<<8))) expected+=";21";
             else if (subset & (1u<<i)) expected+=parameters[i];
         }
-        expected+='m';
+        if (!expected.empty()) {
+            expected.erase(0, 1); // Drop the leading delimiter from the independent table.
+            expected = "\x1b[" + expected + 'm';
+        }
         contract::encodes(expected,value);
     }
 }

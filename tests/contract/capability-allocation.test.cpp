@@ -7,14 +7,14 @@ TEST(BUF_02_bounded_encoding_and_capacity_failure_allocate_nothing)
 {
     std::array<char,256> bytes;
     auto profile=contract::full_profile();
-    Brush brush{.background=TColor{0x010203},.foreground=XColor::BrightRed,.traits=contract::full_traits()};
+    Style style{.background=RGB{0x010203},.foreground=XColor::BrightRed,.traits=contract::full_traits()};
     std::size_t allocations=0;
     EncodeResult result{};
     EncodeResult short_result{};
     {
         contract::AllocationScope scope;
-        result=escape_to(bytes,profile,Cursor{4,2},brush);
-        short_result=escape_to(std::span<char>{},profile,Cursor{4,2},brush);
+        result=encode_to(bytes,profile,Cursor{4,2},style);
+        short_result=encode_to(std::span<char>{},profile,Cursor{4,2},style);
         allocations=scope.count();
     }
     CHECK(allocations==0 && result.written==result.required);
@@ -28,7 +28,7 @@ TEST(BUF_01_append_with_capacity_allocates_nothing)
     std::size_t allocations=0;
     {
         contract::AllocationScope scope;
-        append_escape(frame,profile,Cursor{4,2},Brush{.foreground=TColor{0x010203}},ResetStyle{});
+        append_encoded(frame,profile,Cursor{4,2},Style{.foreground=RGB{0x010203}},ResetStyle{});
         allocations=scope.count();
     }
     CHECK(allocations==0);
@@ -44,7 +44,7 @@ TEST(BUF_01_allocation_failure_preserves_existing_string_contents)
     auto const filled=frame;
     {
         contract::AllocationScope scope{true};
-        CHECK_THROWS(std::bad_alloc,append_escape(frame,profile,Cursor{},contract::full_traits(),Brush{}));
+        CHECK_THROWS(std::bad_alloc,append_encoded(frame,profile,Cursor{},contract::full_traits(),Style{}));
     }
     CHECK(frame==filled && frame.starts_with(before));
 }
@@ -57,15 +57,15 @@ TEST(BUF_02_quantized_profile_encoding_allocates_nothing)
     std::array<char,256> bytes;
     std::string frame="prefix";
     frame.reserve(512);
-    Brush brush{.foreground=TColor{0x123456},.traits=Trait::DoubleUnderline};
+    Style style{.foreground=RGB{0x123456},.traits=Trait::DoubleUnderline};
     std::size_t allocations=0;
     {
         contract::AllocationScope scope;
-        auto result=escape_to(bytes,profile,brush);
+        auto result=encode_to(bytes,profile,style);
         CHECK(result.written==result.required);
-        append_escape(frame,profile,brush);
+        append_encoded(frame,profile,style);
         allocations=scope.count();
     }
     CHECK(allocations==0);
-    CHECK(frame=="prefix"+escape(profile,brush));
+    CHECK(frame=="prefix"+encode(profile,style));
 }

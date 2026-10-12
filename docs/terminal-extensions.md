@@ -12,8 +12,8 @@ false. Environment resolution and the automatic Windows profile leave these
 extensions disabled and report that support needs explicit selection. Existing
 features retain their earlier evidence. A report contains fifteen decisions.
 
-Raw `escape`, `append_escape`, and `escape_to` encode without checking a profile.
-Their profile overloads and `Terminal::send` use the selected capabilities.
+Raw `encode`, `append_encoded`, and `encode_to` encode without checking a profile.
+Their profile overloads and `Terminal::write` use the selected capabilities.
 BestEffort omits unsupported extension commands; Strict throws
 `UnsupportedFeature` with the corresponding `Feature`. Zero-count operations are
 no-ops under either policy, including Strict. Invalid values and payloads throw
@@ -28,10 +28,10 @@ profile.window_title = true; // Caller knows this connection accepts OSC 2.
 profile.hyperlinks = true;   // Caller knows this connection accepts OSC 8.
 options.profile = profile;
 auto terminal = esc::Terminal::open(options);
-terminal.send(esc::WindowTitle{"Build results"});
-terminal.send(esc::BeginHyperlink{"https://example.org/results", "build"});
+terminal.write(esc::WindowTitle{"Build results"});
+terminal.write(esc::BeginHyperlink{"https://example.org/results", "build"});
 terminal.write("Open results");
-terminal.send(esc::EndHyperlink{});
+terminal.write(esc::EndHyperlink{});
 terminal.flush();
 ```
 
@@ -88,15 +88,15 @@ and application decide which destinations are appropriate.
 
 The views are borrowed for each synchronous call. Payload size is bounded by the
 caller's storage and the destination's size, not an arbitrary 256-byte limit.
-`Terminal::send` validates its entire command pack before any output and streams
+`Terminal::write` validates its entire command pack before any output and streams
 OSC fragments directly to `Output`, without building an intermediate string.
 I/O failures may leave partial output, as with other writes.
 
-`escape_to` returns the exact required byte count and leaves an undersized span
+`encode_to` returns the exact required byte count and leaves an undersized span
 unchanged. A payload overlapping the region that would be written is rejected
 before mutation; disjoint payloads within the same larger allocation are valid.
-`append_escape` supports title/URI/ID views into its destination string, including
-when growth relocates it. That aliasing case snapshots the original string and
+`append_encoded` supports title/URI/ID views into its destination string, including
+when growth relocates it. That aliasing case encodes a separate suffix and
 may allocate; normal reserved appends and sufficient spans allocate nothing.
 Validation/allocation failures leave the original destination unchanged.
 
@@ -109,7 +109,7 @@ OSC 8 behavior follows [the original hyperlink specification](https://gist.githu
 auto confirmation = terminal.confirm_synchronized_output();
 {
     auto frame = terminal.frame();
-    terminal.send(esc::Cursor{});
+    terminal.write(esc::Cursor{});
     terminal.write("Updated screen");
     frame.close(); // Checked presentation/flush; destruction also attempts it.
 }
@@ -127,7 +127,7 @@ An explicit `profile.synchronized_output=true` enables frames without probing.
 Alternatively, `confirm_synchronized_output(timeout=250ms)` sends ModeQuery 2026
 and accepts mutable Set/Reset replies, recording support separately from the
 profile. The confirmed mode also becomes the inherited baseline. Unrecognized
-or permanent Set/Reset replies return `QueryStatus::Rejected` with the reply and
+or permanent Set/Reset replies return `Rejected{reply}` and
 disable synchronization. A timeout preserves earlier evidence. No query runs
 automatically on open. Probing inside a frame is rejected before I/O.
 

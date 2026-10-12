@@ -1,3 +1,4 @@
+#include "support/results.hpp"
 #include "support/fixtures.hpp"
 #include "support/posix.hpp"
 
@@ -18,12 +19,12 @@ TEST(IO_01_reader_queues_multiple_events_and_distinguishes_eof)
     pipe.eof();
     for (auto scalar : {U'a',U'b',U'界'}) {
         auto result=reader.read(100ms);
-        CHECK(result.status==ReadStatus::Event);
-        CHECK(result.event==std::optional<Event>{KeyPress{scalar}});
+        CHECK(contract::status(result)==contract::Status::Event);
+        CHECK(contract::event(result)==std::optional<Event>{KeyEvent{scalar}});
     }
     for (int i=0;i<2;++i) {
         auto result=reader.read(); // EOF is already known; cannot block forever.
-        CHECK(result.status==ReadStatus::EndOfInput && !result.event);
+        CHECK(contract::status(result)==contract::Status::EndOfInput && !contract::event(result));
     }
 }
 TEST(IO_01_short_caller_timeout_does_not_expire_a_partial_sequence)
@@ -32,32 +33,32 @@ TEST(IO_01_short_caller_timeout_does_not_expire_a_partial_sequence)
     Reader reader{pipe.reader.get(),ParserOptions{.escape_timeout=500ms,.sequence_timeout=500ms}};
     pipe.write("\x1b[");
     auto first=reader.read(1ms);
-    CHECK(first.status==ReadStatus::Timeout && !first.event);
+    CHECK(contract::status(first)==contract::Status::Timeout && !contract::event(first));
     pipe.write("A");
     auto next=reader.read(100ms);
-    CHECK(next.event==std::optional<Event>{KeyPress{KeyCode::ArrowUp}});
+    CHECK(contract::event(next)==std::optional<Event>{KeyEvent{KeyCode::ArrowUp}});
 }
 TEST(IO_01_unicode_fragment_survives_multiple_timed_reads)
 {
     contract::Pipe pipe;
     Reader reader{pipe.reader.get()};
     pipe.write("\xe7");
-    CHECK(reader.read(1ms).status==ReadStatus::Timeout);
+    CHECK(contract::status(reader.read(1ms))==contract::Status::Timeout);
     pipe.write("\x95");
-    CHECK(reader.read(1ms).status==ReadStatus::Timeout);
+    CHECK(contract::status(reader.read(1ms))==contract::Status::Timeout);
     pipe.write("\x8c");
-    CHECK(reader.read(100ms).event==std::optional<Event>{KeyPress{U'界'}});
+    CHECK(contract::event(reader.read(100ms))==std::optional<Event>{KeyEvent{U'界'}});
 }
 TEST(IO_01_zero_timeout_polls_and_negative_timeout_is_invalid)
 {
     contract::Pipe pipe;
     Reader reader{pipe.reader.get()};
     auto empty=reader.read(0ms);
-    CHECK(empty.status==ReadStatus::Timeout && !empty.event);
+    CHECK(contract::status(empty)==contract::Status::Timeout && !contract::event(empty));
     CHECK_THROWS(std::invalid_argument,reader.read(-1ms));
     CHECK_THROWS(std::invalid_argument,Reader{nullptr});
     pipe.write("x");
-    CHECK(reader.read(0ms).event==std::optional<Event>{KeyPress{U'x'}});
+    CHECK(contract::event(reader.read(0ms))==std::optional<Event>{KeyEvent{U'x'}});
 }
 TEST(IO_01_expired_escape_is_delivered_before_caller_timeout)
 {
@@ -65,8 +66,8 @@ TEST(IO_01_expired_escape_is_delivered_before_caller_timeout)
     Reader reader{pipe.reader.get(),ParserOptions{.escape_timeout=0ms}};
     pipe.write("\x1b");
     auto result=reader.read(100ms);
-    CHECK(result.status==ReadStatus::Event);
-    CHECK(result.event==std::optional<Event>{KeyPress{KeyCode::Escape}});
+    CHECK(contract::status(result)==contract::Status::Event);
+    CHECK(contract::event(result)==std::optional<Event>{KeyEvent{KeyCode::Escape}});
 }
 TEST(IO_01_zero_timeout_services_parser_deadlines_and_buffered_events)
 {
@@ -74,13 +75,13 @@ TEST(IO_01_zero_timeout_services_parser_deadlines_and_buffered_events)
     Reader reader{pipe.reader.get(), ParserOptions{.escape_timeout = 0ms,
                                                   .sequence_timeout = 0ms}};
     pipe.write("ab\x1b");
-    CHECK(reader.read(0ms).event == std::optional<Event>{KeyPress{U'a'}});
-    CHECK(reader.read(0ms).event == std::optional<Event>{KeyPress{U'b'}});
-    CHECK(reader.read(0ms).event == std::optional<Event>{KeyPress{KeyCode::Escape}});
-    CHECK(reader.read(0ms).status == ReadStatus::Timeout);
+    CHECK(contract::event(reader.read(0ms)) == std::optional<Event>{KeyEvent{U'a'}});
+    CHECK(contract::event(reader.read(0ms)) == std::optional<Event>{KeyEvent{U'b'}});
+    CHECK(contract::event(reader.read(0ms)) == std::optional<Event>{KeyEvent{KeyCode::Escape}});
+    CHECK(contract::status(reader.read(0ms)) == contract::Status::Timeout);
     pipe.write("\x1b[");
     auto result = reader.read(0ms);
-    CHECK(result.event == std::optional<Event>{UnknownInput{"\x1b[", InputProblem::Truncated}});
+    CHECK(contract::event(result) == std::optional<Event>{UnknownInput{"\x1b[", InputProblem::Truncated}});
 }
 TEST(IO_01_eof_drains_partial_input_before_end_status)
 {
@@ -89,10 +90,10 @@ TEST(IO_01_eof_drains_partial_input_before_end_status)
     pipe.write("\xe7\x95");
     pipe.eof();
     auto result=reader.read(100ms);
-    CHECK(result.status==ReadStatus::Event);
-    CHECK(std::get<UnknownInput>(*result.event).bytes=="\xe7\x95");
-    CHECK(std::get<UnknownInput>(*result.event).problem==InputProblem::Truncated);
-    CHECK(reader.read(100ms).status==ReadStatus::EndOfInput);
+    CHECK(contract::status(result)==contract::Status::Event);
+    CHECK(std::get<UnknownInput>(*contract::event(result)).bytes=="\xe7\x95");
+    CHECK(std::get<UnknownInput>(*contract::event(result)).problem==InputProblem::Truncated);
+    CHECK(contract::status(reader.read(100ms))==contract::Status::EndOfInput);
 }
 TEST(IO_01_reader_move_preserves_pending_input_and_borrowed_stream)
 {
@@ -100,10 +101,10 @@ TEST(IO_01_reader_move_preserves_pending_input_and_borrowed_stream)
     {
         Reader source{pipe.reader.get(),ParserOptions{.escape_timeout=500ms,.sequence_timeout=500ms}};
         pipe.write("\x1b[");
-        CHECK(source.read(1ms).status==ReadStatus::Timeout);
+        CHECK(contract::status(source.read(1ms))==contract::Status::Timeout);
         Reader destination{std::move(source)};
         pipe.write("A");
-        CHECK(destination.read(100ms).event==std::optional<Event>{KeyPress{KeyCode::ArrowUp}});
+        CHECK(contract::event(destination.read(100ms))==std::optional<Event>{KeyEvent{KeyCode::ArrowUp}});
     }
     CHECK(::fcntl(::fileno(pipe.reader.get()),F_GETFD)!=-1);
 }
@@ -112,11 +113,11 @@ TEST(IO_01_configure_does_not_drop_queued_keys)
     contract::Pipe pipe;
     Reader reader{pipe.reader.get()};
     pipe.write("ab");
-    CHECK(reader.read(100ms).event==std::optional<Event>{KeyPress{U'a'}});
+    CHECK(contract::event(reader.read(100ms))==std::optional<Event>{KeyEvent{U'a'}});
     reader.configure(InputProtocols{.focus=true});
-    CHECK(reader.read(100ms).event==std::optional<Event>{KeyPress{U'b'}});
+    CHECK(contract::event(reader.read(100ms))==std::optional<Event>{KeyEvent{U'b'}});
     pipe.write("\x1b[I");
-    CHECK(reader.read(100ms).event==std::optional<Event>{Focus{true}});
+    CHECK(contract::event(reader.read(100ms))==std::optional<Event>{Focus{true}});
 }
 
 TEST(IO_01_regular_files_are_read_in_blocks_and_eof_is_persistent)
@@ -126,10 +127,10 @@ TEST(IO_01_regular_files_are_read_in_blocks_and_eof_is_persistent)
     CHECK(std::fflush(file.get())==0);
     std::rewind(file.get());
     Reader reader{file.get()};
-    CHECK(reader.read(0ms).event==std::optional<Event>{KeyPress{U'a'}});
-    CHECK(reader.read(0ms).event==std::optional<Event>{KeyPress{U'b'}});
-    CHECK(reader.read(0ms).status==ReadStatus::EndOfInput);
-    CHECK(reader.read().status==ReadStatus::EndOfInput);
+    CHECK(contract::event(reader.read(0ms))==std::optional<Event>{KeyEvent{U'a'}});
+    CHECK(contract::event(reader.read(0ms))==std::optional<Event>{KeyEvent{U'b'}});
+    CHECK(contract::status(reader.read(0ms))==contract::Status::EndOfInput);
+    CHECK(contract::status(reader.read())==contract::Status::EndOfInput);
 }
 TEST(IO_01_sequence_deadline_is_not_extended_by_trickling_bytes)
 {
@@ -149,8 +150,8 @@ TEST(IO_01_sequence_deadline_is_not_extended_by_trickling_bytes)
         ~Join() { stop=true; if(writer.joinable()) writer.join(); }
     } join{stop,writer};
     auto result=reader.read(500ms);
-    CHECK(result.status==ReadStatus::Event);
-    auto const& unknown=std::get<UnknownInput>(*result.event);
+    CHECK(contract::status(result)==contract::Status::Event);
+    auto const& unknown=std::get<UnknownInput>(std::get<Event>(result));
     CHECK(unknown.bytes.starts_with("\x1b[") && unknown.bytes.size()<100);
     CHECK(unknown.problem==InputProblem::Truncated);
 }

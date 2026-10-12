@@ -99,22 +99,9 @@ class Terminal {
     auto profile() const -> TerminalProfile const&;
     auto profile_report() const -> ProfileReport const&;
     auto output() -> Output&;
-    template <Writable... Values>
+    template <Drawable... Values>
     void write(Values const&... values)
-    { output().write(values...); }
-    template <DrawingCommand... Commands>
-    void send(Commands const&... commands)
-    {
-        auto const prepared = detail::prepare_pack(profile(), commands...);
-        detail::SequenceWriter validate;
-        detail::encode_pack(validate, prepared);
-        auto& stream = output();
-        std::apply(
-            [&](auto const&... command) {
-                (detail::send_encoded(stream, command), ...);
-            },
-            prepared);
-    }
+    { output().write_values(&profile(), values...); }
     void flush();
     auto frame() -> Frame;
     auto confirm_synchronized_output(std::chrono::milliseconds timeout =

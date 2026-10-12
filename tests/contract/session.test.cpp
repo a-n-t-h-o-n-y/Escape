@@ -1,3 +1,4 @@
+#include "support/results.hpp"
 #include "support/fixtures.hpp"
 #include "support/posix.hpp"
 #include "support/allocations.hpp"
@@ -103,10 +104,10 @@ TEST(SES_01_switching_back_to_canonical_rebuilds_captured_settings)
 TEST(SES_01_mode_changes_do_not_discard_pending_input)
 {
     contract::Pty pty;
-    pty.send("held\n");
+    pty.write("held\n");
     auto terminal=Terminal::open(streams(pty),options());
     terminal.set(Echo::Off,InputBuffer::Immediate);
-    CHECK(terminal.read(100ms).event==std::optional<Event>{KeyPress{U'h'}});
+    CHECK(contract::event(terminal.read(100ms))==std::optional<Event>{KeyEvent{U'h'}});
     terminal.close();
 }
 TEST(SES_02_invalid_duplicate_and_unsupported_settings_are_transactional)
@@ -169,7 +170,7 @@ TEST(SES_02_moving_transfers_cleanup_and_closed_operations_fail)
     CHECK(pty.drain().empty());
     CHECK_THROWS(std::logic_error,destination.area());
     CHECK_THROWS(std::logic_error,destination.write("x"));
-    CHECK_THROWS(std::logic_error,destination.send(Cursor{}));
+    CHECK_THROWS(std::logic_error,destination.write(Cursor{}));
     CHECK_THROWS(std::logic_error,destination.set(Echo::On));
     CHECK_THROWS(std::logic_error,destination.read(0ms));
     CHECK_THROWS(std::logic_error,destination.profile());
@@ -242,14 +243,14 @@ TEST(SES_05_resize_events_only_report_changed_observations)
     config.echo=Echo::Off;
     config.resize_interval=1ms;
     auto terminal=Terminal::open(streams(pty),config);
-    CHECK(terminal.read(0ms).status==ReadStatus::Timeout); // No initial Resize.
+    CHECK(contract::status(terminal.read(0ms))==contract::Status::Timeout); // No initial Resize.
     pty.resize(100,40);
-    CHECK(terminal.read(100ms).event==std::optional<Event>{Resize{{100,40}}});
+    CHECK(contract::event(terminal.read(100ms))==std::optional<Event>{Resize{{100,40}}});
     pty.resize(100,40);
-    CHECK(terminal.read(5ms).status==ReadStatus::Timeout);
+    CHECK(contract::status(terminal.read(5ms))==contract::Status::Timeout);
     pty.resize(110,45);
     pty.resize(120,50);
-    CHECK(terminal.read(100ms).event==std::optional<Event>{Resize{{120,50}}});
+    CHECK(contract::event(terminal.read(100ms))==std::optional<Event>{Resize{{120,50}}});
 }
 TEST(SES_05_disabled_resize_polling_does_not_emit_resize_events)
 {
@@ -258,7 +259,7 @@ TEST(SES_05_disabled_resize_polling_does_not_emit_resize_events)
     config.input_buffer=InputBuffer::Immediate;
     auto terminal=Terminal::open(streams(pty),config);
     pty.resize(100,40);
-    CHECK(terminal.read(5ms).status==ReadStatus::Timeout);
+    CHECK(contract::status(terminal.read(5ms))==contract::Status::Timeout);
     CHECK_THROWS(std::invalid_argument,Terminal::open(streams(pty),TerminalOptions{.resize_interval=0ms}));
 }
 TEST(SES_01_send_is_capability_aware_and_write_remains_raw)
@@ -267,7 +268,7 @@ TEST(SES_01_send_is_capability_aware_and_write_remains_raw)
     auto config=options();
     config.profile->colors=ColorSupport::Basic8;
     auto terminal=Terminal::open(streams(pty),config);
-    terminal.send(Cursor{},fg(TColor{0x800000}));
+    terminal.write(Cursor{},fg(RGB{0x800000}));
     terminal.write("\x1b[38;2;1;2;3m");
     terminal.flush();
     CHECK(pty.drain()=="\x1b[1;1H\x1b[31m\x1b[38;2;1;2;3m");
@@ -280,7 +281,7 @@ TEST(CAP_03_explicit_profile_overrides_environment_and_no_color)
     auto terminal=Terminal::open(streams(pty),options());
     CHECK(terminal.profile().colors==ColorSupport::TrueColor);
     for (auto const& decision : terminal.profile_report().decisions) CHECK(decision.source==EvidenceSource::Explicit);
-    terminal.send(fg(TColor{0x010203}));
+    terminal.write(fg(RGB{0x010203}));
     terminal.flush();
     CHECK(pty.drain()=="\x1b[38;2;1;2;3m");
 }
@@ -308,9 +309,9 @@ TEST(SES_01_read_and_send_do_not_implicitly_flush_drawing)
     config.input_buffer=InputBuffer::Immediate;
     auto terminal=Terminal::open(streams(pty),config);
     terminal.write("buffered");
-    terminal.send(Cursor{});
-    pty.send("x");
-    CHECK(terminal.read(100ms).event==std::optional<Event>{KeyPress{U'x'}});
+    terminal.write(Cursor{});
+    pty.write("x");
+    CHECK(contract::event(terminal.read(100ms))==std::optional<Event>{KeyEvent{U'x'}});
     CHECK(pty.drain().empty());
     terminal.flush();
     CHECK(pty.drain()=="buffered\x1b[1;1H");
@@ -319,10 +320,10 @@ TEST(SES_01_send_validates_the_entire_pack_before_output)
 {
     contract::Pty pty;
     auto terminal=Terminal::open(streams(pty),options());
-    CHECK_THROWS(std::invalid_argument,terminal.send(Cursor{},Cursor{-1,0}));
+    CHECK_THROWS(std::invalid_argument,terminal.write(Cursor{},Cursor{-1,0}));
     terminal.flush();
     CHECK(pty.drain().empty());
-    terminal.send();
+    terminal.write();
     terminal.write();
 }
 TEST(SES_04_session_preserves_process_signal_dispositions)
@@ -351,11 +352,11 @@ TEST(SES_05_queued_input_precedes_resize_without_reordering_keys)
     config.input_buffer=InputBuffer::Immediate;
     config.resize_interval=1ms;
     auto terminal=Terminal::open(streams(pty),config);
-    pty.send("ab");
-    CHECK(terminal.read(100ms).event==std::optional<Event>{KeyPress{U'a'}});
+    pty.write("ab");
+    CHECK(contract::event(terminal.read(100ms))==std::optional<Event>{KeyEvent{U'a'}});
     pty.resize(100,40);
-    CHECK(terminal.read(100ms).event==std::optional<Event>{KeyPress{U'b'}});
-    CHECK(terminal.read(100ms).event==std::optional<Event>{Resize{{100,40}}});
+    CHECK(contract::event(terminal.read(100ms))==std::optional<Event>{KeyEvent{U'b'}});
+    CHECK(contract::event(terminal.read(100ms))==std::optional<Event>{Resize{{100,40}}});
 }
 
 TEST(SES_01_inherited_protocols_configure_input_without_mode_output)
@@ -369,10 +370,10 @@ TEST(SES_01_inherited_protocols_configure_input_without_mode_output)
     config.restore_modes.paste=BracketedPaste::On;
     auto terminal=Terminal::open(streams(pty),config);
     CHECK(pty.drain().empty());
-    pty.send("\x1b[I\x1b[<0;1;1M\x1b[200~abc\x1b[201~");
-    CHECK(terminal.read(100ms).event==std::optional<Event>{Focus{true}});
-    CHECK(terminal.read(100ms).event==std::optional<Event>{MousePress{{0,0},MouseButton::Left}});
-    CHECK(terminal.read(100ms).event==std::optional<Event>{PasteChunk{"abc",true,true,false}});
+    pty.write("\x1b[I\x1b[<0;1;1M\x1b[200~abc\x1b[201~");
+    CHECK(contract::event(terminal.read(100ms))==std::optional<Event>{Focus{true}});
+    CHECK(contract::event(terminal.read(100ms))==std::optional<Event>{MousePress{{0,0},MouseButton::Left}});
+    CHECK(contract::event(terminal.read(100ms))==std::optional<Event>{PasteChunk{"abc",true,true,false}});
     terminal.close();
     CHECK(pty.drain().empty());
 }
@@ -405,12 +406,12 @@ TEST(SES_04_canonical_restoration_preserves_queued_input)
     config.echo=Echo::Off;
     config.input_buffer=InputBuffer::Immediate;
     auto terminal=Terminal::open(streams(pty),config);
-    pty.send("queued\n");
+    pty.write("queued\n");
     terminal.close();
     CHECK(contract::same_settings(before,pty.settings()));
     Reader reader{pty.input.get()};
     for(auto scalar : {U'q',U'u',U'e',U'u',U'e',U'd',U'\n'})
-        CHECK(reader.read(100ms).event==std::optional<Event>{KeyPress{scalar}});
+        CHECK(contract::event(reader.read(100ms))==std::optional<Event>{KeyEvent{scalar}});
 }
 
 TEST(SES_01_send_and_unicode_output_have_no_intermediate_cpp_allocation)
@@ -420,11 +421,29 @@ TEST(SES_01_send_and_unicode_output_have_no_intermediate_cpp_allocation)
     std::size_t allocations=0;
     {
         contract::AllocationScope scope;
-        terminal.send(Cursor{},Brush{.foreground=TColor{0x123456},.traits=Trait::Bold});
+        terminal.write(Cursor{},Style{.foreground=RGB{0x123456},.traits=Trait::Bold});
         terminal.write(U"界👽",std::u32string_view{U"plain"});
         allocations=scope.count();
     }
     CHECK(allocations==0);
     terminal.flush();
     CHECK(pty.drain().ends_with("界👽plain"));
+}
+
+TEST(SES_05_mixed_output_uses_profile_for_styles_and_restoration)
+{
+    contract::Pty pty;
+    auto options = TerminalOptions::interactive();
+    auto profile = contract::full_profile();
+    profile.colors = ColorSupport::Basic8;
+    profile.traits = bold;
+    options.profile = profile;
+    auto terminal = Terminal::open({pty.input.get(), pty.output.get()}, options);
+    pty.drain();
+    terminal.write(Cursor{4,2}, styled("ok", fg(RGB{0x800000}) | bold | italic), "!");
+    terminal.flush();
+    CHECK(pty.drain() ==
+          "\x1b[3;5H\x1b[49m\x1b[31m\x1b[22;23;24;25;27;28;29;1mok"
+          "\x1b[49m\x1b[39m\x1b[22;23;24;25;27;28;29m!");
+    terminal.close();
 }

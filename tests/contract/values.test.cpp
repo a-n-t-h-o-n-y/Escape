@@ -8,9 +8,9 @@ using namespace esc;
 TEST(COL_01_rgb_and_packed_color_construction_preserve_channels)
 {
     CHECK(RGB{0,127,255} == RGB{0x007FFF});
-    CHECK(TColor{0xF02127} == TrueColor{RGB{240,33,39}});
+    CHECK(RGB{0xF02127} == RGB{RGB{240,33,39}});
     CHECK_THROWS(std::invalid_argument,RGB{std::uint32_t{0x1000000}});
-    CHECK_THROWS(std::invalid_argument,TColor{std::uint32_t{0xFF000000}});
+    CHECK_THROWS(std::invalid_argument,RGB{std::uint32_t{0xFF000000}});
 }
 TEST(COL_01_hsl_boundaries_primaries_and_rounding)
 {
@@ -22,8 +22,8 @@ TEST(COL_01_hsl_boundaries_primaries_and_rounding)
     CHECK(hsl_to_rgb(HSL{0,100,0}) == RGB{0,0,0});
     CHECK(hsl_to_rgb(HSL{0,100,100}) == RGB{255,255,255});
     CHECK_THROWS(std::invalid_argument,hsl_to_rgb(HSL{360,100,50}));
-    CHECK_THROWS(std::invalid_argument,TrueColor{HSL{0,101,50}});
-    CHECK_THROWS(std::invalid_argument,TrueColor{HSL{0,50,101}});
+    CHECK_THROWS(std::invalid_argument,RGB{HSL{0,101,50}});
+    CHECK_THROWS(std::invalid_argument,RGB{HSL{0,50,101}});
 }
 TEST(COL_01_negative_computed_hues_are_normalized)
 {
@@ -61,14 +61,14 @@ TEST(ENC_03_traits_are_canonical_values_with_explicit_mutation)
     CHECK(original == Traits{});
     CHECK_THROWS(std::invalid_argument,Traits{static_cast<Trait>(0x8000)});
 }
-TEST(ENC_03_brush_and_color_helpers_have_value_semantics)
+TEST(ENC_03_style_and_color_helpers_have_value_semantics)
 {
-    CHECK(Brush{} == Brush{TermColor::Default,TermColor::Default,Traits{}});
-    CHECK(fg(XColor::Red).value == foreground(XColor::Red).value);
-    CHECK(bg(XColor::Blue).value == background(XColor::Blue).value);
-    auto brush=Brush{.foreground=XColor::Red};
-    auto changed=brush | bg(XColor::Blue);
-    CHECK(brush.background == Color{TermColor::Default});
+    CHECK(Style{} == Style{TermColor::Default,TermColor::Default,Traits{}});
+    CHECK(fg(XColor::Red).value == Color{XColor::Red});
+    CHECK(bg(XColor::Blue).value == Color{XColor::Blue});
+    auto style=Style{.foreground=XColor::Red};
+    auto changed=style | bg(XColor::Blue);
+    CHECK(style.background == Color{TermColor::Default});
     CHECK(changed.background == Color{XColor::Blue});
     CHECK(changed.foreground == Color{XColor::Red});
 }

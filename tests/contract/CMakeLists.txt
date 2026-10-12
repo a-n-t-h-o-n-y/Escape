@@ -13,7 +13,7 @@ target_link_libraries(escape.tests.contract.text PRIVATE escape)
 # Executable specifications of docs/interface-proposal.md.
 # Core expectations are independent of POSIX session behavior.
 add_executable(escape.tests.contract
-    main.cpp sequence.test.cpp values.test.cpp capabilities.test.cpp
+    main.cpp sequence.test.cpp composition.test.cpp values.test.cpp capabilities.test.cpp
     text.test.cpp layout.test.cpp extensions.test.cpp parser.test.cpp protocols.test.cpp allocation.test.cpp capability-allocation.test.cpp text-allocation.test.cpp encoding-allocation.test.cpp support/allocations.cpp)
 target_link_libraries(escape.tests.contract PRIVATE escape)
 target_compile_features(escape.tests.contract PRIVATE cxx_std_20)

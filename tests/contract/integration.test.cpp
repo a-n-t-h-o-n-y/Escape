@@ -1,3 +1,4 @@
+#include "support/results.hpp"
 #include <esc/esc.hpp>
 #include <optional>
 #include <thread>
@@ -164,12 +165,12 @@ TEST(SES_EXT_explicit_probe_confirms_sync_and_preserves_ordinary_input)
     auto terminal = open(pty, false);
     std::thread reply{[&] {
         std::this_thread::sleep_for(10ms);
-        pty.send("x\x1b[?2026;2$y");
+        pty.write("x\x1b[?2026;2$y");
     }};
     auto result = terminal.confirm_synchronized_output(200ms);
     reply.join();
-    CHECK(result.status == QueryStatus::Reply);
-    CHECK(terminal.read(0ms).event == std::optional<Event>{KeyPress{U'x'}});
+    CHECK(contract::status(result) == contract::Status::Reply);
+    CHECK(contract::event(terminal.read(0ms)) == std::optional<Event>{KeyEvent{U'x'}});
     {
         auto frame = terminal.frame();
         CHECK(frame.synchronized());
@@ -184,11 +185,11 @@ TEST(SES_EXT_permanent_or_unrecognized_sync_is_rejected)
         auto terminal = open(pty);
         std::thread reply{[&] {
             std::this_thread::sleep_for(10ms);
-            pty.send("\x1b[?2026;" + std::to_string(status) + "$y");
+            pty.write("\x1b[?2026;" + std::to_string(status) + "$y");
         }};
         auto result = terminal.confirm_synchronized_output(200ms);
         reply.join();
-        CHECK(result.status == QueryStatus::Rejected);
+        CHECK(contract::status(result) == contract::Status::Rejected);
         {
             auto frame = terminal.frame();
             CHECK(!frame.synchronized());
@@ -202,13 +203,13 @@ TEST(SES_EXT_long_osc_payloads_stream_without_an_intermediate_string)
     std::string title(300, 't'), uri = "https://example.com/" + std::string(300, 'u');
     {
         contract::AllocationScope scope{true};
-        terminal.send(WindowTitle{title}, BeginHyperlink{uri, "x"}, EndHyperlink{});
+        terminal.write(WindowTitle{title}, BeginHyperlink{uri, "x"}, EndHyperlink{});
         terminal.flush();
         CHECK(scope.count() == 0);
     }
     CHECK(pty.drain() ==
-          escape(WindowTitle{title}, BeginHyperlink{uri, "x"}, EndHyperlink{}));
-    CHECK_THROWS(std::invalid_argument, terminal.send(SaveCursor{}, WindowTitle{"ok"},
+          encode(WindowTitle{title}, BeginHyperlink{uri, "x"}, EndHyperlink{}));
+    CHECK_THROWS(std::invalid_argument, terminal.write(SaveCursor{}, WindowTitle{"ok"},
                                                       BeginHyperlink{"\x1b"}));
     CHECK(pty.drain().empty());
 }
@@ -224,14 +225,14 @@ TEST(IO_EXT_wait_state_preserves_read_ahead_and_eof)
     pipe.eof();
     CHECK(reader.wait_state().ready);
     CHECK(reader.wait_state().ready);
-    CHECK(reader.read(0ms).event == std::optional<Event>{KeyPress{U'a'}});
+    CHECK(contract::event(reader.read(0ms)) == std::optional<Event>{KeyEvent{U'a'}});
     CHECK_THROWS(std::invalid_argument, reader.read(-1ms));
     CHECK(reader.wait_state().ready);
-    CHECK(reader.read(0ms).event == std::optional<Event>{KeyPress{U'b'}});
+    CHECK(contract::event(reader.read(0ms)) == std::optional<Event>{KeyEvent{U'b'}});
     CHECK(reader.wait_state().ready);
-    CHECK(reader.read(0ms).status == ReadStatus::EndOfInput);
+    CHECK(contract::status(reader.read(0ms)) == contract::Status::EndOfInput);
     CHECK(reader.wait_state().ready);
-    CHECK(reader.read().status == ReadStatus::EndOfInput);
+    CHECK(contract::status(reader.read()) == contract::Status::EndOfInput);
 }
 TEST(IO_EXT_parser_deadlines_are_absolute_and_survive_repeated_snapshots)
 {
@@ -245,7 +246,7 @@ TEST(IO_EXT_parser_deadlines_are_absolute_and_survive_repeated_snapshots)
     CHECK(second.deadline == first.deadline);
     std::this_thread::sleep_until(*first.deadline + 1ms);
     CHECK(reader.wait_state().ready);
-    CHECK(reader.read(0ms).event == std::optional<Event>{KeyPress{KeyCode::Escape}});
+    CHECK(contract::event(reader.read(0ms)) == std::optional<Event>{KeyEvent{KeyCode::Escape}});
     CHECK(!reader.wait_state().deadline);
 }
 TEST(IO_EXT_host_poll_can_combine_terminal_input_and_shutdown_pipe)
@@ -262,7 +263,7 @@ TEST(IO_EXT_host_poll_can_combine_terminal_input_and_shutdown_pipe)
     input.write("x");
     CHECK(::poll(fds, 2, 100) == 2);
     CHECK(reader.wait_state().ready);
-    CHECK(reader.read(0ms).event == std::optional<Event>{KeyPress{U'x'}});
+    CHECK(contract::event(reader.read(0ms)) == std::optional<Event>{KeyEvent{U'x'}});
 }
 TEST(SES_EXT_wait_state_exposes_resize_and_queued_probe_input)
 {
@@ -275,11 +276,11 @@ TEST(SES_EXT_wait_state_exposes_resize_and_queued_probe_input)
     pty.resize(90, 30);
     std::this_thread::sleep_until(*idle.deadline + 1ms);
     CHECK(terminal.wait_state().ready);
-    CHECK(terminal.read(0ms).event == std::optional<Event>{Resize{Area{90, 30}}});
-    pty.send("x");
-    CHECK(terminal.query(ModeQuery{25}, 10ms).status == QueryStatus::Timeout);
+    CHECK(contract::event(terminal.read(0ms)) == std::optional<Event>{Resize{Area{90, 30}}});
+    pty.write("x");
+    CHECK(contract::status(terminal.query(ModeQuery{25}, 10ms)) == contract::Status::Timeout);
     CHECK(terminal.wait_state().ready);
-    CHECK(terminal.read(0ms).event == std::optional<Event>{KeyPress{U'x'}});
+    CHECK(contract::event(terminal.read(0ms)) == std::optional<Event>{KeyEvent{U'x'}});
 }
 TEST(IO_EXT_wait_snapshot_is_allocation_free_and_moves_with_reader)
 {
@@ -292,7 +293,7 @@ TEST(IO_EXT_wait_snapshot_is_allocation_free_and_moves_with_reader)
     {
         contract::AllocationScope scope{true};
         CHECK(moved.wait_state().ready);
-        CHECK(moved.read(0ms).status == ReadStatus::Event);
+        CHECK(contract::status(moved.read(0ms)) == contract::Status::Event);
         CHECK(!moved.wait_state().ready);
         CHECK(scope.count() == 0);
     }
@@ -312,11 +313,11 @@ TEST(IO_EXT_incomplete_large_units_do_not_hide_remaining_kernel_readiness)
     // First poll consumes only the bounded read-ahead block, not a paste event.
     CHECK(reader.wait_state().ready);
     auto event = reader.read(0ms);
-    CHECK(event.status == ReadStatus::Event);
-    auto paste = std::get<PasteChunk>(*event.event);
+    CHECK(contract::status(event) == contract::Status::Event);
+    auto paste = std::get<PasteChunk>(*contract::event(event));
     CHECK(paste.bytes == std::string(4096, 'p'));
     auto tail = reader.read(0ms);
-    CHECK(std::get<PasteChunk>(*tail.event).bytes == std::string(1904, 'p'));
+    CHECK(std::get<PasteChunk>(*contract::event(tail)).bytes == std::string(1904, 'p'));
 }
 TEST(SES_EXT_frame_guard_unwinds_while_terminal_remains_usable)
 {
@@ -341,13 +342,13 @@ TEST(SES_EXT_confirmed_on_baseline_and_timeout_preserve_inherited_mode)
     auto terminal = open(pty, false);
     std::thread reply{[&] {
         std::this_thread::sleep_for(10ms);
-        pty.send("\x1b[?2026;1$y");
+        pty.write("\x1b[?2026;1$y");
     }};
     auto result = terminal.confirm_synchronized_output(200ms);
     reply.join();
-    CHECK(result.status == QueryStatus::Reply);
+    CHECK(contract::status(result) == contract::Status::Reply);
     CHECK(!terminal.profile().synchronized_output);
-    CHECK(terminal.confirm_synchronized_output(1ms).status == QueryStatus::Timeout);
+    CHECK(contract::status(terminal.confirm_synchronized_output(1ms)) == contract::Status::Timeout);
     {
         auto frame = terminal.frame();
         CHECK(frame.synchronized());

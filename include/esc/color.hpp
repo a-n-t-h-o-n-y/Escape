@@ -19,7 +19,7 @@ namespace esc {
 
 /**
  * The default (foreground or background) color set by the terminal application.
- * @details Foreground/Background is determined by the escape(...) function overload set
+ * @details Foreground/Background is determined by the encode(...) function overload set
  * depending on if ColorFG or ColorBG is used.
  */
 enum class TermColor : bool { Default };
@@ -83,9 +83,10 @@ constexpr XColor XColor::BrightWhite = XColor{15};
 // -------------------------------------------------------------------------------------
 
 /**
- * Red, Green, and Blue values; valid range of [0, 255] for each color.
- * @details For use with TrueColor.
+ * A terminal RGB color with byte channels and checked packed-hex/HSL construction.
  */
+struct HSL;
+
 struct RGB {
    public:
     std::uint8_t red;
@@ -113,15 +114,17 @@ struct RGB {
           green{static_cast<std::uint8_t>(hex >> 8 & 0xFF)},
           blue{static_cast<std::uint8_t>(hex & 0xFF)}
     {
-        if (hex > 0xFFFFFF) throw std::invalid_argument{"RGB: packed value exceeds 24 bits"};
+        if (hex > 0xFFFFFF)
+            throw std::invalid_argument{"RGB: packed value exceeds 24 bits"};
     }
+
+    explicit constexpr RGB(HSL value);
 
     [[nodiscard]] constexpr auto operator==(RGB const&) const -> bool = default;
 };
 
 /**
  * Hue, Saturation, Lightness values of a color.
- * @details For use with TrueColor.
  * @details Hue is in degrees [0, 359], Saturation is in percent [0, 100], Lightness is
  * in percent [0, 100].
  */
@@ -142,9 +145,7 @@ namespace detail {
  */
 template <typename T>
 auto constexpr abs(T x) -> T
-{
-    return x < T(0) ? -x : x;
-}
+{ return x < T(0) ? -x : x; }
 
 /**
  * Calculate the modulo of two numbers; constexpr.
@@ -154,9 +155,7 @@ auto constexpr abs(T x) -> T
  */
 template <typename T>
 auto constexpr fmod(const T x, const T y) -> T
-{
-    return (x - T(static_cast<long long>(x / y)) * y);
-}
+{ return (x - T(static_cast<long long>(x / y)) * y); }
 
 }  // namespace detail
 
@@ -227,49 +226,15 @@ auto constexpr rgb_to_hsl(RGB v) -> HSL
             static_cast<std::uint8_t>(lightness * 100 + 0.5)};
 }
 
-/**
- * Represents a true color for the terminal display.
- * @details True colors can be used to set an exact color to the terminal screen via the
- * escape(Color) function.
- */
-struct TrueColor {
-   public:
-    std::uint8_t red;
-    std::uint8_t green;
-    std::uint8_t blue;
-
-   public:
-    /**
-     * Construct a true color with RGB values.
-     * @param x The RGB value to use.
-     */
-    explicit constexpr TrueColor(std::uint32_t hex) : TrueColor{RGB{hex}} {}
-
-    constexpr TrueColor(RGB x) : red{x.red}, green{x.green}, blue{x.blue} {}
-
-    /**
-     * Construct a true color with HSL values.
-     * @param x The HSL value to use.
-     */
-    constexpr TrueColor(HSL x) : TrueColor{hsl_to_rgb(x)} {}
-
-   public:
-    [[nodiscard]] constexpr bool operator==(TrueColor const&) const = default;
-    [[nodiscard]] constexpr bool operator!=(TrueColor const&) const = default;
-};
-
-/**
- * Alias for TrueColor.
- */
-using TColor = TrueColor;
-
 // -------------------------------------------------------------------------------------
+
+constexpr RGB::RGB(HSL value) : RGB{hsl_to_rgb(value)} {}
 
 /**
  * Variant holding any of the color types that can be used.
- * @details escape(Color) will generate an escape sequence for the color.
+ * Select a channel with fg(Color) or bg(Color) before encoding.
  */
-using Color = std::variant<XColor, TrueColor, TermColor>;
+using Color = std::variant<XColor, RGB, TermColor>;
 
 // -------------------------------------------------------------------------------------
 
@@ -290,30 +255,16 @@ struct ColorBG {
 };
 
 /**
- * Return a background tag type to use with escape(...) function.
+ * Return a background tag type to use with encode(...) function.
  * @param c The color to use as the background.
- * @return A background tag type to use with escape(...) function.
- */
-[[nodiscard]] constexpr auto background(Color c) -> ColorBG { return {c}; }
-
-/**
- * Return a background tag type to use with escape(...) function.
- * @param c The color to use as the background.
- * @return A background tag type to use with escape(...) function.
+ * @return A background tag type to use with encode(...) function.
  */
 [[nodiscard]] constexpr auto bg(Color c) -> ColorBG { return {c}; }
 
 /**
- * Return a foreground tag type to use with escape(...) function.
+ * Return a foreground tag type to use with encode(...) function.
  * @param c The color to use as the foreground.
- * @return A foreground tag type to use with escape(...) function.
- */
-[[nodiscard]] constexpr auto foreground(Color c) -> ColorFG { return {c}; }
-
-/**
- * Return a foreground tag type to use with escape(...) function.
- * @param c The color to use as the foreground.
- * @return A foreground tag type to use with escape(...) function.
+ * @return A foreground tag type to use with encode(...) function.
  */
 [[nodiscard]] constexpr auto fg(Color c) -> ColorFG { return {c}; }
 

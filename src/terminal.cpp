@@ -150,7 +150,7 @@ struct Frame::State {
     std::optional<bool> confirmed;
     void command(SynchronizedOutput mode)
     {
-        detail::send_encoded(*output, mode);
+        output->write(mode);
         output->flush();
     }
 };
@@ -304,11 +304,11 @@ struct Terminal::Impl {
         std::array<char, 128> bytes;
         EncodeResult result{};
         switch (index) {
-            case 0: result = escape_to(bytes, target.screen_buffer); break;
-            case 1: result = escape_to(bytes, target.cursor); break;
-            case 2: result = escape_to(bytes, target.mouse); break;
-            case 3: result = escape_to(bytes, target.focus); break;
-            case 4: result = escape_to(bytes, target.paste); break;
+            case 0: result = encode_to(bytes, target.screen_buffer); break;
+            case 1: result = encode_to(bytes, target.cursor); break;
+            case 2: result = encode_to(bytes, target.mouse); break;
+            case 3: result = encode_to(bytes, target.focus); break;
+            case 4: result = encode_to(bytes, target.paste); break;
         }
         output.write(std::string_view{bytes.data(), result.written});
     }
@@ -593,12 +593,12 @@ auto Terminal::confirm_synchronized_output(std::chrono::milliseconds timeout)
     if (impl_->frames->depth)
         throw std::logic_error{"Terminal: cannot probe synchronization inside a frame"};
     auto result = query(ModeQuery{2026}, timeout);
-    if (result.status == QueryStatus::Reply) {
-        auto mode = std::get<ModeReply>(*result.reply).status;
+    if (std::holds_alternative<Reply>(result)) {
+        auto mode = std::get<ModeReply>(std::get<Reply>(result)).status;
         bool supported = mode == ModeStatus::Set || mode == ModeStatus::Reset;
         impl_->frames->confirmed = supported;
         impl_->frames->baseline = mode == ModeStatus::Set;
-        if (!supported) result.status = QueryStatus::Rejected;
+        if (!supported) result = Rejected{std::get<Reply>(std::move(result))};
     }
     return result;
 }
@@ -632,12 +632,12 @@ auto Terminal::read_until(std::optional<std::chrono::milliseconds> timeout)
     require_open();
     if (timeout && timeout->count() < 0)
         throw std::invalid_argument{"Terminal: negative timeout"};
-    if (impl_->deferred_count) return {ReadStatus::Event, impl_->dequeue()};
+    if (impl_->deferred_count) return impl_->dequeue();
     auto deadline = timeout ? detail::deadline_after(detail::Clock::now(), *timeout)
                             : detail::Clock::time_point::max();
     while (true) {
         auto pending = impl_->reader.read(std::chrono::milliseconds{0});
-        if (pending.status != ReadStatus::Timeout) return pending;
+        if (!std::holds_alternative<Timeout>(pending)) return pending;
         auto now = detail::Clock::now();
         if (impl_->options.resize_interval && now >= impl_->next_resize) {
             auto size = area();
@@ -645,17 +645,17 @@ auto Terminal::read_until(std::optional<std::chrono::milliseconds> timeout)
                 detail::deadline_after(now, *impl_->options.resize_interval);
             if (size != impl_->last_size) {
                 impl_->last_size = size;
-                return {ReadStatus::Event, Resize{size}};
+                return Event{Resize{size}};
             }
         }
-        if (now >= deadline) return {ReadStatus::Timeout, {}};
+        if (now >= deadline) return Timeout{};
         auto until = impl_->options.resize_interval
                          ? std::min(deadline, impl_->next_resize)
                          : deadline;
         if (until == detail::Clock::time_point::max()) return impl_->reader.read();
         auto wait = std::chrono::ceil<std::chrono::milliseconds>(until - now);
         auto result = impl_->reader.read(wait);
-        if (result.status != ReadStatus::Timeout) return result;
+        if (!std::holds_alternative<Timeout>(result)) return result;
     }
 }
 namespace {
@@ -734,26 +734,21 @@ auto Terminal::query(Query const& request, std::chrono::milliseconds timeout)
     std::array<char, 32> validation;
     (void)query_to(validation, request);
     require(impl_->report.profile.control, Feature::Control);
-    if (impl_->deferred_count == impl_->deferred.size())
-        return {QueryStatus::InputPending, {}};
+    if (impl_->deferred_count == impl_->deferred.size()) return InputPending{};
     auto deadline = detail::deadline_after(detail::Clock::now(), timeout);
     this->request(request);
     bool attempted = false;
     while (true) {
-        if (impl_->deferred_count == impl_->deferred.size())
-            return {QueryStatus::InputPending, {}};
-        if (attempted && detail::Clock::now() >= deadline)
-            return {QueryStatus::Timeout, {}};
+        if (impl_->deferred_count == impl_->deferred.size()) return InputPending{};
+        if (attempted && detail::Clock::now() >= deadline) return Timeout{};
         attempted = true;
         auto result = impl_->reader.read(remaining(deadline));
-        if (result.status == ReadStatus::Timeout) return {QueryStatus::Timeout, {}};
-        if (result.status == ReadStatus::EndOfInput)
-            return {QueryStatus::EndOfInput, {}};
-        if (auto reply = std::get_if<TerminalReply>(&*result.event)) {
-            if (matches(request, reply->value))
-                return {QueryStatus::Reply, std::move(reply->value)};
+        if (std::holds_alternative<Timeout>(result)) return Timeout{};
+        if (std::holds_alternative<EndOfInput>(result)) return EndOfInput{};
+        if (auto reply = std::get_if<TerminalReply>(&std::get<Event>(result))) {
+            if (matches(request, reply->value)) return std::move(reply->value);
         }
-        impl_->enqueue(std::move(*result.event));
+        impl_->enqueue(std::move(std::get<Event>(result)));
     }
 }
 auto Terminal::probe(std::chrono::milliseconds timeout) -> ProbeReport
@@ -768,43 +763,41 @@ auto Terminal::probe(std::chrono::milliseconds timeout) -> ProbeReport
                               ModeQuery{2026}};
     report.observations.reserve(std::size(requests));
     for (auto const& request : requests)
-        report.observations.push_back(
-            {request, {QueryStatus::Timeout, {}}, EvidenceSource::Probe});
+        report.observations.push_back({request, Timeout{}, EvidenceSource::Probe});
     if (impl_->deferred_count == impl_->deferred.size()) {
         for (auto& observation : report.observations)
-            observation.result.status = QueryStatus::InputPending;
+            observation.result = InputPending{};
         return report;
     }
     request(std::span<Query const>{requests});
     std::size_t waiting = std::size(requests);
     bool attempted = false;
     while (waiting) {
-        QueryStatus stop = QueryStatus::Timeout;
+        QueryResult stop = Timeout{};
         if (impl_->deferred_count == impl_->deferred.size())
-            stop = QueryStatus::InputPending;
+            stop = InputPending{};
         else if (!attempted || detail::Clock::now() < deadline) {
             attempted = true;
             auto result = impl_->reader.read(remaining(deadline));
-            if (result.status == ReadStatus::Event) {
+            if (std::holds_alternative<Event>(result)) {
                 bool matched = false;
-                if (auto reply = std::get_if<TerminalReply>(&*result.event))
+                if (auto reply = std::get_if<TerminalReply>(&std::get<Event>(result)))
                     for (auto& observation : report.observations)
-                        if (observation.result.status != QueryStatus::Reply &&
+                        if (!std::holds_alternative<Reply>(observation.result) &&
                             matches(observation.request, reply->value)) {
-                            observation.result = {QueryStatus::Reply,
-                                                  std::move(reply->value)};
+                            observation.result = std::move(reply->value);
                             --waiting;
                             matched = true;
                             break;
                         }
-                if (!matched) impl_->enqueue(std::move(*result.event));
+                if (!matched) impl_->enqueue(std::move(std::get<Event>(result)));
                 continue;
             }
-            if (result.status == ReadStatus::EndOfInput) stop = QueryStatus::EndOfInput;
+            if (std::holds_alternative<EndOfInput>(result)) stop = EndOfInput{};
         }
         for (auto& observation : report.observations)
-            if (observation.result.status != QueryStatus::Reply)
-                observation.result.status = stop;
+            if (!std::holds_alternative<Reply>(observation.result))
+                observation.result = stop;
         break;
     }
     return report;
@@ -839,8 +832,8 @@ auto Terminal::enable_keyboard(KittyFlags flags, std::chrono::milliseconds timeo
     if (timeout.count() < 0) throw std::invalid_argument{"Kitty: negative timeout"};
     auto deadline = detail::deadline_after(detail::Clock::now(), timeout);
     auto captured = query(KeyboardQuery{}, remaining(deadline));
-    if (captured.status != QueryStatus::Reply) return captured;
-    unsigned previous = std::get<KeyboardReply>(*captured.reply).flags;
+    if (!std::holds_alternative<Reply>(captured)) return captured;
+    unsigned previous = std::get<KeyboardReply>(std::get<Reply>(captured)).flags;
     auto old_protocol = previous ? KeyboardProtocol::Kitty : KeyboardProtocol::Legacy;
     bool old_touched = impl_->keyboard_touched;
     if (!impl_->keyboard_touched) impl_->saved_keyboard_flags = previous;
@@ -850,16 +843,16 @@ auto Terminal::enable_keyboard(KittyFlags flags, std::chrono::milliseconds timeo
     try {
         impl_->keyboard_command(static_cast<unsigned>(flags));
         auto accepted = query(KeyboardQuery{}, remaining(deadline));
-        if (accepted.status == QueryStatus::Reply &&
-            std::get<KeyboardReply>(*accepted.reply).flags ==
+        if (std::holds_alternative<Reply>(accepted) &&
+            std::get<KeyboardReply>(std::get<Reply>(accepted)).flags ==
                 static_cast<unsigned>(flags))
             return accepted;
         impl_->keyboard_command(previous);
         impl_->keyboard = old_protocol;
         impl_->keyboard_touched = old_touched;
         impl_->configure_reader();
-        if (accepted.status == QueryStatus::Reply)
-            accepted.status = QueryStatus::Rejected;
+        if (std::holds_alternative<Reply>(accepted))
+            accepted = Rejected{std::get<Reply>(std::move(accepted))};
         return accepted;
     }
     catch (std::system_error const& primary) {

@@ -42,16 +42,19 @@ def main():
             # Guard API boundaries separately from runtime behavior. These fail
             # only after the positive header checks establish that the API exists.
             invalid_calls = {
-                "integer command": "esc::escape(42)",
-                "unwrapped point": "esc::escape(esc::Point{})",
-                "bare mouse mode": "esc::escape(esc::MouseMode::Basic)",
-                "OS setting as bytes": "esc::escape(esc::Echo::Off)",
+                "integer command": "esc::encode(42)",
+                "unwrapped point": "esc::encode(esc::Point{})",
+                "bare mouse mode": "esc::encode(esc::MouseMode::Basic)",
+                "OS setting as bytes": "esc::encode(esc::Echo::Off)",
                 "integer output": "esc::write(42)",
                 "boolean output": "esc::write(true)",
                 "isolated UTF8 unit": "char8_t{'a'} | esc::Trait::Bold",
                 "isolated UTF16 unit": "char16_t{'a'} | esc::Trait::Bold",
-                "mode command through send": "terminal.send(esc::ScreenBuffer::Alternate)",
-                "synchronization ownership bypass": "terminal.send(esc::SynchronizedOutput::On)",
+                "mode command through terminal write": "terminal.write(esc::ScreenBuffer::Alternate)",
+                "nested session mode": "terminal.write(esc::sequence(esc::ScreenBuffer::Alternate))",
+                "styled session mode": "terminal.write(esc::styled(esc::sequence(esc::CursorMode::Hide), esc::bold))",
+                "borrowed owning temporary": 'esc::styled_view(std::string{"temporary"}, esc::bold)',
+                "synchronization ownership bypass": "terminal.write(esc::SynchronizedOutput::On)",
             }
             for name, expression in invalid_calls.items():
                 source.write_text(

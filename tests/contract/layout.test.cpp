@@ -227,12 +227,12 @@ TEST(TXT_LAYOUT_ascii_fast_paths_preserve_unicode_boundaries_and_policy)
 TEST(TXT_LAYOUT_styled_glyphs_are_measured_without_copying_or_losing_brushes)
 {
     auto styled = glyphs(U"e\u0301中");
-    styled[1].brush.traits = Trait::Bold;
+    styled[1].style.traits = Trait::Bold;
     contract::AllocationScope scope{true};
     auto first = next_grapheme(std::span<Glyph const>{styled});
     CHECK(first.size() == 2);
     CHECK(first.data() == styled.data());
-    CHECK(first[1].brush.traits == Trait::Bold);
+    CHECK(first[1].style.traits == Trait::Bold);
     CHECK(cell_width(styled) == 3);
     CHECK(grapheme_width(first) == 1);
     CHECK(cell_width(std::span<Glyph const>{}) == 0);

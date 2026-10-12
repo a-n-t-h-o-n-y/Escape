@@ -35,7 +35,7 @@ auto query_to(std::span<char> output, Query const& query) -> EncodeResult
     encode_query(writer, query);
     return {writer.size(), writer.size()};
 }
-auto escape_query(Query const& query) -> std::string
+auto encode_query(Query const& query) -> std::string
 {
     std::array<char, 32> bytes;
     auto result = query_to(bytes, query);
