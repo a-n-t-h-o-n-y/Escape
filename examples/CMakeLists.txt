@@ -6,9 +6,7 @@ add_executable(escape.examples.pong
 target_compile_options(
     escape.examples.pong
     PRIVATE
-        -Wall
-        -Wextra
-        -Wpedantic
+        ${ESCAPE_WARNINGS}
 )
 
 target_link_libraries(

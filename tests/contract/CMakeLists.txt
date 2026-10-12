@@ -2,7 +2,7 @@ add_executable(escape.tests.contract.capabilities EXCLUDE_FROM_ALL
     main.cpp capabilities.test.cpp capability-allocation.test.cpp support/allocations.cpp)
 target_link_libraries(escape.tests.contract.capabilities PRIVATE escape)
 target_compile_features(escape.tests.contract.capabilities PRIVATE cxx_std_20)
-target_compile_options(escape.tests.contract.capabilities PRIVATE -Wall -Wextra -Wpedantic)
+target_compile_options(escape.tests.contract.capabilities PRIVATE ${ESCAPE_WARNINGS})
 add_executable(escape.tests.contract.encoding EXCLUDE_FROM_ALL
     main.cpp sequence.test.cpp values.test.cpp encoding-allocation.test.cpp support/allocations.cpp)
 target_link_libraries(escape.tests.contract.encoding PRIVATE escape)
@@ -17,7 +17,7 @@ add_executable(escape.tests.contract
     text.test.cpp parser.test.cpp allocation.test.cpp capability-allocation.test.cpp text-allocation.test.cpp encoding-allocation.test.cpp support/allocations.cpp)
 target_link_libraries(escape.tests.contract PRIVATE escape)
 target_compile_features(escape.tests.contract PRIVATE cxx_std_20)
-target_compile_options(escape.tests.contract PRIVATE -Wall -Wextra -Wpedantic)
+target_compile_options(escape.tests.contract PRIVATE ${ESCAPE_WARNINGS})
 
 foreach(group ENC BUF CAP TXT GLY COL PAR)
     add_test(NAME escape.contract.${group} COMMAND escape.tests.contract "${group}_")
@@ -29,7 +29,7 @@ if(UNIX)
         main.cpp output.test.cpp reader.test.cpp session.test.cpp failures.test.cpp support/allocations.cpp)
     target_link_libraries(escape.tests.contract.posix PRIVATE escape)
     target_compile_features(escape.tests.contract.posix PRIVATE cxx_std_20)
-    target_compile_options(escape.tests.contract.posix PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(escape.tests.contract.posix PRIVATE ${ESCAPE_WARNINGS})
 
     # Private fault injection adapter uses this flag to supply support/faults.hpp's seam.
     # Neither this flag nor that header belongs to the installed public interface.
@@ -39,6 +39,17 @@ if(UNIX)
         add_test(NAME escape.contract.posix.${group} COMMAND escape.tests.contract.posix "${group}_")
         set_tests_properties(escape.contract.posix.${group} PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
     endforeach()
+endif()
+
+if(WIN32)
+    add_executable(escape.tests.contract.windows main.cpp windows.test.cpp)
+    target_link_libraries(escape.tests.contract.windows PRIVATE escape)
+    target_compile_definitions(escape PRIVATE ESCAPE_CONTRACT_TEST_HOOKS=1)
+    target_include_directories(escape PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/support")
+    target_compile_options(escape.tests.contract.windows PRIVATE ${ESCAPE_WARNINGS})
+    target_compile_definitions(escape.tests.contract.windows PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX _CRT_SECURE_NO_WARNINGS)
+    add_test(NAME escape.contract.windows COMMAND escape.tests.contract.windows)
+    set_tests_properties(escape.contract.windows PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE)
 endif()
 
 find_package(Python3 QUIET COMPONENTS Interpreter)
@@ -51,5 +62,5 @@ if(Python3_Interpreter_FOUND)
                 --source "${PROJECT_SOURCE_DIR}" --cmake "${CMAKE_COMMAND}"
                 --compiler "${CMAKE_CXX_COMPILER}")
     set_tests_properties(escape.contract.PKG.headers PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE)
-    set_tests_properties(escape.contract.PKG.consumers PROPERTIES TIMEOUT 180 RUN_SERIAL TRUE)
+    set_tests_properties(escape.contract.PKG.consumers PROPERTIES TIMEOUT 300 RUN_SERIAL TRUE)
 endif()

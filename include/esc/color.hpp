@@ -5,6 +5,14 @@
 #include <stdexcept>
 #include <variant>
 
+// Windows headers define RGB as a function macro. Preserve the host's macro
+// while declaring the value type; brace initialization remains unambiguous.
+#ifdef RGB
+#    pragma push_macro("RGB")
+#    undef RGB
+#    define ESC_DETAIL_RESTORE_RGB_MACRO
+#endif
+
 namespace esc {
 
 // -------------------------------------------------------------------------------------
@@ -193,8 +201,8 @@ auto constexpr rgb_to_hsl(RGB v) -> HSL
     double const g_prime = v.green / 255.;
     double const b_prime = v.blue / 255.;
 
-    double const c_max = std::max({r_prime, g_prime, b_prime});
-    double const c_min = std::min({r_prime, g_prime, b_prime});
+    double const c_max = (std::max)({r_prime, g_prime, b_prime});
+    double const c_min = (std::min)({r_prime, g_prime, b_prime});
     double const delta = c_max - c_min;
 
     double const lightness = (c_max + c_min) / 2.;
@@ -310,3 +318,7 @@ struct ColorBG {
 [[nodiscard]] constexpr auto fg(Color c) -> ColorFG { return {c}; }
 
 }  // namespace esc
+#ifdef ESC_DETAIL_RESTORE_RGB_MACRO
+#    pragma pop_macro("RGB")
+#    undef ESC_DETAIL_RESTORE_RGB_MACRO
+#endif

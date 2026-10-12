@@ -1,7 +1,7 @@
 # Escape 🕳️
 
 Escape is a C++20 library for terminal byte encoding, Unicode text, incremental
-input parsing, and scoped POSIX terminal sessions. The refactor on this branch
+input parsing, and scoped terminal sessions for Linux, macOS, and Windows. The refactor on this branch
 is a breaking interface revision; the complete contract is in
 [docs/interface-proposal.md](docs/interface-proposal.md).
 
@@ -51,6 +51,21 @@ and a hidden cursor. Mouse, focus, and paste are explicit opt-ins. Closing resto
 captured input settings and changed protocol modes to the supplied initial state.
 The host application owns signal handling.
 
+On Windows, opening a session enables VT output, selects UTF-8 output, and puts
+its borrowed output descriptor in binary mode; closing restores the captured
+console modes, code pages, and descriptor mode. Input uses Unicode console
+records with key repeats, deadlines, and canonical line editing. The automatic
+profile assumes only sixteen colors, bold/underline/inverse, alternate screen,
+and cursor visibility. Mouse, focus, paste, and richer styles need an explicit
+profile for the connection. Windows Terminal and the Windows console host are
+manual validation targets. Console sessions require native console handles;
+redirected files and pipes use `Reader`/`Output` directly. MSYS/mintty pipe handles
+are not native console sessions.
+
+For standalone `Output` on Windows, open byte streams in binary mode (`"wb"`,
+or host-owned `_setmode(_fileno(stream), _O_BINARY)`) to prevent CRT newline
+translation. `Output` itself preserves the borrowed stream's mode.
+
 `Output` also writes directly to a borrowed FILE* without a terminal session.
 Raw byte views preserve their full length, including nulls. UTF-32 output is
 validated before a variadic write and encoded in bounded chunks. No output API
@@ -80,15 +95,17 @@ reusable storage. Grapheme layout and terminal cell width remain outside the API
 
 ## Build and install
 
-Requires a C++20 compiler, CMake 3.16+, and macOS/Linux for Reader and Terminal.
+Requires a C++20 compiler and CMake 3.16+. Session backends target Linux, macOS,
+and Windows 10/11 consoles with VT output support. Windows builds support MSVC;
+the public headers contain no platform console types.
 No third-party library is fetched or required. Python 3 enables package/header
 verification tests.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
-cmake --build build --target termcaps escape.examples.pong
+cmake --build build --config Release --parallel
+ctest --test-dir build -C Release --output-on-failure
+cmake --build build --config Release --target termcaps escape.examples.pong
 ```
 
 `ESCAPE_BUILD_TESTS` and `ESCAPE_BUILD_EXAMPLES` default on for a top-level
@@ -98,8 +115,8 @@ remains an opt-in compatibility switch. Fault injection is private to test build
 ```sh
 cmake -S . -B build-install -DESCAPE_BUILD_TESTS=OFF -DESCAPE_BUILD_EXAMPLES=OFF \
     -DCMAKE_INSTALL_PREFIX=/your/prefix
-cmake --build build-install
-cmake --install build-install
+cmake --build build-install --config Release
+cmake --install build-install --config Release
 ```
 
 Consumers use `Escape::escape` after either `add_subdirectory(Escape)` or
@@ -109,9 +126,16 @@ Consumers use `Escape::escape` after either `add_subdirectory(Escape)` or
 See [contract tests](tests/contract/README.md) for verification and
 [the acceptance matrix](tests/contract/live-terminals.md) for real terminal
 validation. Synthetic fixtures and PTYs check library behavior, not emulator
-rendering or every terminal's advertised capabilities. Windows sessions, active
-probing, enhanced keyboard protocols, width calculation, and benchmarks remain
-deferred.
+rendering or every terminal's advertised capabilities. CI builds and runs behavior
+tests on Linux, macOS, and Windows; a configured CI job is not a recorded passing
+run. Active probing, enhanced keyboard protocols, width calculation, and
+benchmark-driven optimization remains future work.
 
 [TermOx](https://github.com/a-n-t-h-o-n-y/TermOx) provides a higher-level widget
 library; its callers need migration to this revised interface.
+
+## Benchmarks
+
+Set `ESCAPE_BUILD_BENCHMARKS=ON` for the standalone `escape.benchmarks` target
+(default off). See [workloads, commands, and the local baseline](benchmarks/README.md)
+for encoding, reused buffers, parser, reader, and output measurements.

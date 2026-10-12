@@ -10,7 +10,5 @@ target_link_libraries(termcaps
 
 target_compile_options(termcaps
     PRIVATE
-        -Wall
-        -Wextra
-        -Wpedantic
+        ${ESCAPE_WARNINGS}
 )

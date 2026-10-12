@@ -2,6 +2,7 @@
 
 import argparse
 import pathlib
+import shutil
 import subprocess
 import tempfile
 
@@ -28,12 +29,20 @@ def run(*command):
 
 def consumer(folder, cmake_text):
     folder.mkdir()
-    (folder / "main.cpp").write_text(CONSUMER)
+    (folder / "main.cpp").write_text(CONSUMER, encoding="utf-8")
     (folder / "CMakeLists.txt").write_text(
         "cmake_minimum_required(VERSION 3.16)\nproject(Consumer LANGUAGES CXX)\n"
         + cmake_text
         + "\nadd_executable(consumer main.cpp)\ntarget_link_libraries(consumer PRIVATE Escape::escape)\n"
     )
+
+
+def executable(build):
+    for name in ("consumer", "consumer.exe", "Release/consumer.exe"):
+        candidate = build / name
+        if candidate.is_file():
+            return candidate
+    raise RuntimeError("Consumer executable was not produced")
 
 
 def main():
@@ -53,23 +62,27 @@ def main():
                  'set(ESCAPE_BUILD_CONTRACT_TESTS OFF CACHE BOOL "" FORCE)\n'
                  f'add_subdirectory("{source_literal}" escape)')
         run(args.cmake, "-S", str(subproject), "-B", str(root / "sub-build"),
-            f"-DCMAKE_CXX_COMPILER={args.compiler}")
-        run(args.cmake, "--build", str(root / "sub-build"), "--target", "consumer", "-j", "2")
-        run(str(root / "sub-build" / "consumer"))
-        prefix = root / "installed"
-        library_build = root / "library-build"
-        run(args.cmake, "-S", str(source), "-B", str(library_build),
-            f"-DCMAKE_CXX_COMPILER={args.compiler}", f"-DCMAKE_INSTALL_PREFIX={prefix}",
-            "-DESCAPE_BUILD_TESTS=OFF", "-DESCAPE_BUILD_EXAMPLES=OFF",
-            "-DESCAPE_BUILD_CONTRACT_TESTS=OFF", "-DBUILD_SHARED_LIBS=OFF")
-        run(args.cmake, "--build", str(library_build), "--target", "escape", "-j", "2")
-        run(args.cmake, "--install", str(library_build))
-        installed_consumer = root / "installed-consumer"
-        consumer(installed_consumer, "find_package(Escape CONFIG REQUIRED)")
-        run(args.cmake, "-S", str(installed_consumer), "-B", str(root / "installed-build"),
-            f"-DCMAKE_CXX_COMPILER={args.compiler}", f"-DCMAKE_PREFIX_PATH={prefix}")
-        run(args.cmake, "--build", str(root / "installed-build"), "--target", "consumer", "-j", "2")
-        run(str(root / "installed-build" / "consumer"))
+            f"-DCMAKE_CXX_COMPILER={args.compiler}", "-DCMAKE_BUILD_TYPE=Release")
+        run(args.cmake, "--build", str(root / "sub-build"), "--target", "consumer", "-j", "2", "--config", "Release")
+        run(str(executable(root / "sub-build")))
+        for linkage, shared in (("static", "OFF"), ("shared", "ON")):
+            prefix = root / ("installed-" + linkage)
+            library_build = root / ("library-build-" + linkage)
+            run(args.cmake, "-S", str(source), "-B", str(library_build),
+                f"-DCMAKE_CXX_COMPILER={args.compiler}", "-DCMAKE_BUILD_TYPE=Release", f"-DCMAKE_INSTALL_PREFIX={prefix}",
+                "-DESCAPE_BUILD_TESTS=OFF", "-DESCAPE_BUILD_EXAMPLES=OFF",
+                "-DESCAPE_BUILD_CONTRACT_TESTS=OFF", f"-DBUILD_SHARED_LIBS={shared}")
+            run(args.cmake, "--build", str(library_build), "--target", "escape", "-j", "2", "--config", "Release")
+            run(args.cmake, "--install", str(library_build), "--config", "Release")
+            installed_consumer = root / ("installed-consumer-" + linkage)
+            consumer(installed_consumer, "find_package(Escape CONFIG REQUIRED)")
+            run(args.cmake, "-S", str(installed_consumer), "-B", str(root / ("installed-build-" + linkage)),
+                f"-DCMAKE_CXX_COMPILER={args.compiler}", "-DCMAKE_BUILD_TYPE=Release", f"-DCMAKE_PREFIX_PATH={prefix}")
+            run(args.cmake, "--build", str(root / ("installed-build-" + linkage)), "--target", "consumer", "-j", "2", "--config", "Release")
+            binary = executable(root / ("installed-build-" + linkage))
+            for dll in (prefix / "bin").glob("*.dll"):
+                shutil.copy2(dll, binary.parent / dll.name)
+            run(str(binary))
     return 0
 
 

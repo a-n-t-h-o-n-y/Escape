@@ -1,0 +1,16 @@
+Escape benchmarks: steady_clock; median and min/max; 7 samples; target 100 ms/sample
+Build: optimized (NDEBUG)
+case,iterations/sample,median_ns/unit,min_ns/unit,max_ns/unit,MiB/s
+encode/string,434146,212.50,210.01,220.18,251.32
+encode/reserved-append,672383,147.36,146.21,150.69,362.41
+encode/span,695920,134.75,133.53,136.89,396.34
+encode/profile-truecolor,659637,153.70,152.79,158.82,347.47
+encode/profile-16-color,2000000,72.33,71.59,79.60,65.92
+parse/mixed-whole,200000,78.70,78.22,79.53,58.86
+parse/mixed-byte-fragments,200000,113.47,113.04,114.01,40.82
+parse/paste-4KiB-fragments,2877,34157.21,33953.22,34282.30,114.70
+reader/ready-file-ASCII,2000000,67.72,67.49,68.42,14.08
+output/buffered-32B,1000000,95.03,94.67,95.74,321.13
+output/unbuffered-32B,100000,808.65,805.68,824.02,37.74
+output/buffered-4KiB,200000,511.23,508.50,523.75,7640.88
+checksum=819200000

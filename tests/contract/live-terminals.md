@@ -19,6 +19,8 @@ All rows begin **untested**. Do not mark a row passing from unit-test results.
 | screen | Record at execution | Record at execution | Record at execution | Untested |
 | SSH connection | Record at execution | Record at execution | Record at execution | Untested |
 | Linux console | Record at execution | Record at execution | Record at execution | Untested |
+| Windows Terminal / ConPTY | Record at execution | Record at execution | Record at execution | Untested |
+| Windows console host | Record at execution | Record at execution | Record at execution | Untested |
 
 For each connection, record the profile and fallback policy, then verify:
 

@@ -1,5 +1,3 @@
-#include <sys/stat.h>
-#include <unistd.h>
 #include <array>
 #include <cerrno>
 #include <esc/terminal.hpp>
@@ -10,7 +8,7 @@
 namespace esc {
 namespace {
 std::mutex lease_mutex;
-std::set<dev_t> leases;
+std::set<std::uint64_t> leases;
 auto error_code() -> std::error_code
 { return {errno ? errno : EIO, std::generic_category()}; }
 void checked(int result, char const* message)
@@ -107,39 +105,12 @@ void validate_transition(TerminalProfile const& profile,
     if (changed[3]) require(profile.focus_reporting, Feature::Focus);
     if (changed[4]) require(profile.bracketed_paste, Feature::BracketedPaste);
 }
-auto desired_attributes(termios captured, TerminalOptions const& options) -> termios
-{
-    if (options.echo) {
-        if (*options.echo == Echo::On)
-            captured.c_lflag |= ECHO;
-        else
-            captured.c_lflag &= ~(ECHO | ECHONL);
-    }
-    if (options.input_buffer) {
-        if (*options.input_buffer == InputBuffer::Canonical)
-            captured.c_lflag |= ICANON;
-        else {
-            captured.c_lflag &= ~(ICANON | IEXTEN);
-            captured.c_iflag &= ~(ICRNL | INLCR | IGNCR | ISTRIP | IXON | IXOFF);
-            captured.c_cc[VMIN] = 0;
-            captured.c_cc[VTIME] = 0;
-        }
-    }
-    if (options.signals) {
-        if (*options.signals == Signals::On)
-            captured.c_lflag |= ISIG;
-        else {
-            captured.c_lflag &= ~(ISIG | IEXTEN);
-            captured.c_iflag &= ~(IXON | IXOFF);
-        }
-    }
-    return captured;
-}
 void merge_os(TerminalOptions& current, TerminalOptions const& patch)
 {
     if (patch.echo) current.echo = patch.echo;
     if (patch.input_buffer) current.input_buffer = patch.input_buffer;
     if (patch.signals) current.signals = patch.signals;
+    if (patch.mouse) current.mouse = patch.mouse;
 }
 auto explicit_report(TerminalProfile profile) -> ProfileReport
 {
@@ -158,13 +129,13 @@ auto explicit_report(TerminalProfile profile) -> ProfileReport
 struct Terminal::Impl {
     Streams streams;
     int input_fd, output_fd;
-    dev_t device;
+    std::uint64_t device;
     ProfileReport report;
     TerminalOptions options;
     ProtocolState modes, restore;
     Output output;
     Reader reader;
-    termios captured{}, current{};
+    detail::Attributes captured{}, current{};
     Area last_size{};
     detail::Clock::time_point next_resize{};
     std::array<bool, 5> touched{};
@@ -172,10 +143,10 @@ struct Terminal::Impl {
     Impl(Streams s,
          int input,
          int out,
-         dev_t dev,
+         std::uint64_t dev,
          ProfileReport r,
          TerminalOptions o,
-         termios attributes)
+         detail::Attributes attributes)
         : streams{s},
           input_fd{input},
           output_fd{out},
@@ -250,7 +221,7 @@ struct Terminal::Impl {
         }
     }
     auto restore_transition(ProtocolState const& old_modes,
-                            termios const& old_attributes,
+                            detail::Attributes const& old_attributes,
                             std::array<bool, 5> const& attempted,
                             bool os) -> std::error_code
     {
@@ -272,9 +243,9 @@ struct Terminal::Impl {
         validate_transition(report.profile, modes, next);
         auto new_options = options;
         merge_os(new_options, patch);
-        auto attributes = desired_attributes(captured, new_options);
+        auto attributes = detail::desired_attributes(captured, new_options);
         bool os = patch.echo.has_value() || patch.input_buffer.has_value() ||
-                  patch.signals.has_value();
+                  patch.signals.has_value() || detail::transport_setup_required();
         auto changed = changed_modes(modes, next);
         std::array<bool, 5> attempted{};
         if (os) {
@@ -312,8 +283,9 @@ struct Terminal::Impl {
         options.echo = new_options.echo;
         options.input_buffer = new_options.input_buffer;
         options.signals = new_options.signals;
+        options.mouse = new_options.mouse;
         modes = next;
-        reader.configure(input_protocols(modes));
+        reader.configure_session(input_protocols(modes), modes.mouse.mode, output_fd);
     }
     auto cleanup() -> std::error_code
     {
@@ -361,34 +333,35 @@ auto Terminal::open(Streams streams, TerminalOptions options) -> Terminal
         throw std::invalid_argument{"Terminal: null stream"};
     validate_options(options);
     validate_restore(options.restore_modes);
-    int input = ::fileno(streams.input), output = ::fileno(streams.output);
-    if (input < 0 || output < 0 || !::isatty(input) || !::isatty(output))
-        throw std::system_error{
-            std::make_error_code(std::errc::inappropriate_io_control_operation),
-            "Terminal: requires terminal streams"};
-    struct stat in{}, out{};
-    checked(::fstat(input, &in), "Terminal: input identity");
-    checked(::fstat(output, &out), "Terminal: output identity");
-    if (in.st_rdev != out.st_rdev)
-        throw std::system_error{std::make_error_code(std::errc::invalid_argument),
-                                "Terminal: streams refer to different devices"};
+    int input = detail::descriptor(streams.input),
+        output = detail::descriptor(streams.output);
+    auto device = detail::terminal_identity(input, output);
     auto report = options.profile ? explicit_report(*options.profile)
-                                  : resolve_profile(detail::environment(), true);
+                                  : detail::session_profile(input, output);
     detail::validate_profile(report.profile);
     validate_inherited(report.profile, options.restore_modes);
     auto target = desired_modes(report.profile, options.restore_modes, options);
     validate_transition(report.profile, options.restore_modes, target);
     // Allocate parser/session storage and validate limits before OS changes.
-    auto impl = std::make_unique<Impl>(streams, input, output, in.st_rdev,
-                                       std::move(report), options, termios{});
-    checked(detail::get_attributes(input, &impl->captured), "Terminal: capture input");
+    auto impl =
+        std::make_unique<Impl>(streams, input, output, device, std::move(report),
+                               options, detail::Attributes{});
+    checked(detail::get_attributes(input, output, &impl->captured),
+            "Terminal: capture input");
     impl->current = impl->captured;
+    (void)detail::desired_attributes(impl->captured, options);
     impl->last_size = detail::get_size(output);
     impl->next_resize = detail::deadline_after(
         detail::Clock::now(),
         options.resize_interval.value_or(std::chrono::milliseconds{100}));
     impl->reserve();
     try {
+        if (detail::transport_setup_required()) {
+            impl->output.flush();
+            impl->os_touched = true;
+            detail::begin_session(impl->captured);
+            impl->current = impl->captured;
+        }
         impl->apply(options);
     }
     catch (SessionError const& primary) {

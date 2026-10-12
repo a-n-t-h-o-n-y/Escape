@@ -1,111 +1,92 @@
 #include "backend.hpp"
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <algorithm>
 #include <cerrno>
 #include <climits>
 #include <system_error>
-#ifdef ESCAPE_CONTRACT_TEST_HOOKS
-#    include <array>
-#    include <thread>
-#    include <vector>
-#    include "faults.hpp"
-namespace esc::testing {
-struct FaultScope::Impl {
-    std::vector<Fault> faults;
-    std::array<std::size_t, 8> calls{}, bytes{};
-    std::vector<bool> fired;
-    Impl* previous = nullptr;
-};
-static thread_local FaultScope::Impl* active = nullptr;
-FaultScope::FaultScope(std::initializer_list<Fault> faults)
-    : implementation_{std::make_unique<Impl>()}
-{
-    implementation_->faults = faults;
-    implementation_->fired.resize(faults.size());
-    implementation_->previous = active;
-    active = implementation_.get();
-}
-FaultScope::~FaultScope() { active = implementation_->previous; }
-auto FaultScope::calls(Operation operation) const -> std::size_t
-{ return implementation_->calls[static_cast<unsigned>(operation)]; }
-// Private friend-free adapter accesses only this translation unit's scope.
-auto intercept(Operation operation, std::size_t count) -> std::pair<bool, std::size_t>
-{
-    if (!active) return {false, count};
-    auto index = static_cast<unsigned>(operation);
-    auto call = ++active->calls[index];
-    for (std::size_t i = 0; i < active->faults.size(); ++i) {
-        auto const& fault = active->faults[i];
-        if (fault.operation != operation || (active->fired[i] && !fault.persistent))
-            continue;
-        bool by_bytes = operation == Operation::Write &&
-                        fault.after_bytes != std::numeric_limits<std::size_t>::max();
-        bool due = by_bytes ? active->bytes[index] >= fault.after_bytes
-                            : call >= fault.on_call;
-        if (due && fault.error) {
-            if (fault.delay.count()) std::this_thread::sleep_for(fault.delay);
-            active->fired[i] = true;
-            errno = fault.error.value();
-            return {true, 0};
-        }
-        if (call >= fault.on_call) count = std::min(count, fault.maximum_transfer);
-        if (by_bytes) count = std::min(count, fault.after_bytes - active->bytes[index]);
-    }
-    return {false, count};
-}
-void transferred(Operation operation, std::size_t count)
-{
-    if (active) active->bytes[static_cast<unsigned>(operation)] += count;
-}
-}  // namespace esc::testing
-#endif
 namespace esc::detail {
-#ifdef ESCAPE_CONTRACT_TEST_HOOKS
-using testing::Operation;
-#    define ESC_INTERCEPT(op, count) testing::intercept(Operation::op, count)
-#else
-#    define ESC_INTERCEPT(op, count) \
-        std::pair<bool, std::size_t> { false, count }
-#endif
-auto read_bytes(int fd, void* buffer, std::size_t count) -> ssize_t
+auto descriptor(std::FILE* stream) -> int { return stream ? ::fileno(stream) : -1; }
+auto is_terminal(int fd) -> bool { return fd >= 0 && ::isatty(fd); }
+Input::Input(int fd) : descriptor{fd}, terminal{is_terminal(fd)} {}
+auto terminal_identity(int input, int output) -> std::uint64_t
+{
+    if (!is_terminal(input) || !is_terminal(output))
+        throw std::system_error{
+            std::make_error_code(std::errc::inappropriate_io_control_operation),
+            "Terminal: requires terminal streams"};
+    struct stat in{}, out{};
+    if (::fstat(input, &in) < 0 || ::fstat(output, &out) < 0)
+        throw std::system_error{errno, std::generic_category(),
+                                "Terminal: device identity"};
+    if (in.st_rdev != out.st_rdev)
+        throw std::system_error{std::make_error_code(std::errc::invalid_argument),
+                                "Terminal: streams refer to different devices"};
+    return static_cast<std::uint64_t>(in.st_rdev);
+}
+auto transport_setup_required() noexcept -> bool { return false; }
+void begin_session(Attributes&) {}
+auto session_profile(int, int) -> ProfileReport
+{ return resolve_profile(environment(), true); }
+auto desired_attributes(Attributes captured, TerminalOptions const& options)
+    -> Attributes
+{
+    if (options.echo) {
+        if (*options.echo == Echo::On)
+            captured.c_lflag |= ECHO;
+        else
+            captured.c_lflag &= ~(ECHO | ECHONL);
+    }
+    if (options.input_buffer) {
+        if (*options.input_buffer == InputBuffer::Canonical)
+            captured.c_lflag |= ICANON;
+        else {
+            captured.c_lflag &= ~(ICANON | IEXTEN);
+            captured.c_iflag &= ~(ICRNL | INLCR | IGNCR | ISTRIP | IXON | IXOFF);
+            captured.c_cc[VMIN] = 0;
+            captured.c_cc[VTIME] = 0;
+        }
+    }
+    if (options.signals) {
+        if (*options.signals == Signals::On)
+            captured.c_lflag |= ISIG;
+        else {
+            captured.c_lflag &= ~(ISIG | IEXTEN);
+            captured.c_iflag &= ~(IXON | IXOFF);
+        }
+    }
+    return captured;
+}
+auto read_bytes(Input& input, void* buffer, std::size_t count) -> std::ptrdiff_t
 {
     auto [fail, limit] = ESC_INTERCEPT(Read, count);
     if (fail) return -1;
-    return ::read(fd, buffer, limit);
+    return ::read(input.descriptor, buffer, limit);
 }
-auto poll_input(struct pollfd* descriptors, nfds_t count, int timeout) -> int
+auto poll_input(Input& input, int timeout) -> int
 {
-    auto [fail, limit] = ESC_INTERCEPT(Poll, count);
+    auto [fail, limit] = ESC_INTERCEPT(Poll, 1);
     (void)limit;
     if (fail) return -1;
-    return ::poll(descriptors, count, timeout);
+    pollfd descriptor{input.descriptor, POLLIN, 0};
+    auto result = ::poll(&descriptor, 1, timeout);
+    input.hung_up = descriptor.revents & POLLHUP;
+    if (descriptor.revents & POLLNVAL) {
+        errno = EBADF;
+        return -1;
+    }
+    return result;
 }
-auto write_bytes(std::FILE* stream, char const* bytes, std::size_t count) -> std::size_t
-{
-    auto [fail, limit] = ESC_INTERCEPT(Write, count);
-    if (fail) return 0;
-    auto written = std::fwrite(bytes, 1, limit, stream);
-#ifdef ESCAPE_CONTRACT_TEST_HOOKS
-    testing::transferred(Operation::Write, written);
-#endif
-    return written;
-}
-auto flush_stream(std::FILE* stream) -> int
-{
-    auto [fail, limit] = ESC_INTERCEPT(Flush, 0);
-    (void)limit;
-    if (fail) return EOF;
-    return std::fflush(stream);
-}
-auto get_attributes(int fd, struct termios* settings) -> int
+auto get_attributes(int fd, int output, Attributes* settings) -> int
 {
     auto [fail, limit] = ESC_INTERCEPT(GetAttributes, 0);
     (void)limit;
     if (fail) return -1;
+    (void)output;
     return ::tcgetattr(fd, settings);
 }
-auto set_attributes(int fd, struct termios const* settings) -> int
+auto set_attributes(int fd, Attributes const* settings) -> int
 {
     auto [fail, limit] = ESC_INTERCEPT(SetAttributes, 0);
     (void)limit;
@@ -131,28 +112,5 @@ auto get_size(int fd) -> Area
     if (fail || ::ioctl(fd, TIOCGWINSZ, &size) < 0)
         throw std::system_error{errno, std::generic_category(), "Terminal: query size"};
     return {size.ws_col, size.ws_row};
-}
-auto environment() -> Environment
-{
-    auto [fail, limit] = ESC_INTERCEPT(Environment, 0);
-    (void)limit;
-    if (fail)
-        throw std::system_error{errno, std::generic_category(),
-                                "Terminal: environment"};
-    return snapshot_environment();
-}
-auto deadline_after(Clock::time_point start, std::chrono::milliseconds duration)
-    -> Clock::time_point
-{
-    auto available = std::chrono::duration_cast<std::chrono::milliseconds>(
-        Clock::time_point::max() - start);
-    return duration >= available ? Clock::time_point::max() : start + duration;
-}
-auto poll_delay(Clock::time_point deadline) -> int
-{
-    auto remaining = deadline - Clock::now();
-    if (remaining <= Clock::duration::zero()) return 0;
-    auto delay = std::chrono::ceil<std::chrono::milliseconds>(remaining).count();
-    return static_cast<int>(std::min<decltype(delay)>(delay, INT_MAX));
 }
 }  // namespace esc::detail

@@ -11,6 +11,10 @@ def main():
     parser.add_argument("--compiler", required=True)
     parser.add_argument("--include", required=True)
     args = parser.parse_args()
+    msvc = pathlib.Path(args.compiler).name.lower() in ("cl", "cl.exe", "clang-cl", "clang-cl.exe")
+    flags = (["/nologo", "/std:c++20", "/utf-8", "/Zs", "/I" + args.include]
+             if msvc else ["-std=c++20", "-fsyntax-only", "-I", args.include])
+    trace = ["/showIncludes"] if msvc else ["-H"]
     headers = (
         "color", "trait", "brush", "point", "area", "sequence", "text", "glyph",
         "capabilities", "event", "parser", "io", "terminal", "esc",
@@ -20,12 +24,12 @@ def main():
     with tempfile.TemporaryDirectory(prefix="escape-headers-") as folder:
         source = pathlib.Path(folder) / "header.cpp"
         for header in headers:
-            source.write_text(f"#include <esc/{header}.hpp>\nint main() {{}}\n")
+            source.write_text(f"#include <esc/{header}.hpp>\nint main() {{}}\n", encoding="utf-8")
             result = subprocess.run(
-                [args.compiler, "-std=c++20", "-fsyntax-only", "-H", "-I", args.include, str(source)],
+                [args.compiler, *flags, *trace, str(source)],
                 capture_output=True, text=True, timeout=20,
             )
-            leaked = [line for line in result.stderr.splitlines() if any(name in line for name in forbidden)]
+            leaked = [line for line in (result.stdout + result.stderr).replace("\\", "/").splitlines() if any(name in line for name in forbidden)]
             if result.returncode or leaked:
                 failures.append(header)
                 print(f"FAIL esc/{header}.hpp\n{result.stderr}")
@@ -51,7 +55,7 @@ def main():
                     f"void check(esc::Terminal& terminal) {{ (void)({expression}); }}\n"
                 )
                 result = subprocess.run(
-                    [args.compiler, "-std=c++20", "-fsyntax-only", "-I", args.include, str(source)],
+                    [args.compiler, *flags, str(source)],
                     capture_output=True, text=True, timeout=20,
                 )
                 if result.returncode == 0:

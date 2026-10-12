@@ -9,11 +9,28 @@ else()
 endif()
 option(ESCAPE_BUILD_TESTS "Build behavior tests" ${ESCAPE_TOP_LEVEL})
 option(ESCAPE_BUILD_EXAMPLES "Build examples and tools" ${ESCAPE_TOP_LEVEL})
+option(ESCAPE_BUILD_BENCHMARKS "Build standalone performance benchmarks" OFF)
 option(ESCAPE_BUILD_CONTRACT_TESTS "Build behavior tests (compatibility option)" OFF)
+
+if(MSVC)
+    set(ESCAPE_WARNINGS /W4)
+else()
+    set(ESCAPE_WARNINGS -Wall -Wextra -Wpedantic)
+endif()
 
 add_library(escape
     src/text.cpp src/glyph.cpp src/sequence.cpp src/capabilities.cpp
-    src/parser.cpp src/io.cpp src/terminal.cpp src/detail/backend.cpp)
+    src/parser.cpp src/io.cpp src/terminal.cpp src/detail/backend_common.cpp)
+if(WIN32)
+    target_sources(escape PRIVATE src/detail/backend_windows.cpp)
+    target_compile_definitions(escape PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX _CRT_SECURE_NO_WARNINGS)
+else()
+    target_sources(escape PRIVATE src/detail/backend.cpp)
+endif()
+if(MSVC)
+    target_compile_options(escape PUBLIC /utf-8)
+endif()
+set_target_properties(escape PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 add_library(Escape::escape ALIAS escape)
 target_compile_features(escape PUBLIC cxx_std_20)
 target_include_directories(escape PUBLIC
@@ -30,6 +47,10 @@ if(ESCAPE_BUILD_EXAMPLES)
     add_subdirectory(tools)
     add_subdirectory(examples)
 endif()
+if(ESCAPE_BUILD_BENCHMARKS)
+    add_subdirectory(benchmarks)
+endif()
+
 install(TARGETS escape EXPORT EscapeTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}

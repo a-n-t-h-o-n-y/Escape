@@ -62,7 +62,7 @@ inline void validate_utf32(std::u32string_view input)
         auto const scalar = input[i];
         validate_scalar(scalar, i);
         auto const width = scalar < 0x80 ? 1u : scalar < 0x800 ? 2u : scalar < 0x10000 ? 3u : 4u;
-        if (width > std::numeric_limits<std::size_t>::max() - count)
+        if (width > (std::numeric_limits<std::size_t>::max)() - count)
             throw std::length_error{"Unicode: encoded size overflow"};
         count += width;
     }

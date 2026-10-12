@@ -23,10 +23,10 @@ engine, terminal emulator, or a new wire protocol. It aims to be a modern termin
 control library using existing protocols. A capability claim is a statement about
 the selected terminal connection, not a guarantee about every emulator.
 
-The first implementation targets macOS and Linux session backends. Encoding,
-text conversion, capability resolution, and input parsing are portable C++20.
-Windows terminal sessions require a separate backend and are not claimed as
-supported until tested. The public value model must not depend on POSIX headers.
+The implementation targets Linux, macOS, and Windows 10/11 session backends.
+Encoding, text conversion, capability resolution, and input parsing are portable
+C++20. Platform implementation and live terminal validation are separate claims.
+The public value model must not depend on POSIX or Windows console headers.
 
 ## 2. Everyday usage
 
@@ -1103,6 +1103,62 @@ shutdown into ordinary control flow before destroying the session.
 Use bounded reads if the host checks a shutdown flag between iterations; an
 indefinite read does not treat an interrupted syscall as an implicit quit request.
 
+### Windows session and reader backend
+
+Windows sessions require readable console-input and writable console-screen-buffer
+handles, including distinct FILE* wrappers. Windows attaches a process to one
+console; its screen buffers share input settings and code pages. One session
+owns that console in the process, even for different screen buffers. Reject
+redirected or wrong-direction handles before changing modes. Native console
+handles used by Windows Terminal/ConPTY are supported; pipe-only MSYS/mintty
+connections use standalone Reader/Output and are not interactive sessions.
+
+Capture input/output console modes and code pages before acquiring ownership.
+After acquisition, flush prior output and capture/change the output CRT descriptor
+mode with `_setmode(..., _O_BINARY)`. Enable processed and VT output, select UTF-8
+output, and disable Quick Edit while preserving unrelated flags. VT output mode
+must succeed; unsupported older console hosts fail open with checked rollback.
+Restore modes, both code pages, and the original descriptor mode at close. No
+control handler is installed, input discarded, or console allocated by the library.
+The host must not change these shared settings during a session.
+
+Echo maps to ENABLE_ECHO_INPUT, Canonical/Immediate to ENABLE_LINE_INPUT,
+and Signals to ENABLE_PROCESSED_INPUT. Windows requires echo to be disabled for
+immediate input; an effective Echo::On + Immediate combination is invalid. The
+interactive preset already selects Echo::Off. Native console-record reading
+avoids a blocking ReadConsole call after readiness for a non-character record.
+Reader maintains bounded canonical editing storage (4096 UTF-8 bytes), handles
+Backspace and Enter, and delivers a completed line through the same parser.
+Overflow reports system_error(value_too_large). Echo uses the attached console's
+active output buffer. It does not implement shell line editing/history.
+
+KEY_EVENT records normalize Unicode (including UTF-16 surrogate pairs), repeats,
+Alt text, AltGr text, arrows/navigation, and F1..F24 into the shared byte parser.
+Key releases and unrelated native records do not become key presses or extend a
+read deadline. Malformed native UTF-16 units become replacement scalars. Mouse
+records normalize to the configured SGR, legacy, or urxvt grammar; focus records
+are delivered only when configured. Session mouse tracking filters motion to
+Basic/Drag/Move and toggles native mouse-input capture. Resize queries measure
+the visible viewport, not the scrollback buffer. Resize sampling uses the shared
+session scheduler. Native records cannot identify bracketed paste themselves;
+paste boundaries require actual sequences from a connection that supports them.
+
+The automatic session profile uses a conservative Windows VT baseline: control,
+sixteen colors, bold/underline/inverse, alternate screen, cursor visibility.
+Mouse/focus/paste default off and richer capabilities need an explicit profile.
+The backend uses the current console color table when available. Evidence records
+the Windows backend assumption; NO_COLOR disables colors only.
+The pure TERM resolver's table is unchanged. A backend profile is not a live
+emulator verification result.
+
+Redirected disk and pipe input remains byte-oriented, with the same parser,
+EOF handling, and monotonic deadlines. Synchronous pipes use PeekNamedPipe and
+bounded 2 ms waits because they expose no reliable waitable readability event.
+Readers must have exclusive access to their stream/handle. Standalone Output
+retains borrowed stdio buffering and descriptor mode; Windows callers provide a
+binary byte stream to prevent CRT newline translation. Session output sets and
+restores binary mode explicitly.
+
 ## 12. Compatibility scope
 
 Three compatibility levels must be reported separately:
@@ -1118,7 +1174,8 @@ tested features, known limits, and fixture provenance. Matrix rows start as
 untested; do not claim all terminals work because they accept some ANSI commands.
 
 The validation set should include xterm, macOS Terminal, a VTE terminal, Konsole,
-kitty, Alacritty, WezTerm, tmux, screen, an SSH connection, and a Linux console.
+kitty, Alacritty, WezTerm, tmux, screen, an SSH connection, a Linux console,
+Windows Terminal, and the Windows console host.
 These are test targets, not support claims. Add older/limited terminals when
 their behavior motivates a concrete profile or adapter. A TERM value names the
 connection's advertised behavior; do not turn emulator-brand detection into an
@@ -1132,7 +1189,7 @@ an emulator dependency on ordinary byte generation.
 
 Deferred additions require their own reviewed contracts: active queries,
 terminfo-backed arbitrary terminals, enhanced keyboard protocols, synchronized
-output, hyperlinks/titles/clipboard, graphics, Windows sessions, event-loop or
+output, hyperlinks/titles/clipboard, graphics, event-loop or
 nonblocking output adapters, and style diff rendering. They must not be smuggled
 into current functions through hidden environment behavior or magic flags.
 
@@ -1278,8 +1335,8 @@ Changing one means updating the contract and its tests before implementation.
   from a timed read with no event.
 - Use scoped sessions without automatic signal-handler installation; distinguish
   captured OS state from assumed protocol state.
-- Defer enhanced keyboard protocols, active probes, terminfo adapters, layout,
-  and a Windows session backend without hiding their absence.
+- Defer enhanced keyboard protocols, active probes, terminfo adapters, and layout
+  without hiding their absence.
 
 The primary tradeoffs are explicit: strong append/span guarantees require a size/
 validation pass; pure lvalue styling can copy; conservative profiles may require
@@ -1374,3 +1431,8 @@ with the strongest applied evidence source and an explanation. Default/unknown
 results explain the plain fallback; NO_COLOR explains color suppression. Diagnostic
 wording is not a stable string API. Explicit terminal profiles bypass this
 resolver and report Explicit for each feature.
+
+Windows backend references: Microsoft's [console modes](https://learn.microsoft.com/en-us/windows/console/setconsolemode),
+[low-level input](https://learn.microsoft.com/en-us/windows/console/low-level-console-input-functions),
+and [VT sequences](https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences).
+These define API behavior; they do not replace the live acceptance matrix.

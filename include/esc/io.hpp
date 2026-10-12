@@ -79,6 +79,8 @@ class Reader {
     void configure(InputProtocols protocols);
 
    private:
+    friend class Terminal;
+    void configure_session(InputProtocols protocols, MouseMode mode, int output_descriptor);
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

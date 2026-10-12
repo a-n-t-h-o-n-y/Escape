@@ -1,4 +1,3 @@
-#include <unistd.h>
 #include <algorithm>
 #include <array>
 #include <cerrno>
@@ -72,7 +71,7 @@ void Output::flush()
 void flush() { Output{}.flush(); }
 
 struct Reader::Impl {
-    int descriptor;
+    detail::Input input;
     Parser parser;
     ParserOptions options;
     std::array<char, 4096> bytes{};
@@ -81,13 +80,14 @@ struct Reader::Impl {
     std::optional<PendingTimeout> pending;
     std::optional<detail::Clock::time_point> origin, deadline;
     Impl(std::FILE* input, ParserOptions opts, InputProtocols protocols)
-        : descriptor{input ? ::fileno(input) : -1},
-          parser{opts, protocols},
-          options{opts}
+        : input{detail::descriptor(input)}, parser{opts, protocols}, options{opts}
     {
         if (!input) throw std::invalid_argument{"Reader: null stream"};
-        if (descriptor < 0) io_error("Reader: descriptor");
-        terminal = ::isatty(descriptor);
+        if (this->input.descriptor < 0) io_error("Reader: descriptor");
+        terminal = this->input.terminal;
+#ifdef _WIN32
+        this->input.protocols = protocols;
+#endif
     }
     void update_deadline()
     {
@@ -132,24 +132,19 @@ struct Reader::Impl {
             auto now = detail::Clock::now();
             if (attempted_poll && now >= caller) return {ReadStatus::Timeout, {}};
             auto until = deadline ? std::min(caller, *deadline) : caller;
-            struct pollfd poller{descriptor, POLLIN, 0};
             attempted_poll = true;
-            auto ready = detail::poll_input(&poller, 1,
-                                            until == detail::Clock::time_point::max()
-                                                ? -1
-                                                : detail::poll_delay(until));
+            auto ready =
+                detail::poll_input(input, until == detail::Clock::time_point::max()
+                                              ? -1
+                                              : detail::poll_delay(until));
             if (ready < 0) {
                 if (errno == EINTR) continue;
                 io_error("Reader: poll");
             }
             if (!ready) continue;
-            if (poller.revents & POLLNVAL) {
-                errno = EBADF;
-                io_error("Reader: poll descriptor");
-            }
-            ssize_t count;
+            std::ptrdiff_t count;
             do {
-                count = detail::read_bytes(descriptor, bytes.data(), bytes.size());
+                count = detail::read_bytes(input, bytes.data(), bytes.size());
             } while (count < 0 && errno == EINTR && detail::Clock::now() < caller);
             if (count < 0) {
                 if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) continue;
@@ -159,7 +154,7 @@ struct Reader::Impl {
             end = static_cast<std::size_t>(count);
             if (!count) {
                 // VMIN=0 on a terminal means an empty readiness read is not EOF.
-                if (!terminal || (poller.revents & POLLHUP)) eof = true;
+                if (!terminal || input.hung_up) eof = true;
             }
         }
     }
@@ -184,5 +179,24 @@ void Reader::configure(InputProtocols protocols)
 {
     if (!impl_) throw std::logic_error{"Reader: moved from"};
     impl_->parser.configure(protocols);
+#ifdef _WIN32
+    impl_->input.protocols = protocols;
+#endif
+}
+}  // namespace esc
+
+namespace esc {
+void Reader::configure_session(InputProtocols protocols,
+                               MouseMode mode,
+                               int output_descriptor)
+{
+    configure(protocols);
+#ifdef _WIN32
+    impl_->input.mouse_mode = mode;
+    impl_->input.output_descriptor = output_descriptor;
+#else
+    (void)mode;
+    (void)output_descriptor;
+#endif
 }
 }  // namespace esc
