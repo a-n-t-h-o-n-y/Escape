@@ -11,10 +11,10 @@ import termios
 import time
 
 
-def run(binary, keys):
+def run(binary, keys, width=100, height=30, expected=None):
     master, slave = pty.openpty()
     try:
-        fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 30, 100, 0, 0))
+        fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", height, width, 0, 0))
         before = termios.tcgetattr(slave)
         env = dict(os.environ, TERM="xterm-256color", COLORTERM="truecolor")
         env.pop("NO_COLOR", None)
@@ -51,6 +51,8 @@ def run(binary, keys):
                 raise AssertionError("example did not terminate before its deadline")
             assert process.returncode == 0, process.stderr.read().decode(errors="replace")
             assert sent
+            if expected is not None:
+                assert expected in output
             assert b"\x1b[?1049h" in output
             assert b"\x1b[?25h" in output and b"\x1b[?1049l" in output
             assert termios.tcgetattr(slave) == before
@@ -73,5 +75,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     run(args.termcaps, b"q")
     run(args.pong, b"\r\x1b[B\x1b[B\r")
+    play_and_quit = b"\r\r\r\r\r\x1b\x1b[B\x1b[B\r"
+    run(args.pong, play_and_quit, width=81, height=25,
+        expected=b"Resize to at least 83 x 29 to play")
+    run(args.pong, play_and_quit, width=83, height=29,
+        expected=b"Press Enter to start next round")
 
     run(args.event_loop, b"q")

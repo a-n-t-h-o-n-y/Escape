@@ -427,9 +427,9 @@ using EventResponse = std::optional<State>;
 {
     static constexpr auto display_space = Game::game_space;
 
-    if (dimensions.width < display_space.width ||
-        dimensions.height < display_space.height) {
-        return encode(Cursor{}, "Terminal too small to display game");
+    if (dimensions.width < display_space.width + 2 ||
+        dimensions.height < display_space.height + 4) {
+        return encode(Cursor{}, "Resize to at least 83 x 29 to play");
     }
 
     auto const offset = Point{
