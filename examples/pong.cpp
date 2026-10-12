@@ -32,13 +32,18 @@ constexpr auto logo = std::string_view{
 
 // The host application owns termination policy; the library never installs handlers.
 volatile std::sig_atomic_t sigint_flag = 0;
+
 void request_shutdown(int) { sigint_flag = 1; }
+
 struct SignalGuard {
     using Handler = void (*)(int);
     Handler previous = std::signal(SIGINT, request_shutdown);
+
     ~SignalGuard() { std::signal(SIGINT, previous); }
 };
+
 enum class Action { Enter, Up, Down, Back, LeftUp, LeftDown, Other };
+
 auto action(std::optional<Key> const& value) -> Action
 {
     if (!value) return Action::Other;
@@ -124,6 +129,7 @@ struct Game {
 
     struct Ball {
         Location at = {.x = game_space.width / 2, .y = game_space.height / 2};
+
         struct Velocity {
             float dx = 0;
             float dy = 0;

@@ -1,10 +1,14 @@
 #pragma once
+
 #include <cstdint>
 #include <esc/key.hpp>
 #include <optional>
 #include <string>
+
 namespace esc {
+
 enum class KeyboardProtocol { Legacy, Kitty };
+
 enum class KittyFlags : unsigned {
     Disambiguate = 1,
     EventTypes = 2,
@@ -12,9 +16,12 @@ enum class KittyFlags : unsigned {
     AllKeys = 8,
     AssociatedText = 16
 };
+
 constexpr auto operator|(KittyFlags a, KittyFlags b) -> KittyFlags
 { return static_cast<KittyFlags>(static_cast<unsigned>(a) | static_cast<unsigned>(b)); }
+
 enum class KeyAction { Press, Repeat, Release };
+
 // Legacy and enhanced protocols share this event. Unreported text stays empty.
 // A text-only IME event has no key.
 struct KeyEvent {
@@ -23,6 +30,7 @@ struct KeyEvent {
     KeyAction action = KeyAction::Press;
     std::optional<char32_t> shifted_key = {}, base_layout_key = {};
     std::u32string text = {};
+
     [[nodiscard]] auto matches(Key const& expected,
                                Modifiers required = {},
                                KeyAction expected_action = KeyAction::Press) const
@@ -31,6 +39,7 @@ struct KeyEvent {
         return key && *key == expected && modifiers == required &&
                action == expected_action;
     }
+
     friend auto operator==(KeyEvent const&, KeyEvent const&) -> bool = default;
 };
 }  // namespace esc

@@ -1,8 +1,10 @@
 #pragma once
+
 #include <optional>
 #include <variant>
 
 namespace esc {
+
 enum class KeyCode {
     Escape,
     Enter,
@@ -116,16 +118,20 @@ enum class KeyCode {
     IsoLevel3Shift,
     IsoLevel5Shift,
 };
+
 struct KittyKey {
     unsigned code;
     friend auto operator==(KittyKey const&, KittyKey const&) -> bool = default;
 };
+
 using Key = std::variant<char32_t, KeyCode, KittyKey>;
+
 struct Modifiers {
     bool shift = false, ctrl = false, alt = false, meta = false;
     bool super = false, hyper = false, caps_lock = false, num_lock = false;
     friend auto operator==(Modifiers const&, Modifiers const&) -> bool = default;
 };
+
 [[nodiscard]] inline auto text_scalar(Key const& key) noexcept
     -> std::optional<char32_t>
 {

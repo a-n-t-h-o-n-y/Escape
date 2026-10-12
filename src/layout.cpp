@@ -9,6 +9,7 @@
 
 namespace esc {
 namespace {
+
 enum class Break : unsigned {
     Other,
     CR,
@@ -25,18 +26,29 @@ enum class Break : unsigned {
     LV,
     LVT
 };
+
 struct Properties {
     unsigned bits;
+
     auto boundary() const noexcept -> Break { return static_cast<Break>(bits & 15); }
+
     auto indic() const noexcept -> unsigned { return (bits >> 4) & 3; }
+
     auto pictographic() const noexcept -> bool { return bits & (1u << 6); }
+
     auto emoji() const noexcept -> bool { return bits & (1u << 7); }
+
     auto presentation() const noexcept -> bool { return bits & (1u << 8); }
+
     auto east_asian() const noexcept -> unsigned { return (bits >> 9) & 3; }
+
     auto zero() const noexcept -> bool { return bits & ((1u << 11) | (1u << 14)); }
+
     auto assigned() const noexcept -> bool { return bits & (1u << 12); }
+
     auto control() const noexcept -> bool { return bits & (1u << 13); }
 };
+
 // Narrow each lookup to one 256-scalar page. The immutable index is derived at
 // compile time from the pinned intervals, including ranges crossing page edges.
 constexpr auto range_pages = [] {
@@ -45,11 +57,13 @@ constexpr auto range_pages = [] {
     std::array<std::uint16_t, 0x1100 + 1> pages{};
     std::size_t index = 0;
     for (std::size_t page = 0; page < pages.size(); ++page) {
-        while (index < std::size(ranges) && ranges[index].last < (page << 8)) ++index;
+        while (index < std::size(ranges) && ranges[index].last < (page << 8))
+            ++index;
         pages[page] = static_cast<std::uint16_t>(index);
     }
     return pages;
 }();
+
 auto properties(char32_t cp) noexcept -> Properties
 {
     // ASCII bypasses all table searches.
@@ -67,17 +81,19 @@ auto properties(char32_t cp) noexcept -> Properties
     auto first = std::begin(ranges) + range_pages[page];
     auto last = std::begin(ranges) +
                 std::min(std::size(ranges), std::size_t{range_pages[page + 1]} + 1);
-    auto it = std::lower_bound(
-        first, last, cp,
-        [](auto const& range, char32_t value) { return range.last < value; });
+    auto it = std::lower_bound(first, last, cp, [](auto const& range, char32_t value) {
+        return range.last < value;
+    });
     unsigned bits = it != last && cp >= it->first ? it->properties : 0;
     if (cp >= 0xac00 && cp <= 0xd7a3)
         bits = (bits & ~15u) |
                static_cast<unsigned>((cp - 0xac00) % 28 ? Break::LVT : Break::LV);
     return {bits};
 }
+
 auto decode(std::string_view input, std::size_t& offset) -> char32_t
 { return detail::decode_utf8(input, offset); }
+
 auto decode(std::u32string_view input, std::size_t& offset) -> char32_t
 {
     auto cp = input[offset];
@@ -85,6 +101,7 @@ auto decode(std::u32string_view input, std::size_t& offset) -> char32_t
     ++offset;
     return cp;
 }
+
 auto decode(std::span<Glyph const> input, std::size_t& offset) -> char32_t
 {
     auto cp = input[offset].symbol;
@@ -92,13 +109,16 @@ auto decode(std::span<Glyph const> input, std::size_t& offset) -> char32_t
     ++offset;
     return cp;
 }
+
 auto control(Break value) noexcept -> bool
 { return value == Break::CR || value == Break::LF || value == Break::Control; }
+
 // Constant-space left context for GB9c, GB11 and GB12/13. Never scan backwards.
 struct BoundaryState {
     Break previous = Break::Other;
     bool odd_ri = false, pictographic_extend = false, pictographic_zwj = false;
     unsigned indic_chain = 0;  // 0 absent, 1 consonant, 2 consonant + linker.
+
     void accept(Properties p) noexcept
     {
         auto b = p.boundary();
@@ -114,6 +134,7 @@ struct BoundaryState {
             indic_chain = 0;
         previous = b;
     }
+
     auto joins(Properties p) const noexcept -> bool
     {
         auto a = previous, b = p.boundary();
@@ -133,10 +154,13 @@ struct BoundaryState {
         return a == Break::RI && b == Break::RI && odd_ri;
     }
 };
+
 template <class Char>
 auto scalar_unit(Char value) noexcept -> Char
 { return value; }
+
 auto scalar_unit(Glyph const& glyph) noexcept -> char32_t { return glyph.symbol; }
+
 template <class Char>
 auto printable_ascii(Char const& value) noexcept -> bool
 { return scalar_unit(value) >= 0x20 && scalar_unit(value) <= 0x7e; }
@@ -158,6 +182,7 @@ auto first_size(View input) -> std::size_t
     }
     return offset;
 }
+
 void validate(WidthPolicy const& policy)
 {
     if ((policy.ambiguous != AmbiguousWidth::One &&
@@ -181,6 +206,7 @@ void validate(WidthPolicy const& policy)
         previous = item.scalar;
     }
 }
+
 auto override_width(char32_t cp, WidthPolicy const& policy) noexcept
     -> std::optional<unsigned>
 {
@@ -191,16 +217,19 @@ auto override_width(char32_t cp, WidthPolicy const& policy) noexcept
     if (it != policy.overrides.end() && it->scalar == cp) return it->cells;
     return {};
 }
+
 void add(std::size_t& total, std::size_t value)
 {
     if (value > (std::numeric_limits<std::size_t>::max)() - total)
         throw std::length_error{"Cell width overflow"};
     total += value;
 }
+
 struct ClusterMeasure {
     std::size_t maximum = 0, sum = 0;
     bool known = true, mark = false;
     unsigned keycap_state = 0;  // 1 keycap base, 2 optional VS16.
+
     void accept(char32_t cp, Properties p, char32_t next, WidthPolicy const& policy)
     {
         if (p.control()) {
@@ -238,6 +267,7 @@ struct ClusterMeasure {
         maximum = (std::max)(maximum, static_cast<std::size_t>(width));
         add(sum, width);
     }
+
     auto finish(WidthPolicy const& policy) const -> std::size_t
     {
         auto result = policy.clusters == ClusterWidth::Maximum ? maximum : sum;
@@ -246,6 +276,7 @@ struct ClusterMeasure {
                    : result;
     }
 };
+
 template <class View>
 auto measure(View input, WidthPolicy const& policy, bool single)
     -> std::optional<std::size_t>
@@ -302,27 +333,36 @@ auto measure(View input, WidthPolicy const& policy, bool single)
     return known ? std::optional<std::size_t>{total} : std::nullopt;
 }
 }  // namespace
+
 auto next_grapheme(std::string_view input) -> std::string_view
 { return input.substr(0, first_size(input)); }
+
 auto next_grapheme(std::u32string_view input) -> std::u32string_view
 { return input.substr(0, first_size(input)); }
+
 auto cell_width(std::string_view input, WidthPolicy policy)
     -> std::optional<std::size_t>
 { return measure(input, policy, false); }
+
 auto cell_width(std::u32string_view input, WidthPolicy policy)
     -> std::optional<std::size_t>
 { return measure(input, policy, false); }
+
 auto grapheme_width(std::string_view input, WidthPolicy policy)
     -> std::optional<std::size_t>
 { return measure(input, policy, true); }
+
 auto grapheme_width(std::u32string_view input, WidthPolicy policy)
     -> std::optional<std::size_t>
 { return measure(input, policy, true); }
+
 auto next_grapheme(std::span<Glyph const> input) -> std::span<Glyph const>
 { return input.first(first_size(input)); }
+
 auto cell_width(std::span<Glyph const> input, WidthPolicy policy)
     -> std::optional<std::size_t>
 { return measure(input, policy, false); }
+
 auto grapheme_width(std::span<Glyph const> input, WidthPolicy policy)
     -> std::optional<std::size_t>
 { return measure(input, policy, true); }

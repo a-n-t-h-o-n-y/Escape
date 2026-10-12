@@ -14,6 +14,7 @@ void SequenceWriter::add_size(std::size_t count)
         throw std::length_error{"escape: encoded size overflow"};
     size_ += count;
 }
+
 void SequenceWriter::text(std::string_view bytes)
 {
     auto const offset = size_;
@@ -45,12 +46,14 @@ void parameter(SequenceWriter& out, std::uint64_t value, std::string_view final)
     out.number(value);
     out.text(final);
 }
+
 void mode(SequenceWriter& out, unsigned value, bool enabled)
 {
     out.text("\x1b[?");
     out.number(value);
     out.text(enabled ? "h" : "l");
 }
+
 auto erase_parameter(Erase extent) -> unsigned
 {
     switch (extent) {
@@ -60,6 +63,7 @@ auto erase_parameter(Erase extent) -> unsigned
     }
     throw std::invalid_argument{"escape: invalid erase extent"};
 }
+
 void color(SequenceWriter& out, Color const& value, bool foreground)
 {
     if (value.valueless_by_exception())
@@ -105,6 +109,7 @@ void encode(SequenceWriter& out, Cursor position)
     out.number(static_cast<std::uint64_t>(position.x) + 1);
     out.text("H");
 }
+
 void encode(SequenceWriter& out, MoveCursor delta)
 {
     // Widen before negating: INT_MIN has no positive int counterpart.
@@ -115,12 +120,17 @@ void encode(SequenceWriter& out, MoveCursor delta)
     if (delta.dy) parameter(out, magnitude(delta.dy), delta.dy < 0 ? "A" : "B");
     if (delta.dx) parameter(out, magnitude(delta.dx), delta.dx < 0 ? "D" : "C");
 }
+
 void encode(SequenceWriter& out, BlankRow row)
 { parameter(out, erase_parameter(row.extent), "K"); }
+
 void encode(SequenceWriter& out, BlankScreen screen)
 { parameter(out, erase_parameter(screen.extent), "J"); }
+
 void encode(SequenceWriter& out, ResetStyle) { out.text("\x1b[0m"); }
+
 void encode(SequenceWriter& out, Trait trait) { encode(out, Traits{trait}); }
+
 namespace {
 void trait_parameters(SequenceWriter& out, Traits traits, bool has_parameter)
 {
@@ -143,12 +153,14 @@ void trait_parameters(SequenceWriter& out, Traits traits, bool has_parameter)
     add(Trait::CrossedOut, "9");
 }
 }  // namespace
+
 void replace_traits(SequenceWriter& out, Traits traits)
 {
     out.text("\x1b[22;23;24;25;27;28;29");
     trait_parameters(out, traits, true);
     out.text("m");
 }
+
 void encode(SequenceWriter& out, Traits traits)
 {
     if (!traits.data()) return;
@@ -156,14 +168,18 @@ void encode(SequenceWriter& out, Traits traits)
     trait_parameters(out, traits, false);
     out.text("m");
 }
+
 void encode(SequenceWriter& out, ColorFG const& c) { color(out, c.value, true); }
+
 void encode(SequenceWriter& out, ColorBG const& c) { color(out, c.value, false); }
+
 void encode(SequenceWriter& out, Style const& style)
 {
     color(out, style.background, false);
     color(out, style.foreground, true);
     replace_traits(out, style.traits);
 }
+
 void encode(SequenceWriter& out, ScreenBuffer buffer)
 {
     switch (buffer) {
@@ -172,6 +188,7 @@ void encode(SequenceWriter& out, ScreenBuffer buffer)
     }
     throw std::invalid_argument{"escape: invalid screen buffer"};
 }
+
 void encode(SequenceWriter& out, CursorMode cursor_mode)
 {
     switch (cursor_mode) {
@@ -180,6 +197,7 @@ void encode(SequenceWriter& out, CursorMode cursor_mode)
     }
     throw std::invalid_argument{"escape: invalid cursor mode"};
 }
+
 void encode(SequenceWriter& out, FocusReporting reporting)
 {
     switch (reporting) {
@@ -188,6 +206,7 @@ void encode(SequenceWriter& out, FocusReporting reporting)
     }
     throw std::invalid_argument{"escape: invalid focus reporting"};
 }
+
 void encode(SequenceWriter& out, BracketedPaste paste)
 {
     switch (paste) {
@@ -196,6 +215,7 @@ void encode(SequenceWriter& out, BracketedPaste paste)
     }
     throw std::invalid_argument{"escape: invalid bracketed paste"};
 }
+
 void encode(SequenceWriter& out, MouseReporting mouse)
 {
     unsigned tracking = 0;
@@ -237,6 +257,7 @@ void encode_style(SequenceWriter& output,
     else
         encode(output, style);
 }
+
 void encode_patch(SequenceWriter& output,
                   TerminalProfile const* profile,
                   Style& current,
@@ -274,10 +295,12 @@ void encode_patch(SequenceWriter& output,
         for (auto trait : {Trait::Underline, Trait::DoubleUnderline})
             if (next.traits.contains(trait)) enabled.insert(trait);
     }
+
     struct Disable {
         Trait trait;
         std::string_view bytes;
     };
+
     for (auto item :
          {Disable{Trait::Italic, "\x1b[23m"}, Disable{Trait::Blink, "\x1b[25m"},
           Disable{Trait::Inverse, "\x1b[27m"}, Disable{Trait::Invisible, "\x1b[28m"},

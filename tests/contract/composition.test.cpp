@@ -20,6 +20,7 @@ TEST(ENC_05_mixed_commands_text_and_unicode_share_every_sink)
                       fg(colors::cyan), bold, "Hello 👽\0"sv, U'界', ResetStyle{});
     contract::encodes("ab界", sequence("a", 'b', U'界'));
 }
+
 TEST(ENC_05_style_patches_are_pure_and_last_component_wins)
 {
     auto original = warning_patch;
@@ -36,6 +37,7 @@ TEST(ENC_05_style_patches_are_pure_and_last_component_wins)
     contract::encodes("\x1b[21m\x1b[24m\x1b[4m", underline | double_underline,
                       without(double_underline));
 }
+
 TEST(ENC_05_styled_text_owns_storage_and_pipes_preserve_inputs)
 {
     std::string source(128, 'a');
@@ -55,6 +57,7 @@ TEST(ENC_05_styled_text_owns_storage_and_pipes_preserve_inputs)
     CHECK_THROWS(std::invalid_argument,
                  styled(static_cast<char const*>(nullptr), bold));
 }
+
 TEST(ENC_05_nested_styled_runs_restore_known_enclosing_style)
 {
     auto inner = styled("b", without(bold) | fg(colors::red));
@@ -70,6 +73,7 @@ TEST(ENC_05_nested_styled_runs_restore_known_enclosing_style)
         "\x1b[49m\x1b[34m\x1b[22;23;24;25;27;28;29my",
         fg(colors::blue), styled("x", bold), "y");
 }
+
 TEST(BUF_05_nested_borrowed_aliases_survive_append_growth)
 {
     std::string output(256, 'a');
@@ -86,6 +90,7 @@ TEST(BUF_05_nested_borrowed_aliases_survive_append_growth)
     CHECK_THROWS(std::invalid_argument, encode_to(bytes, label));
     CHECK(bytes == before);
 }
+
 TEST(BUF_05_late_invalid_nested_values_preserve_destinations)
 {
     auto bad = sequence(Cursor{}, styled("ok", bold), std::u32string{U'a', 0xd800});
@@ -100,6 +105,7 @@ TEST(BUF_05_late_invalid_nested_values_preserve_destinations)
     auto invalid = StylePatch{.enabled = bold, .disabled = bold};
     CHECK_THROWS(std::invalid_argument, encode(invalid));
 }
+
 TEST(BUF_05_borrowed_styled_runs_and_mixed_buffers_allocate_nothing)
 {
     auto label = styled_view("Hello 👽", warning_patch);
@@ -116,6 +122,7 @@ TEST(BUF_05_borrowed_styled_runs_and_mixed_buffers_allocate_nothing)
     }
     CHECK(allocations == 0);
 }
+
 TEST(CAP_05_styled_runs_obey_color_and_trait_fallback)
 {
     auto profile = contract::full_profile();
@@ -130,6 +137,7 @@ TEST(CAP_05_styled_runs_obey_color_and_trait_fallback)
     CHECK_THROWS(UnsupportedFeature, encode(profile, label));
     contract::encodes("x", TerminalProfile{}, label);
 }
+
 TEST(PAR_05_result_alternatives_and_keyboard_matching_are_explicit)
 {
     ReadResult value = Event{KeyEvent{U'q'}};
@@ -171,6 +179,7 @@ TEST(BUF_05_lazy_glyph_views_can_read_the_append_destination)
           "abc\x1b[49m\x1b[39m\x1b[22;23;24;25;27;28;29mabc"
           "\x1b[49m\x1b[39m\x1b[22;23;24;25;27;28;29m");
 }
+
 TEST(ENC_05_glyph_values_and_ranges_share_bounded_and_owned_encoding)
 {
     auto values = glyphs("a界", Style{.foreground = colors::red});

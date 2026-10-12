@@ -36,17 +36,20 @@ auto unsupported_message(Feature feature) -> char const*
             return "Terminal profile does not support window titles";
         case Feature::Hyperlinks: return "Terminal profile does not support hyperlinks";
         case Feature::Bell: return "Terminal profile does not support the bell";
-        case Feature::PlayNotes: return "Terminal profile does not support DECPS playback";
+        case Feature::PlayNotes:
+            return "Terminal profile does not support DECPS playback";
         case Feature::SynchronizedOutput:
             return "Terminal profile does not support synchronized output";
     }
     throw std::invalid_argument{"UnsupportedFeature: invalid feature"};
 }
+
 constexpr auto basic_traits() -> Traits
 {
     return Trait::Bold | Trait::Dim | Trait::Underline | Trait::Blink | Trait::Inverse |
            Trait::Invisible;
 }
+
 constexpr auto full_traits() -> Traits
 { return basic_traits() | Trait::Italic | Trait::CrossedOut | Trait::DoubleUnderline; }
 
@@ -57,6 +60,7 @@ struct KnownTerminal {
     bool alternate;
     bool visibility;
 };
+
 // Resolution table v1, matching interface-proposal.md Appendix C. This is a
 // reviewed advertised-protocol heuristic, not a captured-emulator claim.
 // Protocol basis: https://invisible-island.net/xterm/ctlseqs/ctlseqs.html
@@ -73,6 +77,7 @@ constexpr KnownTerminal known_terminals[] = {
     {"linux", ColorSupport::Basic16, false, false, true},
 };
 }  // namespace
+
 UnsupportedFeature::UnsupportedFeature(Feature feature)
     : std::runtime_error{unsupported_message(feature)}, feature_{feature}
 {}
@@ -86,6 +91,7 @@ auto snapshot_environment() -> Environment
     auto const* no_color = std::getenv("NO_COLOR");
     return {read("TERM"), read("COLORTERM"), no_color && *no_color};
 }
+
 auto resolve_profile(Environment const& environment, bool output_is_terminal)
     -> ProfileReport
 {
@@ -159,6 +165,7 @@ void require(bool supported, Feature feature)
 {
     if (!supported) throw UnsupportedFeature{feature};
 }
+
 [[nodiscard]] auto palette_color(TerminalProfile const& profile, unsigned index) -> RGB
 {
     if (index < 16) return profile.system_palette[index];
@@ -170,7 +177,9 @@ void require(bool supported, Feature feature)
     auto const cube = index - 16;
     return {levels[cube / 36], levels[(cube / 6) % 6], levels[cube % 6]};
 }
-[[nodiscard]] auto nearest_color(TerminalProfile const& profile, RGB color) -> IndexedColor
+
+[[nodiscard]] auto nearest_color(TerminalProfile const& profile, RGB color)
+    -> IndexedColor
 {
     unsigned const candidates = profile.colors == ColorSupport::Basic8 ? 8 : 16;
     unsigned best = 0;
@@ -211,6 +220,7 @@ void require(bool supported, Feature feature)
     }
     return {static_cast<std::uint8_t>(best)};
 }
+
 [[nodiscard]] auto prepare_color(TerminalProfile const& profile, Color const& color)
     -> std::optional<Color>
 {
@@ -241,6 +251,7 @@ void require(bool supported, Feature feature)
     return Color{
         nearest_color(profile, RGB{true_color.red, true_color.green, true_color.blue})};
 }
+
 void validate_erase(Erase erase)
 {
     switch (erase) {
@@ -298,12 +309,14 @@ void validate_profile(TerminalProfile const& profile)
         throw std::invalid_argument{
             "TerminalProfile: plain output cannot have control features"};
 }
+
 void encode(SequenceWriter& output, PreparedStyle const& style)
 {
     encode(output, style.background);
     encode(output, style.foreground);
     if (style.traits) replace_traits(output, *style.traits);
 }
+
 auto prepare(TerminalProfile const& profile, Cursor const& cursor)
     -> std::optional<Cursor>
 {
@@ -312,12 +325,14 @@ auto prepare(TerminalProfile const& profile, Cursor const& cursor)
     require(profile.control, Feature::Control);
     return cursor;
 }
+
 auto prepare(TerminalProfile const& profile, MoveCursor const& cursor)
     -> std::optional<MoveCursor>
 {
     require(profile.control, Feature::Control);
     return cursor;
 }
+
 auto prepare(TerminalProfile const& profile, BlankRow const& row)
     -> std::optional<BlankRow>
 {
@@ -325,6 +340,7 @@ auto prepare(TerminalProfile const& profile, BlankRow const& row)
     require(profile.control, Feature::Control);
     return row;
 }
+
 auto prepare(TerminalProfile const& profile, BlankScreen const& screen)
     -> std::optional<BlankScreen>
 {
@@ -332,9 +348,11 @@ auto prepare(TerminalProfile const& profile, BlankScreen const& screen)
     require(profile.control, Feature::Control);
     return screen;
 }
+
 auto prepare(TerminalProfile const& profile, ResetStyle const& reset)
     -> std::optional<ResetStyle>
 { return profile.control ? std::optional<ResetStyle>{reset} : std::nullopt; }
+
 auto prepare(TerminalProfile const& profile, Traits const& traits)
     -> std::optional<Traits>
 {
@@ -351,26 +369,31 @@ auto prepare(TerminalProfile const& profile, Traits const& traits)
         resolved.insert(Trait::Underline);
     return resolved;
 }
+
 auto prepare(TerminalProfile const& profile, Trait trait) -> std::optional<Traits>
 { return prepare(profile, Traits{trait}); }
+
 auto prepare(TerminalProfile const& profile, ColorFG const& foreground)
     -> std::optional<ColorFG>
 {
     auto color = prepare_color(profile, foreground.value);
     return color ? std::optional<ColorFG>{{*color}} : std::nullopt;
 }
+
 auto prepare(TerminalProfile const& profile, ColorBG const& background)
     -> std::optional<ColorBG>
 {
     auto color = prepare_color(profile, background.value);
     return color ? std::optional<ColorBG>{{*color}} : std::nullopt;
 }
+
 auto prepare(TerminalProfile const& profile, Style const& style) -> PreparedStyle
 {
     validate_style(style);
     return {prepare(profile, bg(style.background)),
             prepare(profile, fg(style.foreground)), prepare(profile, style.traits)};
 }
+
 auto prepare(TerminalProfile const& profile, ScreenBuffer const& screen)
     -> std::optional<ScreenBuffer>
 {
@@ -379,6 +402,7 @@ auto prepare(TerminalProfile const& profile, ScreenBuffer const& screen)
     require(profile.alternate_screen, Feature::AlternateScreen);
     return screen;
 }
+
 auto prepare(TerminalProfile const& profile, CursorMode const& cursor)
     -> std::optional<CursorMode>
 {
@@ -387,6 +411,7 @@ auto prepare(TerminalProfile const& profile, CursorMode const& cursor)
     require(profile.cursor_visibility, Feature::CursorVisibility);
     return cursor;
 }
+
 auto prepare(TerminalProfile const& profile, FocusReporting const& focus)
     -> std::optional<FocusReporting>
 {
@@ -395,6 +420,7 @@ auto prepare(TerminalProfile const& profile, FocusReporting const& focus)
     require(profile.focus_reporting, Feature::Focus);
     return focus;
 }
+
 auto prepare(TerminalProfile const& profile, BracketedPaste const& paste)
     -> std::optional<BracketedPaste>
 {
@@ -403,6 +429,7 @@ auto prepare(TerminalProfile const& profile, BracketedPaste const& paste)
     require(profile.bracketed_paste, Feature::BracketedPaste);
     return paste;
 }
+
 auto prepare(TerminalProfile const& profile, MouseReporting const& mouse)
     -> std::optional<MouseReporting>
 {

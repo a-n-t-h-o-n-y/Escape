@@ -1,23 +1,24 @@
 #pragma once
+
 #include <esc/area.hpp>
-#include <esc/style.hpp>
 #include <esc/capabilities.hpp>
 #include <esc/color.hpp>
 #include <esc/event.hpp>
 #include <esc/glyph.hpp>
 #include <esc/io.hpp>
 #include <esc/key.hpp>
+#include <esc/layout.hpp>
 #include <esc/mouse.hpp>
 #include <esc/parser.hpp>
 #include <esc/point.hpp>
 #include <esc/sequence.hpp>
+#include <esc/style.hpp>
 #include <esc/terminal.hpp>
 #include <esc/text.hpp>
-#include <esc/layout.hpp>
 #include <esc/trait.hpp>
 
-#include <esc/query.hpp>
 #include <esc/keyboard.hpp>
+#include <esc/query.hpp>
 
-#include <esc/styled_text.hpp>
 #include <esc/result.hpp>
+#include <esc/styled_text.hpp>

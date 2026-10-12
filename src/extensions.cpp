@@ -13,6 +13,7 @@ void counted(SequenceWriter& out, unsigned count, std::string_view final)
         out.text(final);
     }
 }
+
 void osc_text(std::string_view input)
 {
     for (std::size_t offset = 0; offset < input.size();) {
@@ -23,7 +24,9 @@ void osc_text(std::string_view input)
             throw std::invalid_argument{"OSC: control character in payload"};
     }
 }
+
 void validate(WindowTitle const& value) { osc_text(value.text); }
+
 void validate(BeginHyperlink const& value)
 {
     if (value.uri.empty())
@@ -35,6 +38,7 @@ void validate(BeginHyperlink const& value)
             throw std::invalid_argument{
                 "Hyperlink: id must use ASCII unreserved characters"};
 }
+
 auto relocate(std::string_view input,
               char const* data,
               std::size_t size,
@@ -47,6 +51,7 @@ auto relocate(std::string_view input,
             "escape: aliased payload extends beyond owned string"};
     return {copy + (input.data() - data), input.size()};
 }
+
 template <class Command>
 auto prepare_optional(TerminalProfile const& profile,
                       Command command,
@@ -60,7 +65,9 @@ auto prepare_optional(TerminalProfile const& profile,
     return {};
 }
 }  // namespace
+
 void encode(SequenceWriter& out, Bell) { out.text("\x07"); }
+
 void encode(SequenceWriter& out, PlayNotes const& value)
 {
     auto const duration = value.duration.count();
@@ -69,15 +76,16 @@ void encode(SequenceWriter& out, PlayNotes const& value)
             "PlayNotes: duration must be 0..7,968,750 microseconds"};
     // Bounds are checked before addition; zero remains zero and a positive
     // duration cannot disappear when rounded below half a protocol tick.
-    auto const ticks = duration == 0 ? 0 : (std::max)(decltype(duration){1},
-                                                     (duration + 15625) / 31250);
-    if (value.volume > 7)
-        throw std::invalid_argument{"PlayNotes: volume must be 0..7"};
+    auto const ticks =
+        duration == 0 ? 0
+                      : (std::max)(decltype(duration){1}, (duration + 15625) / 31250);
+    if (value.volume > 7) throw std::invalid_argument{"PlayNotes: volume must be 0..7"};
     for (auto note : value.notes)
         if (static_cast<unsigned>(note) > 25)
             throw std::invalid_argument{"PlayNotes: note must be Rest or C5..C7"};
     for (std::size_t start = 0; start < value.notes.size();) {
-        auto const end = start + (std::min)(std::size_t{16}, value.notes.size() - start);
+        auto const end =
+            start + (std::min)(std::size_t{16}, value.notes.size() - start);
         out.text("\x1b[");
         out.number(value.volume);
         out.text(";");
@@ -89,12 +97,13 @@ void encode(SequenceWriter& out, PlayNotes const& value)
         out.text(",~");
     }
 }
+
 void encode(SequenceWriter& out, PlayNotes const* value)
 {
     if (value) encode(out, *value);
 }
-auto prepare(TerminalProfile const& profile, PlayNotes const& value)
-    -> PlayNotes const*
+
+auto prepare(TerminalProfile const& profile, PlayNotes const& value) -> PlayNotes const*
 {
     SequenceWriter validation;
     encode(validation, value);
@@ -103,6 +112,7 @@ auto prepare(TerminalProfile const& profile, PlayNotes const& value)
         throw UnsupportedFeature{Feature::PlayNotes};
     return nullptr;
 }
+
 void encode(SequenceWriter& out, CursorStyle style)
 {
     auto n = static_cast<unsigned>(style);
@@ -111,18 +121,21 @@ void encode(SequenceWriter& out, CursorStyle style)
     out.number(n);
     out.text(" q");
 }
+
 void encode(SequenceWriter& out, SaveCursor)
 {
     out.text(
         "\x1b"
         "7");
 }
+
 void encode(SequenceWriter& out, RestoreCursor)
 {
     out.text(
         "\x1b"
         "8");
 }
+
 void encode(SequenceWriter& out, ScrollRegion value)
 {
     if (value.top < 0 || value.bottom <= value.top)
@@ -133,15 +146,23 @@ void encode(SequenceWriter& out, ScrollRegion value)
     out.number(static_cast<std::uint64_t>(value.bottom) + 1);
     out.text("r");
 }
+
 void encode(SequenceWriter& out, ResetScrollRegion) { out.text("\x1b[r"); }
+
 void encode(SequenceWriter& out, ScrollUp value) { counted(out, value.count, "S"); }
+
 void encode(SequenceWriter& out, ScrollDown value) { counted(out, value.count, "T"); }
+
 void encode(SequenceWriter& out, InsertCharacters value)
 { counted(out, value.count, "@"); }
+
 void encode(SequenceWriter& out, DeleteCharacters value)
 { counted(out, value.count, "P"); }
+
 void encode(SequenceWriter& out, InsertLines value) { counted(out, value.count, "L"); }
+
 void encode(SequenceWriter& out, DeleteLines value) { counted(out, value.count, "M"); }
+
 void encode(SequenceWriter& out, WindowTitle value)
 {
     if (out.measuring()) validate(value);
@@ -149,6 +170,7 @@ void encode(SequenceWriter& out, WindowTitle value)
     out.text(value.text);
     out.text("\x1b\\");
 }
+
 void encode(SequenceWriter& out, BeginHyperlink value)
 {
     if (out.measuring()) validate(value);
@@ -161,13 +183,16 @@ void encode(SequenceWriter& out, BeginHyperlink value)
     out.text(value.uri);
     out.text("\x1b\\");
 }
+
 void encode(SequenceWriter& out, EndHyperlink) { out.text("\x1b]8;;\x1b\\"); }
+
 void encode(SequenceWriter& out, SynchronizedOutput value)
 {
     if (value != SynchronizedOutput::On && value != SynchronizedOutput::Off)
         throw std::invalid_argument{"SynchronizedOutput: invalid value"};
     out.text(value == SynchronizedOutput::On ? "\x1b[?2026h" : "\x1b[?2026l");
 }
+
 auto overlaps(std::string_view input, char const* data, std::size_t size) noexcept
     -> bool
 {
@@ -175,26 +200,32 @@ auto overlaps(std::string_view input, char const* data, std::size_t size) noexce
     auto less = std::less<char const*>{};
     return less(input.data(), data + size) && less(data, input.data() + input.size());
 }
+
 auto payload_overlaps(WindowTitle const& value,
                       char const* data,
                       std::size_t size) noexcept -> bool
 { return overlaps(value.text, data, size); }
+
 auto payload_overlaps(PlayNotes const& value,
                       char const* data,
                       std::size_t size) noexcept -> bool
 {
     return overlaps({reinterpret_cast<char const*>(value.notes.data()),
-                     value.notes.size() * sizeof(Note)}, data, size);
+                     value.notes.size() * sizeof(Note)},
+                    data, size);
 }
+
 auto payload_overlaps(BeginHyperlink const& value,
                       char const* data,
                       std::size_t size) noexcept -> bool
 { return overlaps(value.uri, data, size) || overlaps(value.id, data, size); }
+
 void relocate_payload(WindowTitle& value,
                       char const* data,
                       std::size_t size,
                       char const* copy)
 { value.text = relocate(value.text, data, size, copy); }
+
 void relocate_payload(BeginHyperlink& value,
                       char const* data,
                       std::size_t size,
@@ -203,6 +234,7 @@ void relocate_payload(BeginHyperlink& value,
     value.uri = relocate(value.uri, data, size, copy);
     value.id = relocate(value.id, data, size, copy);
 }
+
 #define ESC_PREPARE(Type, member, feature)                                           \
     auto prepare(TerminalProfile const& p, Type const& value) -> std::optional<Type> \
     { return prepare_optional(p, value, p.member, Feature::feature); }

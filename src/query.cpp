@@ -2,6 +2,7 @@
 #include <charconv>
 #include <esc/query.hpp>
 #include "detail/protocol.hpp"
+
 namespace esc {
 namespace {
 void encode_query(detail::SequenceWriter& out, Query const& query)
@@ -26,6 +27,7 @@ void encode_query(detail::SequenceWriter& out, Query const& query)
         query);
 }
 }  // namespace
+
 auto query_to(std::span<char> output, Query const& query) -> EncodeResult
 {
     detail::SequenceWriter measure;
@@ -35,6 +37,7 @@ auto query_to(std::span<char> output, Query const& query) -> EncodeResult
     encode_query(writer, query);
     return {writer.size(), writer.size()};
 }
+
 auto encode_query(Query const& query) -> std::string
 {
     std::array<char, 32> bytes;
@@ -42,6 +45,7 @@ auto encode_query(Query const& query) -> std::string
     return {bytes.data(), result.written};
 }
 }  // namespace esc
+
 namespace esc::detail {
 namespace {
 auto number(std::string_view text, unsigned& value) -> bool
@@ -51,6 +55,7 @@ auto number(std::string_view text, unsigned& value) -> bool
     return error == std::errc{} && end == text.data() + text.size();
 }
 }  // namespace
+
 auto parse_reply(std::string_view fields, char final) -> std::optional<Reply>
 {
     if (!fields.starts_with('?')) return {};

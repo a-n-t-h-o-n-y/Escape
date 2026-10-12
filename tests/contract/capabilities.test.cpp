@@ -9,73 +9,84 @@ using contract::encodes;
 TEST(CAP_01_plain_output_drops_style_but_rejects_geometry)
 {
     TerminalProfile plain;
-    encodes("",plain,fg(colors::red),bg(RGB{0x010203}),Trait::Bold,Style{},ResetStyle{});
-    CHECK_THROWS(UnsupportedFeature,encode(plain,Cursor{}));
-    CHECK_THROWS(UnsupportedFeature,encode(plain,MoveCursor{1,0}));
-    CHECK_THROWS(UnsupportedFeature,encode(plain,BlankRow{}));
-    CHECK_THROWS(UnsupportedFeature,encode(plain,ScreenBuffer::Alternate));
+    encodes("", plain, fg(colors::red), bg(RGB{0x010203}), Trait::Bold, Style{},
+            ResetStyle{});
+    CHECK_THROWS(UnsupportedFeature, encode(plain, Cursor{}));
+    CHECK_THROWS(UnsupportedFeature, encode(plain, MoveCursor{1, 0}));
+    CHECK_THROWS(UnsupportedFeature, encode(plain, BlankRow{}));
+    CHECK_THROWS(UnsupportedFeature, encode(plain, ScreenBuffer::Alternate));
 }
+
 TEST(CAP_01_strict_plain_profile_accepts_only_default_style)
 {
     TerminalProfile plain;
-    plain.fallback=FallbackPolicy::Strict;
-    encodes("",plain,Style{},Traits{},fg(default_color),ResetStyle{});
-    CHECK_THROWS(UnsupportedFeature,encode(plain,fg(colors::red)));
-    CHECK_THROWS(UnsupportedFeature,encode(plain,Trait::Bold));
+    plain.fallback = FallbackPolicy::Strict;
+    encodes("", plain, Style{}, Traits{}, fg(default_color), ResetStyle{});
+    CHECK_THROWS(UnsupportedFeature, encode(plain, fg(colors::red)));
+    CHECK_THROWS(UnsupportedFeature, encode(plain, Trait::Bold));
 }
+
 TEST(CAP_01_supported_commands_match_the_raw_contract)
 {
-    auto profile=contract::full_profile();
-    encodes("\x1b[3;5H\x1b[38;2;1;2;3m",profile,Cursor{4,2},fg(RGB{0x010203}));
-    encodes("\x1b[?1049h",profile,ScreenBuffer::Alternate);
-    encodes("\x1b[?1004h",profile,FocusReporting::On);
-    encodes("\x1b[?2004h",profile,BracketedPaste::On);
+    auto profile = contract::full_profile();
+    encodes("\x1b[3;5H\x1b[38;2;1;2;3m", profile, Cursor{4, 2}, fg(RGB{0x010203}));
+    encodes("\x1b[?1049h", profile, ScreenBuffer::Alternate);
+    encodes("\x1b[?1004h", profile, FocusReporting::On);
+    encodes("\x1b[?2004h", profile, BracketedPaste::On);
 }
+
 TEST(CAP_01_unsupported_traits_fallback_or_throw)
 {
-    auto profile=contract::full_profile();
-    profile.traits=Trait::Bold | Trait::Underline;
-    encodes("\x1b[1m",profile,Trait::Bold | Trait::Italic);
-    encodes("\x1b[4m",profile,Trait::DoubleUnderline);
-    encodes("\x1b[4m",profile,Trait::Underline | Trait::DoubleUnderline);
-    profile.fallback=FallbackPolicy::Strict;
-    CHECK_THROWS(UnsupportedFeature,encode(profile,Trait::Italic));
-    CHECK_THROWS(UnsupportedFeature,encode(profile,Trait::DoubleUnderline));
-    encodes("",profile,Traits{});
+    auto profile = contract::full_profile();
+    profile.traits = Trait::Bold | Trait::Underline;
+    encodes("\x1b[1m", profile, Trait::Bold | Trait::Italic);
+    encodes("\x1b[4m", profile, Trait::DoubleUnderline);
+    encodes("\x1b[4m", profile, Trait::Underline | Trait::DoubleUnderline);
+    profile.fallback = FallbackPolicy::Strict;
+    CHECK_THROWS(UnsupportedFeature, encode(profile, Trait::Italic));
+    CHECK_THROWS(UnsupportedFeature, encode(profile, Trait::DoubleUnderline));
+    encodes("", profile, Traits{});
 }
+
 TEST(CAP_01_no_supported_traits_means_no_trait_bytes)
 {
-    auto profile=contract::full_profile();
-    profile.traits={};
-    encodes("",profile,Trait::Bold,Traits{});
-    profile.fallback=FallbackPolicy::Strict;
-    CHECK_THROWS(UnsupportedFeature,encode(profile,Trait::Bold));
-    encodes("",profile,Traits{});
+    auto profile = contract::full_profile();
+    profile.traits = {};
+    encodes("", profile, Trait::Bold, Traits{});
+    profile.fallback = FallbackPolicy::Strict;
+    CHECK_THROWS(UnsupportedFeature, encode(profile, Trait::Bold));
+    encodes("", profile, Traits{});
 }
+
 TEST(CAP_01_color_quantization_uses_specified_palette_and_ties)
 {
-    auto profile=contract::full_profile();
-    profile.colors=ColorSupport::Basic8;
-    encodes("\x1b[31m",profile,fg(RGB{0x800000}));
-    encodes("\x1b[30m",profile,fg(RGB{0x400000})); // Equidistant black/dark red, lower slot wins.
-    encodes("\x1b[41m",profile,bg(RGB{0x800000}));
-    encodes("\x1b[31m",profile,fg(colors::bright_red)); // Fold brightness, never add Bold.
-    encodes("\x1b[37m",profile,fg(IndexedColor{255}));
-    profile.colors=ColorSupport::Basic16;
-    encodes("\x1b[91m",profile,fg(RGB{0xFF0000}));
-    profile.system_palette[4]=RGB{1,2,3};
-    encodes("\x1b[34m",profile,fg(RGB{0x010203}));
+    auto profile = contract::full_profile();
+    profile.colors = ColorSupport::Basic8;
+    encodes("\x1b[31m", profile, fg(RGB{0x800000}));
+    encodes("\x1b[30m", profile,
+            fg(RGB{0x400000}));  // Equidistant black/dark red, lower slot wins.
+    encodes("\x1b[41m", profile, bg(RGB{0x800000}));
+    encodes("\x1b[31m", profile,
+            fg(colors::bright_red));  // Fold brightness, never add Bold.
+    encodes("\x1b[37m", profile, fg(IndexedColor{255}));
+    profile.colors = ColorSupport::Basic16;
+    encodes("\x1b[91m", profile, fg(RGB{0xFF0000}));
+    profile.system_palette[4] = RGB{1, 2, 3};
+    encodes("\x1b[34m", profile, fg(RGB{0x010203}));
 }
+
 TEST(CAP_01_indexed_quantization_has_fixed_expected_candidates)
 {
-    auto profile=contract::full_profile();
-    profile.colors=ColorSupport::Indexed256;
-    encodes("\x1b[38;5;67m",profile,fg(RGB{0x5F87AF}));
-    encodes("\x1b[38;5;232m",profile,fg(RGB{0x080808}));
-    encodes("\x1b[38;5;245m",profile,fg(RGB{0x8A8A8A}));
-    encodes("\x1b[31m",profile,fg(colors::red));
-    encodes("\x1b[38;5;196m",profile,fg(IndexedColor{196})); // Preserve slot even if RGB matches slot 9.
+    auto profile = contract::full_profile();
+    profile.colors = ColorSupport::Indexed256;
+    encodes("\x1b[38;5;67m", profile, fg(RGB{0x5F87AF}));
+    encodes("\x1b[38;5;232m", profile, fg(RGB{0x080808}));
+    encodes("\x1b[38;5;245m", profile, fg(RGB{0x8A8A8A}));
+    encodes("\x1b[31m", profile, fg(colors::red));
+    encodes("\x1b[38;5;196m", profile,
+            fg(IndexedColor{196}));  // Preserve slot even if RGB matches slot 9.
 }
+
 TEST(CAP_01_palette_approximation_matches_exhaustive_distance_search)
 {
     // Independent oracle: enumerate the complete declared palette, preserving
@@ -84,11 +95,13 @@ TEST(CAP_01_palette_approximation_matches_exhaustive_distance_search)
     auto check = [&](RGB input) {
         auto palette = profile.system_palette;
         unsigned best = 0, distance = 3 * 255 * 255 + 1;
-        unsigned count = profile.colors == ColorSupport::Basic8 ? 8
-                         : profile.colors == ColorSupport::Basic16 ? 16 : 256;
+        unsigned count = profile.colors == ColorSupport::Basic8    ? 8
+                         : profile.colors == ColorSupport::Basic16 ? 16
+                                                                   : 256;
         for (unsigned i = 0; i < count; ++i) {
             RGB candidate{0, 0, 0};
-            if (i < 16) candidate = palette[i];
+            if (i < 16)
+                candidate = palette[i];
             else if (i < 232) {
                 constexpr std::uint8_t values[] = {0, 95, 135, 175, 215, 255};
                 auto cube = i - 16;
@@ -102,19 +115,25 @@ TEST(CAP_01_palette_approximation_matches_exhaustive_distance_search)
             int g = int(input.green) - candidate.green;
             int b = int(input.blue) - candidate.blue;
             unsigned score = r * r + g * g + b * b;
-            if (score < distance) { best = i; distance = score; }
+            if (score < distance) {
+                best = i;
+                distance = score;
+            }
         }
-        CHECK(encode(profile, fg(RGB{input})) == encode(fg(IndexedColor{static_cast<std::uint8_t>(best)})));
+        CHECK(encode(profile, fg(RGB{input})) ==
+              encode(fg(IndexedColor{static_cast<std::uint8_t>(best)})));
     };
-    for (auto support : {ColorSupport::Basic8, ColorSupport::Basic16, ColorSupport::Indexed256}) {
+    for (auto support :
+         {ColorSupport::Basic8, ColorSupport::Basic16, ColorSupport::Indexed256}) {
         profile.colors = support;
         for (bool custom : {false, true}) {
             profile.system_palette = conventional_system_palette();
             if (custom) {
                 for (unsigned i = 0; i < 16; ++i)
-                    profile.system_palette[i] = RGB{static_cast<std::uint8_t>(i * 13),
-                                                    static_cast<std::uint8_t>(255 - i * 7),
-                                                    static_cast<std::uint8_t>(i * 11)};
+                    profile.system_palette[i] =
+                        RGB{static_cast<std::uint8_t>(i * 13),
+                            static_cast<std::uint8_t>(255 - i * 7),
+                            static_cast<std::uint8_t>(i * 11)};
             }
             // Every channel value in gray and off-gray inputs, including all
             // grayscale rounding transitions and ties between palette groups.
@@ -124,145 +143,184 @@ TEST(CAP_01_palette_approximation_matches_exhaustive_distance_search)
                 check({channel, static_cast<std::uint8_t>(255 - i), channel});
             }
             // All combinations immediately around the cube's decision planes.
-            constexpr std::uint8_t boundaries[] = {0, 47, 48, 114, 115, 116, 154, 155,
-                                                   156, 194, 195, 196, 234, 235, 236, 255};
+            constexpr std::uint8_t boundaries[] = {0,   47,  48,  114, 115, 116,
+                                                   154, 155, 156, 194, 195, 196,
+                                                   234, 235, 236, 255};
             for (auto r : boundaries)
                 for (auto g : boundaries)
-                    for (auto b : boundaries) check({r, g, b});
+                    for (auto b : boundaries)
+                        check({r, g, b});
         }
     }
 }
+
 TEST(CAP_01_default_colors_remain_default_and_none_drops_only_colors)
 {
-    auto profile=contract::full_profile();
-    profile.colors=ColorSupport::Basic8;
-    encodes("\x1b[39m\x1b[49m",profile,fg(default_color),bg(default_color));
-    profile.colors=ColorSupport::None;
-    encodes("\x1b[1m",profile,fg(colors::red),Trait::Bold);
-    encodes("",profile,fg(default_color));
-    profile.fallback=FallbackPolicy::Strict;
-    CHECK_THROWS(UnsupportedFeature,encode(profile,bg(colors::red)));
+    auto profile = contract::full_profile();
+    profile.colors = ColorSupport::Basic8;
+    encodes("\x1b[39m\x1b[49m", profile, fg(default_color), bg(default_color));
+    profile.colors = ColorSupport::None;
+    encodes("\x1b[1m", profile, fg(colors::red), Trait::Bold);
+    encodes("", profile, fg(default_color));
+    profile.fallback = FallbackPolicy::Strict;
+    CHECK_THROWS(UnsupportedFeature, encode(profile, bg(colors::red)));
 }
+
 TEST(CAP_01_strict_policy_never_approximates_color)
 {
-    auto profile=contract::full_profile();
-    profile.colors=ColorSupport::Basic8;
-    profile.fallback=FallbackPolicy::Strict;
-    encodes("\x1b[31m",profile,fg(colors::red));
-    CHECK_THROWS(UnsupportedFeature,encode(profile,fg(colors::bright_red)));
-    CHECK_THROWS(UnsupportedFeature,encode(profile,fg(IndexedColor{67})));
-    CHECK_THROWS(UnsupportedFeature,encode(profile,fg(RGB{0x800000})));
+    auto profile = contract::full_profile();
+    profile.colors = ColorSupport::Basic8;
+    profile.fallback = FallbackPolicy::Strict;
+    encodes("\x1b[31m", profile, fg(colors::red));
+    CHECK_THROWS(UnsupportedFeature, encode(profile, fg(colors::bright_red)));
+    CHECK_THROWS(UnsupportedFeature, encode(profile, fg(IndexedColor{67})));
+    CHECK_THROWS(UnsupportedFeature, encode(profile, fg(RGB{0x800000})));
 }
+
 TEST(CAP_01_mouse_protocol_can_fallback_but_tracking_cannot)
 {
-    auto profile=contract::full_profile();
-    constexpr auto off="\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1005l\x1b[?1006l\x1b[?1015l\x1b[?1016l";
-    encodes(std::string{off}+"\x1b[?1006h\x1b[?1000h",profile,MouseReporting{MouseMode::Basic,MouseProtocol::Legacy});
-    profile.maximum_mouse_mode=MouseMode::Basic;
-    CHECK_THROWS(UnsupportedFeature,encode(profile,MouseReporting{MouseMode::Drag,MouseProtocol::Sgr}));
-    profile.fallback=FallbackPolicy::Strict;
-    CHECK_THROWS(UnsupportedFeature,encode(profile,MouseReporting{MouseMode::Basic,MouseProtocol::Legacy}));
+    auto profile = contract::full_profile();
+    constexpr auto off =
+        "\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1005l\x1b[?1006l\x1b[?1015l\x1b[?1016l";
+    encodes(std::string{off} + "\x1b[?1006h\x1b[?1000h", profile,
+            MouseReporting{MouseMode::Basic, MouseProtocol::Legacy});
+    profile.maximum_mouse_mode = MouseMode::Basic;
+    CHECK_THROWS(UnsupportedFeature,
+                 encode(profile, MouseReporting{MouseMode::Drag, MouseProtocol::Sgr}));
+    profile.fallback = FallbackPolicy::Strict;
+    CHECK_THROWS(
+        UnsupportedFeature,
+        encode(profile, MouseReporting{MouseMode::Basic, MouseProtocol::Legacy}));
 }
+
 TEST(CAP_01_mode_support_is_required_under_both_policies)
 {
-    for (auto policy : {FallbackPolicy::BestEffort,FallbackPolicy::Strict}) {
-        auto profile=contract::full_profile();
-        profile.fallback=policy;
-        profile.alternate_screen=false;
-        profile.cursor_visibility=false;
-        profile.focus_reporting=false;
-        profile.bracketed_paste=false;
-        CHECK_THROWS(UnsupportedFeature,encode(profile,ScreenBuffer::Alternate));
-        CHECK_THROWS(UnsupportedFeature,encode(profile,CursorMode::Hide));
-        CHECK_THROWS(UnsupportedFeature,encode(profile,FocusReporting::On));
-        CHECK_THROWS(UnsupportedFeature,encode(profile,BracketedPaste::On));
+    for (auto policy : {FallbackPolicy::BestEffort, FallbackPolicy::Strict}) {
+        auto profile = contract::full_profile();
+        profile.fallback = policy;
+        profile.alternate_screen = false;
+        profile.cursor_visibility = false;
+        profile.focus_reporting = false;
+        profile.bracketed_paste = false;
+        CHECK_THROWS(UnsupportedFeature, encode(profile, ScreenBuffer::Alternate));
+        CHECK_THROWS(UnsupportedFeature, encode(profile, CursorMode::Hide));
+        CHECK_THROWS(UnsupportedFeature, encode(profile, FocusReporting::On));
+        CHECK_THROWS(UnsupportedFeature, encode(profile, BracketedPaste::On));
     }
 }
+
 TEST(BUF_01_capability_failure_is_transactional_for_all_commands)
 {
-    auto profile=contract::full_profile();
-    profile.fallback=FallbackPolicy::Strict;
-    profile.colors=ColorSupport::Basic8;
-    std::string output="prefix";
-    CHECK_THROWS(UnsupportedFeature,append_encoded(output,profile,Cursor{},fg(RGB{0x010203})));
+    auto profile = contract::full_profile();
+    profile.fallback = FallbackPolicy::Strict;
+    profile.colors = ColorSupport::Basic8;
+    std::string output = "prefix";
+    CHECK_THROWS(UnsupportedFeature,
+                 append_encoded(output, profile, Cursor{}, fg(RGB{0x010203})));
     CHECK(output == "prefix");
-    std::array<char,128> bytes;
+    std::array<char, 128> bytes;
     bytes.fill('#');
-    auto before=bytes;
-    CHECK_THROWS(UnsupportedFeature,encode_to(bytes,profile,Cursor{},fg(RGB{0x010203})));
+    auto before = bytes;
+    CHECK_THROWS(UnsupportedFeature,
+                 encode_to(bytes, profile, Cursor{}, fg(RGB{0x010203})));
     CHECK(bytes == before);
 }
+
 TEST(CAP_02_inconsistent_and_invalid_profiles_are_rejected)
 {
-    auto profile=contract::full_profile();
-    profile.control=false;
-    CHECK_THROWS(std::invalid_argument,encode(profile,ResetStyle{}));
-    profile=contract::full_profile();
-    profile.mouse_protocol=MouseProtocol::None;
-    CHECK_THROWS(std::invalid_argument,encode(profile,Cursor{}));
-    profile=contract::full_profile();
-    profile.colors=static_cast<ColorSupport>(99);
-    CHECK_THROWS(std::invalid_argument,encode(profile,Cursor{}));
+    auto profile = contract::full_profile();
+    profile.control = false;
+    CHECK_THROWS(std::invalid_argument, encode(profile, ResetStyle{}));
+    profile = contract::full_profile();
+    profile.mouse_protocol = MouseProtocol::None;
+    CHECK_THROWS(std::invalid_argument, encode(profile, Cursor{}));
+    profile = contract::full_profile();
+    profile.colors = static_cast<ColorSupport>(99);
+    CHECK_THROWS(std::invalid_argument, encode(profile, Cursor{}));
 }
+
 TEST(CAP_02_unknown_dumb_empty_and_redirected_output_are_plain)
 {
-    for (auto term : {"","dumb","unknown-terminal","xterm-256color-extra","not-xterm"}) {
-        auto report=resolve_profile(Environment{.term=term,.colorterm="truecolor"},true);
+    for (auto term :
+         {"", "dumb", "unknown-terminal", "xterm-256color-extra", "not-xterm"}) {
+        auto report =
+            resolve_profile(Environment{.term = term, .colorterm = "truecolor"}, true);
         CHECK(!report.profile.control);
         CHECK(report.profile.colors == ColorSupport::None);
         CHECK(report.profile.traits == Traits{});
     }
-    auto redirected=resolve_profile(Environment{.term="xterm-256color",.colorterm="truecolor"},false);
+    auto redirected = resolve_profile(
+        Environment{.term = "xterm-256color", .colorterm = "truecolor"}, false);
     CHECK(!redirected.profile.control);
     CHECK(redirected.profile.colors == ColorSupport::None);
 }
+
 TEST(CAP_03_exact_resolution_table_and_noncolor_capabilities)
 {
-    struct Case { char const* term; ColorSupport colors; bool full; bool alternate; bool visibility; bool mouse; };
+    struct Case {
+        char const* term;
+        ColorSupport colors;
+        bool full;
+        bool alternate;
+        bool visibility;
+        bool mouse;
+    };
+
     Case const cases[] = {
-        {"ansi",ColorSupport::Basic8,false,false,false,false},
-        {"xterm",ColorSupport::Basic8,true,true,true,true},
-        {"xterm-color",ColorSupport::Basic8,true,true,true,true},
-        {"xterm-256color",ColorSupport::Indexed256,true,true,true,true},
-        {"screen",ColorSupport::Basic8,false,true,true,false},
-        {"tmux",ColorSupport::Basic8,false,true,true,false},
-        {"screen-256color",ColorSupport::Indexed256,false,true,true,false},
-        {"tmux-256color",ColorSupport::Indexed256,false,true,true,false},
-        {"linux",ColorSupport::Basic16,false,false,true,false},
+        {"ansi", ColorSupport::Basic8, false, false, false, false},
+        {"xterm", ColorSupport::Basic8, true, true, true, true},
+        {"xterm-color", ColorSupport::Basic8, true, true, true, true},
+        {"xterm-256color", ColorSupport::Indexed256, true, true, true, true},
+        {"screen", ColorSupport::Basic8, false, true, true, false},
+        {"tmux", ColorSupport::Basic8, false, true, true, false},
+        {"screen-256color", ColorSupport::Indexed256, false, true, true, false},
+        {"tmux-256color", ColorSupport::Indexed256, false, true, true, false},
+        {"linux", ColorSupport::Basic16, false, false, true, false},
     };
     for (auto const& c : cases) {
-        auto report=resolve_profile(Environment{.term=c.term},true);
-        auto const& p=report.profile;
+        auto report = resolve_profile(Environment{.term = c.term}, true);
+        auto const& p = report.profile;
         CHECK(p.control && p.colors == c.colors);
-        CHECK(p.traits == (c.full ? contract::full_traits() : contract::basic_traits()));
+        CHECK(p.traits ==
+              (c.full ? contract::full_traits() : contract::basic_traits()));
         CHECK(p.alternate_screen == c.alternate && p.cursor_visibility == c.visibility);
         CHECK(p.mouse_protocol == (c.mouse ? MouseProtocol::Sgr : MouseProtocol::None));
         CHECK(p.maximum_mouse_mode == (c.mouse ? MouseMode::Move : MouseMode::Off));
         CHECK(p.focus_reporting == c.full && p.bracketed_paste == c.full);
     }
 }
+
 TEST(CAP_03_environment_precedence_and_case_sensitive_matching)
 {
-    for (auto hint : {"truecolor","24bit"}) {
-        auto report=resolve_profile(Environment{.term="xterm-256color",.colorterm=hint},true);
+    for (auto hint : {"truecolor", "24bit"}) {
+        auto report = resolve_profile(
+            Environment{.term = "xterm-256color", .colorterm = hint}, true);
         CHECK(report.profile.colors == ColorSupport::TrueColor);
     }
-    auto no_hint=resolve_profile(Environment{.term="xterm-256color"},true);
+    auto no_hint = resolve_profile(Environment{.term = "xterm-256color"}, true);
     CHECK(no_hint.profile.colors == ColorSupport::Indexed256);
-    auto wrong_case=resolve_profile(Environment{.term="xterm-256color",.colorterm="RGB"},true);
+    auto wrong_case = resolve_profile(
+        Environment{.term = "xterm-256color", .colorterm = "RGB"}, true);
     CHECK(wrong_case.profile.colors == ColorSupport::Indexed256);
-    auto no_color=resolve_profile(Environment{.term="xterm-256color",.colorterm="truecolor",.no_color=true},true);
+    auto no_color = resolve_profile(
+        Environment{
+            .term = "xterm-256color", .colorterm = "truecolor", .no_color = true},
+        true);
     CHECK(no_color.profile.colors == ColorSupport::None);
-    CHECK(no_color.profile.control && no_color.profile.traits == contract::full_traits());
+    CHECK(no_color.profile.control &&
+          no_color.profile.traits == contract::full_traits());
     CHECK(no_color.profile.mouse_protocol == MouseProtocol::Sgr);
 }
+
 TEST(CAP_03_reports_have_one_ordered_decision_per_feature)
 {
-    auto report=resolve_profile(Environment{.term="xterm-256color"},true);
-    Feature const features[] = {Feature::Control,Feature::Colors,Feature::Traits,
-        Feature::AlternateScreen,Feature::CursorVisibility,Feature::Mouse,Feature::Focus,Feature::BracketedPaste};
+    auto report = resolve_profile(Environment{.term = "xterm-256color"}, true);
+    Feature const features[] = {
+        Feature::Control,         Feature::Colors,           Feature::Traits,
+        Feature::AlternateScreen, Feature::CursorVisibility, Feature::Mouse,
+        Feature::Focus,           Feature::BracketedPaste};
     CHECK(report.decisions.size() == std::size(features) + 9);
-    for (std::size_t i=0;i<std::size(features);++i) {
+    for (std::size_t i = 0; i < std::size(features); ++i) {
         CHECK(report.decisions[i].feature == features[i]);
         CHECK(report.decisions[i].source == EvidenceSource::KnownTerminal);
         CHECK(!report.decisions[i].explanation.empty());
@@ -272,102 +330,120 @@ TEST(CAP_03_reports_have_one_ordered_decision_per_feature)
 TEST(ENC_01_raw_encoding_does_not_consult_capabilities)
 {
     auto const before = encode(fg(RGB{0x010203}));
-    static_cast<void>(resolve_profile(Environment{.term="dumb",.no_color=true},false));
+    static_cast<void>(
+        resolve_profile(Environment{.term = "dumb", .no_color = true}, false));
     static_cast<void>(encode(Trait::Bold));
     CHECK(encode(fg(RGB{0x010203})) == before);
     CHECK(before == "\x1b[38;2;1;2;3m");
 }
 
-
 TEST(CAP_01_disabled_modes_still_require_the_feature)
 {
-    for (auto policy : {FallbackPolicy::BestEffort,FallbackPolicy::Strict}) {
+    for (auto policy : {FallbackPolicy::BestEffort, FallbackPolicy::Strict}) {
         TerminalProfile plain;
-        plain.fallback=policy;
-        CHECK_THROWS(UnsupportedFeature,encode(plain,MoveCursor{}));
-        CHECK_THROWS(UnsupportedFeature,encode(plain,ScreenBuffer::Normal));
-        CHECK_THROWS(UnsupportedFeature,encode(plain,CursorMode::Show));
-        CHECK_THROWS(UnsupportedFeature,encode(plain,MouseReporting{}));
-        CHECK_THROWS(UnsupportedFeature,encode(plain,FocusReporting::Off));
-        CHECK_THROWS(UnsupportedFeature,encode(plain,BracketedPaste::Off));
+        plain.fallback = policy;
+        CHECK_THROWS(UnsupportedFeature, encode(plain, MoveCursor{}));
+        CHECK_THROWS(UnsupportedFeature, encode(plain, ScreenBuffer::Normal));
+        CHECK_THROWS(UnsupportedFeature, encode(plain, CursorMode::Show));
+        CHECK_THROWS(UnsupportedFeature, encode(plain, MouseReporting{}));
+        CHECK_THROWS(UnsupportedFeature, encode(plain, FocusReporting::Off));
+        CHECK_THROWS(UnsupportedFeature, encode(plain, BracketedPaste::Off));
     }
 }
+
 TEST(CAP_01_mouse_off_does_not_select_an_encoding)
 {
-    auto profile=contract::full_profile();
-    profile.fallback=FallbackPolicy::Strict;
-    for (auto protocol : {MouseProtocol::None,MouseProtocol::Legacy,MouseProtocol::Sgr,MouseProtocol::Urxvt})
-        encodes(encode(MouseReporting{}),profile,MouseReporting{MouseMode::Off,protocol});
+    auto profile = contract::full_profile();
+    profile.fallback = FallbackPolicy::Strict;
+    for (auto protocol : {MouseProtocol::None, MouseProtocol::Legacy,
+                          MouseProtocol::Sgr, MouseProtocol::Urxvt})
+        encodes(encode(MouseReporting{}), profile,
+                MouseReporting{MouseMode::Off, protocol});
 }
+
 TEST(CAP_01_invalid_commands_are_not_hidden_by_style_fallback)
 {
     TerminalProfile plain;
-    CHECK_THROWS(std::invalid_argument,encode(plain,Cursor{-1,0}));
-    CHECK_THROWS(std::invalid_argument,encode(plain,BlankRow{static_cast<Erase>(99)}));
-    CHECK_THROWS(std::invalid_argument,encode(plain,static_cast<Trait>(1)));
-    CHECK_THROWS(std::invalid_argument,encode(plain,static_cast<FocusReporting>(99)));
+    CHECK_THROWS(std::invalid_argument, encode(plain, Cursor{-1, 0}));
+    CHECK_THROWS(std::invalid_argument,
+                 encode(plain, BlankRow{static_cast<Erase>(99)}));
+    CHECK_THROWS(std::invalid_argument, encode(plain, static_cast<Trait>(1)));
+    CHECK_THROWS(std::invalid_argument, encode(plain, static_cast<FocusReporting>(99)));
 }
+
 TEST(CAP_01_empty_pack_validates_the_profile_and_preserves_output)
 {
-    auto profile=contract::full_profile();
-    profile.fallback=static_cast<FallbackPolicy>(99);
-    std::string output="prefix";
-    CHECK_THROWS(std::invalid_argument,append_encoded(output,profile));
-    CHECK(output=="prefix");
-    std::array<char,8> bytes;
+    auto profile = contract::full_profile();
+    profile.fallback = static_cast<FallbackPolicy>(99);
+    std::string output = "prefix";
+    CHECK_THROWS(std::invalid_argument, append_encoded(output, profile));
+    CHECK(output == "prefix");
+    std::array<char, 8> bytes;
     bytes.fill('x');
-    CHECK_THROWS(std::invalid_argument,encode_to(bytes,profile));
-    CHECK(std::all_of(bytes.begin(),bytes.end(),[](char value){return value=='x';}));
-    CHECK_THROWS(std::invalid_argument,encode(profile));
-    encodes("",TerminalProfile{});
+    CHECK_THROWS(std::invalid_argument, encode_to(bytes, profile));
+    CHECK(std::all_of(bytes.begin(), bytes.end(),
+                      [](char value) { return value == 'x'; }));
+    CHECK_THROWS(std::invalid_argument, encode(profile));
+    encodes("", TerminalProfile{});
 }
+
 TEST(CAP_01_supported_indexed_colors_are_preserved_exhaustively)
 {
-    auto profile=contract::full_profile();
-    for (auto depth : {ColorSupport::Indexed256,ColorSupport::TrueColor}) {
-        profile.colors=depth;
-        for (unsigned i=0;i<256;++i) {
-            auto color=IndexedColor{static_cast<std::uint8_t>(i)};
-            encodes(encode(fg(color)),profile,fg(color));
+    auto profile = contract::full_profile();
+    for (auto depth : {ColorSupport::Indexed256, ColorSupport::TrueColor}) {
+        profile.colors = depth;
+        for (unsigned i = 0; i < 256; ++i) {
+            auto color = IndexedColor{static_cast<std::uint8_t>(i)};
+            encodes(encode(fg(color)), profile, fg(color));
         }
     }
-    profile.colors=ColorSupport::Basic8;
-    for (unsigned i=8;i<16;++i)
-        encodes(encode(fg(IndexedColor{static_cast<std::uint8_t>(i-8)})),profile,
+    profile.colors = ColorSupport::Basic8;
+    for (unsigned i = 8; i < 16; ++i)
+        encodes(encode(fg(IndexedColor{static_cast<std::uint8_t>(i - 8)})), profile,
                 fg(IndexedColor{static_cast<std::uint8_t>(i)}));
 }
+
 TEST(CAP_01_unsupported_errors_identify_the_feature)
 {
-    auto check=[](auto command,Feature expected) {
-        try { (void)encode(TerminalProfile{},command); CHECK(false); }
-        catch (UnsupportedFeature const& error) { CHECK(error.feature()==expected); }
+    auto check = [](auto command, Feature expected) {
+        try {
+            (void)encode(TerminalProfile{}, command);
+            CHECK(false);
+        }
+        catch (UnsupportedFeature const& error) {
+            CHECK(error.feature() == expected);
+        }
     };
-    check(Cursor{},Feature::Control);
-    check(ScreenBuffer::Alternate,Feature::AlternateScreen);
-    check(CursorMode::Hide,Feature::CursorVisibility);
-    check(MouseReporting{},Feature::Mouse);
-    check(FocusReporting::On,Feature::Focus);
-    check(BracketedPaste::On,Feature::BracketedPaste);
+    check(Cursor{}, Feature::Control);
+    check(ScreenBuffer::Alternate, Feature::AlternateScreen);
+    check(CursorMode::Hide, Feature::CursorVisibility);
+    check(MouseReporting{}, Feature::Mouse);
+    check(FocusReporting::On, Feature::Focus);
+    check(BracketedPaste::On, Feature::BracketedPaste);
 }
 
 #if defined(__unix__) || defined(__APPLE__)
-#include "support/posix.hpp"
+#    include "support/posix.hpp"
+
 TEST(CAP_02_environment_snapshot_owns_values_and_resolution_is_pure)
 {
-    contract::EnvironmentVariable term{"TERM","xterm-256color"};
-    contract::EnvironmentVariable colorterm{"COLORTERM","truecolor"};
-    contract::EnvironmentVariable no_color{"NO_COLOR",""};
-    auto snapshot=snapshot_environment();
-    CHECK(snapshot.term=="xterm-256color" && snapshot.colorterm=="truecolor" && !snapshot.no_color);
+    contract::EnvironmentVariable term{"TERM", "xterm-256color"};
+    contract::EnvironmentVariable colorterm{"COLORTERM", "truecolor"};
+    contract::EnvironmentVariable no_color{"NO_COLOR", ""};
+    auto snapshot = snapshot_environment();
+    CHECK(snapshot.term == "xterm-256color" && snapshot.colorterm == "truecolor" &&
+          !snapshot.no_color);
     {
-        contract::EnvironmentVariable changed_term{"TERM","dumb"};
-        contract::EnvironmentVariable changed_color{"NO_COLOR","1"};
+        contract::EnvironmentVariable changed_term{"TERM", "dumb"};
+        contract::EnvironmentVariable changed_color{"NO_COLOR", "1"};
         CHECK(snapshot_environment().no_color);
-        CHECK(snapshot.term=="xterm-256color");
-        CHECK(resolve_profile(snapshot,true).profile.colors==ColorSupport::TrueColor);
-        CHECK(resolve_profile(Environment{"ansi","",false},true).profile.colors==ColorSupport::Basic8);
+        CHECK(snapshot.term == "xterm-256color");
+        CHECK(resolve_profile(snapshot, true).profile.colors ==
+              ColorSupport::TrueColor);
+        CHECK(resolve_profile(Environment{"ansi", "", false}, true).profile.colors ==
+              ColorSupport::Basic8);
     }
-    contract::EnvironmentVariable absent{"NO_COLOR",nullptr};
+    contract::EnvironmentVariable absent{"NO_COLOR", nullptr};
     CHECK(!snapshot_environment().no_color);
 }
 #endif

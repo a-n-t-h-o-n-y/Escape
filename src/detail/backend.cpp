@@ -6,10 +6,14 @@
 #include <cerrno>
 #include <climits>
 #include <system_error>
+
 namespace esc::detail {
 auto descriptor(std::FILE* stream) -> int { return stream ? ::fileno(stream) : -1; }
+
 auto is_terminal(int fd) -> bool { return fd >= 0 && ::isatty(fd); }
+
 Input::Input(int fd) : descriptor{fd}, terminal{is_terminal(fd)} {}
+
 auto terminal_identity(int input, int output) -> std::uint64_t
 {
     if (!is_terminal(input) || !is_terminal(output))
@@ -25,19 +29,27 @@ auto terminal_identity(int input, int output) -> std::uint64_t
                                 "Terminal: streams refer to different devices"};
     return static_cast<std::uint64_t>(in.st_rdev);
 }
+
 Input::~Input() = default;
+
 auto query_attributes(Attributes captured) -> Attributes
 {
     if (captured.c_lflag & ICANON)
         throw std::invalid_argument{"Query: immediate input is required"};
     return captured;
 }
+
 void prepare_queries(Input&) {}
+
 void stop_queries(Input&) noexcept {}
+
 auto transport_setup_required() noexcept -> bool { return false; }
+
 void begin_session(Attributes&) {}
+
 auto session_profile(int, int) -> ProfileReport
 { return resolve_profile(environment(), true); }
+
 auto desired_attributes(Attributes captured, TerminalOptions const& options)
     -> Attributes
 {
@@ -67,12 +79,14 @@ auto desired_attributes(Attributes captured, TerminalOptions const& options)
     }
     return captured;
 }
+
 auto read_bytes(Input& input, void* buffer, std::size_t count) -> std::ptrdiff_t
 {
     auto [fail, limit] = ESC_INTERCEPT(Read, count);
     if (fail) return -1;
     return ::read(input.descriptor, buffer, limit);
 }
+
 auto poll_input(Input& input, int timeout) -> int
 {
     auto [fail, limit] = ESC_INTERCEPT(Poll, 1);
@@ -87,6 +101,7 @@ auto poll_input(Input& input, int timeout) -> int
     }
     return result;
 }
+
 auto get_attributes(int fd, int output, Attributes* settings) -> int
 {
     auto [fail, limit] = ESC_INTERCEPT(GetAttributes, 0);
@@ -95,6 +110,7 @@ auto get_attributes(int fd, int output, Attributes* settings) -> int
     (void)output;
     return ::tcgetattr(fd, settings);
 }
+
 auto set_attributes(int fd, Attributes const* settings) -> int
 {
     auto [fail, limit] = ESC_INTERCEPT(SetAttributes, 0);
@@ -113,6 +129,7 @@ auto set_attributes(int fd, Attributes const* settings) -> int
 #endif
     return 0;
 }
+
 auto get_size(int fd) -> Area
 {
     auto [fail, limit] = ESC_INTERCEPT(GetSize, 0);
@@ -127,4 +144,4 @@ auto get_size(int fd) -> Area
 namespace esc::detail {
 auto wait_source(Input& input) -> WaitSource
 { return {WaitSourceKind::FileDescriptor, input.descriptor}; }
-}
+}  // namespace esc::detail

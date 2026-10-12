@@ -34,6 +34,7 @@ concept Attribute = detail::AnyOf<std::remove_cvref_t<T>,
                                   WithoutTraits,
                                   StylePatch,
                                   Style>;
+
 template <class T>
 concept PatchAttribute = Attribute<T> && !std::same_as<std::remove_cvref_t<T>, Style>;
 
@@ -43,11 +44,13 @@ constexpr void validate_color(Color const& color)
     if (color.valueless_by_exception())
         throw std::invalid_argument{"Style: valueless color"};
 }
+
 constexpr void validate_style(Style const& style)
 {
     validate_color(style.background);
     validate_color(style.foreground);
 }
+
 template <Attribute A>
 constexpr void validate_attribute(A const& attribute)
 {
@@ -66,6 +69,7 @@ constexpr void validate_attribute(A const& attribute)
                 "StylePatch: a trait cannot be both enabled and disabled"};
     }
 }
+
 template <PatchAttribute A>
 [[nodiscard]] constexpr auto patch(A const& attribute) -> StylePatch
 {
@@ -84,12 +88,14 @@ template <PatchAttribute A>
         result = attribute;
     return result;
 }
+
 constexpr void apply_attribute(Style& style, StylePatch const& patch)
 {
     if (patch.background) style.background = *patch.background;
     if (patch.foreground) style.foreground = *patch.foreground;
     style.traits.remove(patch.disabled).insert(patch.enabled);
 }
+
 template <Attribute A>
 constexpr void apply_attribute(Style& style, A const& attribute)
 {
@@ -119,6 +125,7 @@ template <PatchAttribute A, PatchAttribute B>
     left.disabled.remove(right.enabled).insert(right.disabled);
     return left;
 }
+
 template <PatchAttribute A>
 [[nodiscard]] constexpr auto operator|(A const& first, Style const& replacement)
     -> Style

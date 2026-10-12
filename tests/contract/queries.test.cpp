@@ -1,13 +1,14 @@
-#include "support/results.hpp"
 #include <esc/esc.hpp>
 #include <thread>
 #include <vector>
 #include "support/capabilities.hpp"
 #include "support/faults.hpp"
 #include "support/posix.hpp"
+#include "support/results.hpp"
 using namespace esc;
 using namespace std::chrono_literals;
 using namespace std::literals;
+
 namespace {
 auto options() -> TerminalOptions
 {
@@ -17,11 +18,14 @@ auto options() -> TerminalOptions
     options.input_buffer = InputBuffer::Immediate;
     return options;
 }
+
 auto open(contract::Pty& pty) -> Terminal
 { return Terminal::open({pty.input.get(), pty.output.get()}, options()); }
+
 struct Responder {
     std::exception_ptr error;
     std::thread thread;
+
     Responder(contract::Pty& pty,
               std::vector<std::pair<std::string, std::string>> stages)
         : thread{[&, stages = std::move(stages)] {
@@ -44,10 +48,12 @@ struct Responder {
               }
           }}
     {}
+
     ~Responder()
     {
         if (thread.joinable()) thread.join();
     }
+
     void check()
     {
         thread.join();
@@ -55,6 +61,7 @@ struct Responder {
     }
 };
 }  // namespace
+
 TEST(SES_QUERY_matches_reply_and_preserves_interleaved_input)
 {
     contract::Pty pty;
@@ -63,19 +70,22 @@ TEST(SES_QUERY_matches_reply_and_preserves_interleaved_input)
     auto result = terminal.query(ModeQuery{2004}, 500ms);
     responder.check();
     CHECK(contract::status(result) == contract::Status::Reply);
-    CHECK(contract::reply(result) == std::optional<Reply>{ModeReply{2004, ModeStatus::Set}});
+    CHECK(contract::reply(result) ==
+          std::optional<Reply>{ModeReply{2004, ModeStatus::Set}});
     CHECK(contract::event(terminal.read(0ms)) == std::optional<Event>{KeyEvent{U'a'}});
     CHECK(contract::event(terminal.read(0ms)) ==
           std::optional<Event>{TerminalReply{ModeReply{25, ModeStatus::Reset}}});
     CHECK(contract::event(terminal.read(0ms)) == std::optional<Event>{KeyEvent{U'b'}});
 }
+
 TEST(SES_QUERY_timeout_keeps_input_and_late_replies_visible)
 {
     contract::Pty pty;
     auto terminal = open(pty);
     pty.write("abc");
     auto before = std::chrono::steady_clock::now();
-    CHECK(contract::status(terminal.query(KeyboardQuery{}, 10ms)) == contract::Status::Timeout);
+    CHECK(contract::status(terminal.query(KeyboardQuery{}, 10ms)) ==
+          contract::Status::Timeout);
     CHECK(std::chrono::steady_clock::now() - before < 500ms);
     for (auto c : U"abc"sv)
         CHECK(contract::event(terminal.read(0ms)) == std::optional<Event>{KeyEvent{c}});
@@ -83,18 +93,23 @@ TEST(SES_QUERY_timeout_keeps_input_and_late_replies_visible)
     CHECK(contract::event(terminal.read(100ms)) ==
           std::optional<Event>{TerminalReply{KeyboardReply{0}}});
 }
+
 TEST(SES_QUERY_preservation_storage_is_bounded_without_dropping_input)
 {
     contract::Pty pty;
     auto terminal = open(pty);
     pty.write(std::string(65, 'x') + "\x1b[?1u");
-    CHECK(contract::status(terminal.query(KeyboardQuery{}, 100ms)) == contract::Status::InputPending);
-    CHECK(contract::status(terminal.query(KeyboardQuery{}, 100ms)) == contract::Status::InputPending);
+    CHECK(contract::status(terminal.query(KeyboardQuery{}, 100ms)) ==
+          contract::Status::InputPending);
+    CHECK(contract::status(terminal.query(KeyboardQuery{}, 100ms)) ==
+          contract::Status::InputPending);
     for (unsigned i = 0; i < 65; ++i)
-        CHECK(contract::event(terminal.read(100ms)) == std::optional<Event>{KeyEvent{U'x'}});
+        CHECK(contract::event(terminal.read(100ms)) ==
+              std::optional<Event>{KeyEvent{U'x'}});
     CHECK(contract::event(terminal.read(100ms)) ==
           std::optional<Event>{TerminalReply{KeyboardReply{1}}});
 }
+
 TEST(SES_QUERY_request_is_explicit_and_validates_before_writes)
 {
     contract::Pty pty;
@@ -109,6 +124,7 @@ TEST(SES_QUERY_request_is_explicit_and_validates_before_writes)
     CHECK(contract::event(terminal.read(100ms)) ==
           std::optional<Event>{TerminalReply{DeviceAttributesReply{{1, 2}}}});
 }
+
 TEST(SES_QUERY_canonical_input_is_rejected_before_output)
 {
     contract::Pty pty;
@@ -118,6 +134,7 @@ TEST(SES_QUERY_canonical_input_is_rejected_before_output)
     CHECK_THROWS(std::invalid_argument, terminal.query(KeyboardQuery{}, 10ms));
     CHECK(pty.drain().empty());
 }
+
 TEST(SES_QUERY_probe_batches_requests_and_keeps_evidence_separate)
 {
     contract::Pty pty;
@@ -140,6 +157,7 @@ TEST(SES_QUERY_probe_batches_requests_and_keeps_evidence_separate)
     CHECK(terminal.profile().colors == before);
     CHECK(contract::event(terminal.read(0ms)) == std::optional<Event>{KeyEvent{U'x'}});
 }
+
 TEST(SES_KITTY_negotiates_events_and_restores_prior_flags_on_close)
 {
     contract::Pty pty;
@@ -159,6 +177,7 @@ TEST(SES_KITTY_negotiates_events_and_restores_prior_flags_on_close)
     terminal.close();
     CHECK(pty.drain() == "\x1b[=0;1u");
 }
+
 TEST(SES_KITTY_rejected_or_missing_confirmation_rolls_back)
 {
     for (bool timeout : {false, true}) {
@@ -172,21 +191,26 @@ TEST(SES_KITTY_rejected_or_missing_confirmation_rolls_back)
         responder.check();
         CHECK(contract::status(result) ==
               (timeout ? contract::Status::Timeout : contract::Status::Rejected));
-        if (!timeout) CHECK(std::get<Rejected>(result).reply == Reply{KeyboardReply{1}});
+        if (!timeout)
+            CHECK(std::get<Rejected>(result).reply == Reply{KeyboardReply{1}});
         CHECK(terminal.keyboard_protocol() == KeyboardProtocol::Legacy);
-        CHECK(contract::event(terminal.read(0ms)) == std::optional<Event>{KeyEvent{U'x'}});
+        CHECK(contract::event(terminal.read(0ms)) ==
+              std::optional<Event>{KeyEvent{U'x'}});
         CHECK(pty.drain() == "\x1b[=0;1u");
         terminal.close();
         CHECK(pty.drain().empty());
     }
 }
+
 TEST(SES_KITTY_disable_restores_inherited_flags_and_allows_screen_changes)
 {
     contract::Pty pty;
     auto terminal = open(pty);
     Responder responder{pty,
                         {{"\x1b[?u", "\x1b[?1u"}, {"\x1b[=3;1u\x1b[?u", "\x1b[?3u"}}};
-    CHECK(contract::status(terminal.enable_keyboard(KittyFlags::Disambiguate | KittyFlags::EventTypes, 500ms)) == contract::Status::Reply);
+    CHECK(contract::status(terminal.enable_keyboard(
+              KittyFlags::Disambiguate | KittyFlags::EventTypes, 500ms)) ==
+          contract::Status::Reply);
     responder.check();
     terminal.disable_keyboard();
     CHECK(pty.drain() == "\x1b[=1;1u");
@@ -196,6 +220,7 @@ TEST(SES_KITTY_disable_restores_inherited_flags_and_allows_screen_changes)
     terminal.set(ScreenBuffer::Alternate);
     CHECK(pty.drain() == "\x1b[?1049h");
 }
+
 TEST(SES_KITTY_invalid_flags_and_no_support_do_not_change_keyboard_modes)
 {
     contract::Pty pty;
@@ -212,6 +237,7 @@ TEST(SES_KITTY_invalid_flags_and_no_support_do_not_change_keyboard_modes)
     CHECK(pty.drain() == "\x1b[?u");
     CHECK(terminal.keyboard_protocol() == KeyboardProtocol::Legacy);
 }
+
 TEST(SES_KITTY_partial_mode_write_is_unusable_and_cleanup_still_restores)
 {
     contract::Pty pty;
@@ -243,6 +269,7 @@ TEST(SES_QUERY_batch_validates_all_requests_before_transport_or_output)
     CHECK(operations.calls(testing::Operation::Flush) == 1);
     CHECK(pty.drain() == "\x1b[?u\x1b[c\x1b[?25$p");
 }
+
 TEST(SES_KITTY_renegotiation_restores_the_original_session_baseline)
 {
     contract::Pty pty;
@@ -254,7 +281,9 @@ TEST(SES_KITTY_renegotiation_restores_the_original_session_baseline)
                          {"\x1b[=3;1u\x1b[?u", "\x1b[?3u"}}};
     CHECK(contract::status(terminal.enable_keyboard(KittyFlags::Disambiguate, 500ms)) ==
           contract::Status::Reply);
-    CHECK(contract::status(terminal.enable_keyboard(KittyFlags::Disambiguate | KittyFlags::EventTypes, 500ms)) == contract::Status::Reply);
+    CHECK(contract::status(terminal.enable_keyboard(
+              KittyFlags::Disambiguate | KittyFlags::EventTypes, 500ms)) ==
+          contract::Status::Reply);
     responder.check();
     terminal.disable_keyboard();
     CHECK(pty.drain() == "\x1b[=0;1u");
@@ -267,7 +296,9 @@ TEST(SES_KITTY_rejection_preserves_inherited_protocol_interpretation)
     auto terminal = open(pty);
     Responder responder{pty,
                         {{"\x1b[?u", "\x1b[?1u"}, {"\x1b[=3;1u\x1b[?u", "\x1b[?1u"}}};
-    CHECK(contract::status(terminal.enable_keyboard(KittyFlags::Disambiguate | KittyFlags::EventTypes, 500ms)) == contract::Status::Rejected);
+    CHECK(contract::status(terminal.enable_keyboard(
+              KittyFlags::Disambiguate | KittyFlags::EventTypes, 500ms)) ==
+          contract::Status::Rejected);
     responder.check();
     CHECK(terminal.keyboard_protocol() == KeyboardProtocol::Kitty);
     CHECK(pty.drain() == "\x1b[=1;1u");

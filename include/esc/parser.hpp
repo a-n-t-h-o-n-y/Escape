@@ -1,4 +1,5 @@
 #pragma once
+
 #include <chrono>
 #include <cstddef>
 #include <esc/event.hpp>
@@ -14,31 +15,41 @@ struct InputProtocols {
     bool replies = false;
     KeyboardProtocol keyboard = KeyboardProtocol::Legacy;
 };
+
 struct ParserOptions {
     std::chrono::milliseconds escape_timeout{25}, sequence_timeout{250};
     std::size_t sequence_limit = 256, paste_chunk_size = 4096;
 };
+
 struct ParseResult {
     std::size_t consumed;
     std::optional<Event> event;
 };
+
 enum class PendingTimeout { Escape, Sequence };
 
 // Owns only a bounded incomplete unit, never an event queue. No clock or I/O.
 class Parser {
    public:
     explicit Parser(ParserOptions options = {}, InputProtocols protocols = {});
+
     auto next(std::span<char const> input) -> ParseResult;
+
     auto pending_timeout() const noexcept -> std::optional<PendingTimeout>;
+
     auto expire() -> std::optional<Event>;
+
     auto finish() -> std::optional<Event>;
+
     void configure(InputProtocols protocols);
+
     void reset() noexcept;
 
    private:
     friend class Reader;
     // Private transport grammar: never enabled for arbitrary terminal bytes.
     bool native_function_keys_ = false;
+
     enum class State {
         Ground,
         Escape,
@@ -57,8 +68,11 @@ class Parser {
     unsigned utf8_width_ = 0;
     bool alt_ = false, overflow_ = false, string_osc_ = false, string_escape_ = false;
     bool paste_first_ = true, paste_aborted_ = false, eof_ = false;
+
     auto unknown(InputProblem problem, bool final = true) -> Event;
+
     auto paste_chunk(bool last) -> Event;
+
     auto complete_sequence() -> Event;
 };
 }  // namespace esc

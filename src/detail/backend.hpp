@@ -1,4 +1,5 @@
 #pragma once
+
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -42,41 +43,68 @@ struct Input {
     std::string repeated;
 #endif
     explicit Input(int fd);
+
     ~Input();
 };
+
 auto descriptor(std::FILE* stream) -> int;
+
 auto is_terminal(int fd) -> bool;
+
 auto terminal_identity(int input, int output) -> std::uint64_t;
+
 auto read_bytes(Input& input, void* buffer, std::size_t count) -> std::ptrdiff_t;
+
 auto poll_input(Input& input, int timeout) -> int;
+
 auto wait_source(Input& input) -> WaitSource;
+
 auto write_bytes(std::FILE* stream, char const* bytes, std::size_t count)
     -> std::size_t;
+
 auto flush_stream(std::FILE* stream) -> int;
+
 auto get_attributes(int input, int output, Attributes* settings) -> int;
+
 auto set_attributes(int input, Attributes const* settings) -> int;
+
 auto desired_attributes(Attributes captured, TerminalOptions const& options)
     -> Attributes;
+
 auto query_attributes(Attributes captured) -> Attributes;
+
 void prepare_queries(Input& input);
+
 void stop_queries(Input& input) noexcept;
+
 auto transport_setup_required() noexcept -> bool;
+
 void begin_session(Attributes& captured);
+
 auto get_size(int fd) -> Area;
+
 auto environment() -> Environment;
+
 auto session_profile(int input, int output) -> ProfileReport;
+
 using Clock = std::chrono::steady_clock;
+
 auto deadline_after(Clock::time_point start, std::chrono::milliseconds duration)
     -> Clock::time_point;
+
 auto poll_delay(Clock::time_point deadline) -> int;
 }  // namespace esc::detail
 
 #ifdef ESCAPE_CONTRACT_TEST_HOOKS
 #    include "faults.hpp"
+
 namespace esc::testing {
+
 auto intercept(Operation operation, std::size_t count) -> std::pair<bool, std::size_t>;
+
 void transferred(Operation operation, std::size_t count);
 }  // namespace esc::testing
+
 #    define ESC_INTERCEPT(op, count) \
         esc::testing::intercept(esc::testing::Operation::op, count)
 #else

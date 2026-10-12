@@ -8,6 +8,7 @@
 #    include <thread>
 #    include <vector>
 #    include "faults.hpp"
+
 namespace esc::testing {
 struct FaultScope::Impl {
     std::vector<Fault> faults;
@@ -15,7 +16,9 @@ struct FaultScope::Impl {
     std::vector<bool> fired;
     Impl* previous = nullptr;
 };
+
 static thread_local FaultScope::Impl* active = nullptr;
+
 FaultScope::FaultScope(std::initializer_list<Fault> faults)
     : implementation_{std::make_unique<Impl>()}
 {
@@ -24,9 +27,12 @@ FaultScope::FaultScope(std::initializer_list<Fault> faults)
     implementation_->previous = active;
     active = implementation_.get();
 }
+
 FaultScope::~FaultScope() { active = implementation_->previous; }
+
 auto FaultScope::calls(Operation operation) const -> std::size_t
 { return implementation_->calls[static_cast<unsigned>(operation)]; }
+
 // Private friend-free adapter accesses only this translation unit's scope.
 auto intercept(Operation operation, std::size_t count) -> std::pair<bool, std::size_t>
 {
@@ -52,6 +58,7 @@ auto intercept(Operation operation, std::size_t count) -> std::pair<bool, std::s
     }
     return {false, count};
 }
+
 void transferred(Operation operation, std::size_t count)
 {
     if (active) active->bytes[static_cast<unsigned>(operation)] += count;
@@ -72,6 +79,7 @@ auto write_bytes(std::FILE* stream, char const* bytes, std::size_t count) -> std
 #endif
     return written;
 }
+
 auto flush_stream(std::FILE* stream) -> int
 {
     auto [fail, limit] = ESC_INTERCEPT(Flush, 0);
@@ -79,6 +87,7 @@ auto flush_stream(std::FILE* stream) -> int
     if (fail) return EOF;
     return std::fflush(stream);
 }
+
 auto environment() -> Environment
 {
     auto [fail, limit] = ESC_INTERCEPT(Environment, 0);
@@ -88,6 +97,7 @@ auto environment() -> Environment
                                 "Terminal: environment"};
     return snapshot_environment();
 }
+
 auto deadline_after(Clock::time_point start, std::chrono::milliseconds duration)
     -> Clock::time_point
 {
@@ -95,6 +105,7 @@ auto deadline_after(Clock::time_point start, std::chrono::milliseconds duration)
         Clock::time_point::max() - start);
     return duration >= available ? Clock::time_point::max() : start + duration;
 }
+
 auto poll_delay(Clock::time_point deadline) -> int
 {
     auto remaining = deadline - Clock::now();

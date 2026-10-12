@@ -21,6 +21,7 @@ void validate_protocols(InputProtocols p)
     }
     throw std::invalid_argument{"Parser: invalid mouse protocol"};
 }
+
 auto scalar_key(char32_t scalar, bool alt = false) -> KeyEvent
 {
     Key key = scalar;
@@ -33,6 +34,7 @@ auto scalar_key(char32_t scalar, bool alt = false) -> KeyEvent
     }
     return {key, Modifiers{.alt = alt}};
 }
+
 auto utf8_width(unsigned char byte) -> unsigned
 {
     if (byte >= 0xc2 && byte <= 0xdf) return 2;
@@ -40,10 +42,12 @@ auto utf8_width(unsigned char byte) -> unsigned
     if (byte >= 0xf0 && byte <= 0xf4) return 4;
     return 0;
 }
+
 struct Parameters {
     std::array<std::uint64_t, 3> values{};
     std::size_t size = 0;
     bool valid = true;
+
     explicit Parameters(std::string_view text)
     {
         if (text.empty()) return;
@@ -66,11 +70,13 @@ struct Parameters {
         }
     }
 };
+
 auto modifiers(std::uint64_t parameter) -> Modifiers
 {
     auto bits = parameter - 1;
     return {bool(bits & 1), bool(bits & 4), bool(bits & 2), bool(bits & 8)};
 }
+
 auto named_key(char final, bool keypad) -> std::optional<KeyCode>
 {
     switch (final) {
@@ -106,6 +112,7 @@ auto named_key(char final, bool keypad) -> std::optional<KeyCode>
     }
     return {};
 }
+
 auto tilde_key(std::uint64_t number, bool native_functions) -> std::optional<KeyCode>
 {
     if (native_functions) {
@@ -148,6 +155,7 @@ auto tilde_key(std::uint64_t number, bool native_functions) -> std::optional<Key
     }
     return {};
 }
+
 auto mouse_event(std::uint64_t code,
                  std::uint64_t x,
                  std::uint64_t y,
@@ -191,11 +199,13 @@ Parser::Parser(ParserOptions options, InputProtocols protocols)
         throw std::invalid_argument{"Parser: invalid limits or timeouts"};
     buffer_.reserve(std::max(options.sequence_limit, options.paste_chunk_size + 6));
 }
+
 void Parser::configure(InputProtocols p)
 {
     validate_protocols(p);
     protocols_ = p;
 }
+
 void Parser::reset() noexcept
 {
     state_ = State::Ground;
@@ -207,6 +217,7 @@ void Parser::reset() noexcept
     paste_first_ = true;
     paste_aborted_ = false;
 }
+
 auto Parser::pending_timeout() const noexcept -> std::optional<PendingTimeout>
 {
     if (state_ == State::Escape) return PendingTimeout::Escape;
@@ -215,6 +226,7 @@ auto Parser::pending_timeout() const noexcept -> std::optional<PendingTimeout>
         return PendingTimeout::Sequence;
     return {};
 }
+
 auto Parser::unknown(InputProblem problem, bool final) -> Event
 {
     Event event =
@@ -226,6 +238,7 @@ auto Parser::unknown(InputProblem problem, bool final) -> Event
     }
     return event;
 }
+
 auto Parser::paste_chunk(bool last) -> Event
 {
     auto count = std::min(buffer_.size(), options_.paste_chunk_size);
@@ -236,6 +249,7 @@ auto Parser::paste_chunk(bool last) -> Event
     if (last) state_ = State::Ground;
     return event;
 }
+
 auto Parser::complete_sequence() -> Event
 {
     if (overflow_) return unknown(InputProblem::TooLong);
@@ -317,6 +331,7 @@ auto Parser::complete_sequence() -> Event
     }
     return succeed(KeyEvent{*key, mods});
 }
+
 auto Parser::next(std::span<char const> input) -> ParseResult
 {
     if (eof_) throw std::logic_error{"Parser: reset required after finish"};
@@ -483,6 +498,7 @@ auto Parser::next(std::span<char const> input) -> ParseResult
             return event(unknown(InputProblem::Malformed));
     }
 }
+
 auto Parser::expire() -> std::optional<Event>
 {
     if (!pending_timeout()) return {};
@@ -493,6 +509,7 @@ auto Parser::expire() -> std::optional<Event>
     }
     return unknown(InputProblem::Truncated);
 }
+
 auto Parser::finish() -> std::optional<Event>
 {
     eof_ = true;

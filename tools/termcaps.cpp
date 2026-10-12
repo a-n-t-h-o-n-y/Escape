@@ -17,6 +17,7 @@
 
 using namespace esc;
 using namespace std::chrono_literals;
+
 namespace {
 constexpr std::array<std::string_view, 10> pages = {
     "System palette", "256 colors",     "True color",      "Text styles",
@@ -46,6 +47,7 @@ constexpr std::array<std::string_view, 17> features = {"Control sequences",
                                                        "Synchronized output",
                                                        "Bell",
                                                        "DECPS notes"};
+
 auto safe(std::string_view text) -> std::string
 {
     std::string result;
@@ -61,6 +63,7 @@ auto safe(std::string_view text) -> std::string
     }
     return result;
 }
+
 auto fit(std::string_view text, int columns) -> std::string
 {
     std::string result;
@@ -74,6 +77,7 @@ auto fit(std::string_view text, int columns) -> std::string
     }
     return result;
 }
+
 auto reply_text(Reply const& reply) -> std::string
 {
     return match(
@@ -93,6 +97,7 @@ auto reply_text(Reply const& reply) -> std::string
                    std::string{i < 5 ? states[i] : "invalid reply"};
         });
 }
+
 auto outcome(QueryResult const& r) -> std::string
 {
     return match(
@@ -104,6 +109,7 @@ auto outcome(QueryResult const& r) -> std::string
         },
         [](Rejected const& v) { return "Rejected: " + reply_text(v.reply); });
 }
+
 auto key_name(Key const& key) -> std::string
 {
     return match(
@@ -127,6 +133,7 @@ auto key_name(Key const& key) -> std::string
         },
         [](KittyKey k) { return "Kitty key " + std::to_string(k.code); });
 }
+
 auto event_text(Event const& event) -> std::string
 {
     return std::visit(
@@ -182,6 +189,7 @@ auto event_text(Event const& event) -> std::string
         },
         event);
 }
+
 auto tty(std::FILE* stream) -> bool
 {
 #ifdef _WIN32
@@ -190,6 +198,7 @@ auto tty(std::FILE* stream) -> bool
     return isatty(fileno(stream)) != 0;
 #endif
 }
+
 void report(Environment const& env, bool output_tty)
 {
     auto r = resolve_profile(env, output_tty);
@@ -202,6 +211,7 @@ void report(Environment const& env, bool output_tty)
     std::cout << "\nThese are assumptions, not test results. Run in a terminal for "
                  "interactive tests.\n";
 }
+
 class Tester {
     Terminal& terminal;
     Environment env;
@@ -219,6 +229,7 @@ class Tester {
     unsigned palette_offset = 0, report_offset = 0, cursor_shape = 0;
     std::string message = "Explore samples; press p to query terminal capabilities.";
     int x = 24, y = 7, width = 50;
+
     void row(int column,
              int line,
              std::string_view text,
@@ -231,18 +242,22 @@ class Tester {
         append_encoded(frame, Cursor{column, line},
                        styled(fit(text, size.width - column - 1), appearance));
     }
+
     void line(std::string_view text, Traits traits = {})
     { row(x, y++, fit(text, width), traits); }
+
     void heading(std::string_view text)
     {
         row(x, y++, fit(text, width), bold, true);
         ++y;
     }
+
     void sample(std::string_view text, StylePatch patch)
     {
         if (y >= size.height - 5) return;
         append_encoded(frame, Cursor{x, y++}, styled(fit(text, width), patch));
     }
+
     void body()
     {
         switch (page) {
@@ -414,6 +429,7 @@ class Tester {
           assumptions{resolve_profile(env, true)},
           chrome_color{!env.no_color}
     {}
+
     void draw()
     {
         size = terminal.area();
@@ -452,6 +468,7 @@ class Tester {
         terminal.output().write(frame);
         terminal.flush();
     }
+
     void query_modes()
     {
         probes.clear();
@@ -467,6 +484,7 @@ class Tester {
         page = 9;
         message = "Terminal replies recorded on the probe page.";
     }
+
     void kitty()
     {
         auto r = terminal.enable_keyboard(
@@ -478,6 +496,7 @@ class Tester {
         probes.push_back(message);
         if (probes.size() > 12) probes.erase(probes.begin());
     }
+
     bool handle(Event const& event)
     {
         events.push_front(event_text(event));
@@ -590,8 +609,10 @@ class Tester {
         return true;
     }
 };
+
 struct VisualCleanup {
     Terminal& terminal;
+
     ~VisualCleanup()
     {
         try {
@@ -604,6 +625,7 @@ struct VisualCleanup {
     }
 };
 }  // namespace
+
 int main(int argc, char** argv)
 {
     try {

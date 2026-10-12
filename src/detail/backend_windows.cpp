@@ -19,6 +19,7 @@ auto handle(int fd) -> HANDLE
     return fd < 0 ? INVALID_HANDLE_VALUE
                   : reinterpret_cast<HANDLE>(::_get_osfhandle(fd));
 }
+
 auto failed() -> int
 {
     switch (::GetLastError()) {
@@ -31,12 +32,14 @@ auto failed() -> int
     }
     return -1;
 }
+
 void check(BOOL success, char const* message)
 {
     if (!success)
         throw std::system_error{static_cast<int>(::GetLastError()),
                                 std::system_category(), message};
 }
+
 auto key_bytes(KEY_EVENT_RECORD const& key, Input& input) -> std::string
 {
     if (!key.bKeyDown) return {};
@@ -99,6 +102,7 @@ auto key_bytes(KEY_EVENT_RECORD const& key, Input& input) -> std::string
     bytes.append(encoded.view());
     return bytes;
 }
+
 void mouse_bytes(Input& input, MOUSE_EVENT_RECORD const& mouse)
 {
     auto held = mouse.dwButtonState & 0x1f;
@@ -185,6 +189,7 @@ void mouse_bytes(Input& input, MOUSE_EVENT_RECORD const& mouse)
             if ((held ^ previous) & masks[i]) append(codes[i], !(held & masks[i]));
     }
 }
+
 void echo(Input const& input, std::string_view bytes)
 {
     auto text = utf8_to_utf32(bytes);
@@ -224,6 +229,7 @@ void echo(Input const& input, std::string_view bytes)
         throw std::system_error{static_cast<int>(error), std::system_category(),
                                 "Reader: echo"};
 }
+
 void accept(Input& input, std::string const& bytes, DWORD mode)
 {
     if (bytes.empty()) return;
@@ -256,11 +262,13 @@ void accept(Input& input, std::string const& bytes, DWORD mode)
 }  // namespace
 
 auto descriptor(std::FILE* stream) -> int { return stream ? ::_fileno(stream) : -1; }
+
 auto is_terminal(int fd) -> bool
 {
     DWORD mode = 0;
     return ::GetConsoleMode(handle(fd), &mode) != FALSE;
 }
+
 // Optional console stream worker. Native-record input remains the default.
 // One bounded ReadFile can remain pending across caller timeouts. Stop cancels
 // and joins it before session modes or borrowed handles can be released.
@@ -271,6 +279,7 @@ struct Input::ConsoleRead {
     std::size_t offset = 0;
     bool requested = false;
     std::atomic<bool> stopping{false}, done{false}, work{false};
+
     explicit ConsoleRead(HANDLE handle) : source{handle}
     {
         ready = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
@@ -283,6 +292,7 @@ struct Input::ConsoleRead {
             check(FALSE, "Query: create read request event");
         }
     }
+
     static DWORD WINAPI run(void* context) noexcept
     {
         auto& read = *static_cast<ConsoleRead*>(context);
@@ -303,6 +313,7 @@ struct Input::ConsoleRead {
             ::SetEvent(read.ready);
         }
     }
+
     void start()
     {
         count = error = 0;
@@ -317,6 +328,7 @@ struct Input::ConsoleRead {
         work.store(true, std::memory_order_release);
         ::SetEvent(command);
     }
+
     ~ConsoleRead() noexcept
     {
         stopping.store(true, std::memory_order_release);
@@ -331,7 +343,9 @@ struct Input::ConsoleRead {
         ::CloseHandle(ready);
     }
 };
+
 Input::~Input() = default;
+
 void prepare_queries(Input& input)
 {
     if (input.high_surrogate)
@@ -345,7 +359,9 @@ void prepare_queries(Input& input)
         input.console_read =
             std::make_unique<Input::ConsoleRead>(handle(input.descriptor));
 }
+
 void stop_queries(Input& input) noexcept { input.console_read.reset(); }
+
 Input::Input(int fd) : descriptor{fd}, terminal{is_terminal(fd)}
 {
     if (terminal) {
@@ -353,6 +369,7 @@ Input::Input(int fd) : descriptor{fd}, terminal{is_terminal(fd)}
         line.reserve(4096);
     }
 }
+
 auto terminal_identity(int input, int output) -> std::uint64_t
 {
     DWORD mode = 0;
@@ -368,6 +385,7 @@ auto terminal_identity(int input, int output) -> std::uint64_t
     // its input modes and code pages, so even distinct output buffers overlap.
     return 1;
 }
+
 auto query_attributes(Attributes captured) -> Attributes
 {
     if (captured.input_mode & (ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT))
@@ -376,7 +394,9 @@ auto query_attributes(Attributes captured) -> Attributes
     captured.input_codepage = CP_UTF8;
     return captured;
 }
+
 auto transport_setup_required() noexcept -> bool { return true; }
+
 void begin_session(Attributes& captured)
 {
     auto previous = ::_setmode(captured.output, _O_BINARY);
@@ -385,6 +405,7 @@ void begin_session(Attributes& captured)
                                 "Terminal: output binary mode"};
     captured.output_crt_mode = previous;
 }
+
 auto session_profile(int, int output) -> ProfileReport
 {
     auto env = environment();
@@ -419,14 +440,19 @@ auto session_profile(int, int output) -> ProfileReport
     if (env.no_color)
         result.decisions[1] = {Feature::Colors, EvidenceSource::Environment,
                                "NO_COLOR disables colors"};
-    for (auto feature : {Feature::CursorStyle, Feature::CursorSaveRestore, Feature::Scrolling, Feature::Editing, Feature::WindowTitle, Feature::Hyperlinks, Feature::SynchronizedOutput})
-        result.decisions.push_back({feature, EvidenceSource::Default, "Extension support requires an explicit profile or explicit probe"});
+    for (auto feature : {Feature::CursorStyle, Feature::CursorSaveRestore,
+                         Feature::Scrolling, Feature::Editing, Feature::WindowTitle,
+                         Feature::Hyperlinks, Feature::SynchronizedOutput})
+        result.decisions.push_back(
+            {feature, EvidenceSource::Default,
+             "Extension support requires an explicit profile or explicit probe"});
     result.decisions.push_back({Feature::Bell, EvidenceSource::KnownTerminal,
-                               "Windows console baseline supports BEL"});
+                                "Windows console baseline supports BEL"});
     result.decisions.push_back({Feature::PlayNotes, EvidenceSource::Default,
-                               "DECPS playback requires an explicit profile"});
+                                "DECPS playback requires an explicit profile"});
     return result;
 }
+
 auto get_attributes(int input, int output, Attributes* settings) -> int
 {
     auto [fail, limit] = ESC_INTERCEPT(GetAttributes, 0);
@@ -442,6 +468,7 @@ auto get_attributes(int input, int output, Attributes* settings) -> int
     if (!settings->input_codepage || !settings->output_codepage) return failed();
     return 0;
 }
+
 auto desired_attributes(Attributes captured, TerminalOptions const& options)
     -> Attributes
 {
@@ -482,6 +509,7 @@ auto desired_attributes(Attributes captured, TerminalOptions const& options)
         throw std::invalid_argument{"Terminal: Windows echo requires canonical input"};
     return captured;
 }
+
 auto set_attributes(int input, Attributes const* settings) -> int
 {
     auto [fail, limit] = ESC_INTERCEPT(SetAttributes, 0);
@@ -510,6 +538,7 @@ auto set_attributes(int input, Attributes const* settings) -> int
     }
     return 0;
 }
+
 auto get_size(int fd) -> Area
 {
     auto [fail, limit] = ESC_INTERCEPT(GetSize, 0);
@@ -522,6 +551,7 @@ auto get_size(int fd) -> Area
     return {info.srWindow.Right - info.srWindow.Left + 1,
             info.srWindow.Bottom - info.srWindow.Top + 1};
 }
+
 auto poll_input(Input& input, int timeout) -> int
 {
     auto [fail, limit] = ESC_INTERCEPT(Poll, 1);
@@ -627,6 +657,7 @@ auto poll_input(Input& input, int timeout) -> int
         }
     }
 }
+
 auto read_bytes(Input& input, void* buffer, std::size_t count) -> std::ptrdiff_t
 {
     auto [fail, limit] = ESC_INTERCEPT(Read, count);
@@ -694,12 +725,15 @@ auto read_bytes(Input& input, void* buffer, std::size_t count) -> std::ptrdiff_t
 namespace esc::detail {
 auto wait_source(Input& input) -> WaitSource
 {
-    if(input.console_read)
-        return {WaitSourceKind::WindowsHandle, reinterpret_cast<std::intptr_t>(input.console_read->ready)};
-    auto source=handle(input.descriptor);
-    if(source==INVALID_HANDLE_VALUE) throw std::system_error{EBADF,std::generic_category(),"Reader: wait source"};
-    if(input.terminal) return {WaitSourceKind::WindowsHandle,reinterpret_cast<std::intptr_t>(source)};
+    if (input.console_read)
+        return {WaitSourceKind::WindowsHandle,
+                reinterpret_cast<std::intptr_t>(input.console_read->ready)};
+    auto source = handle(input.descriptor);
+    if (source == INVALID_HANDLE_VALUE)
+        throw std::system_error{EBADF, std::generic_category(), "Reader: wait source"};
+    if (input.terminal)
+        return {WaitSourceKind::WindowsHandle, reinterpret_cast<std::intptr_t>(source)};
     // Synchronous pipe handles do not expose waitable byte availability.
     return {};
 }
-}
+}  // namespace esc::detail

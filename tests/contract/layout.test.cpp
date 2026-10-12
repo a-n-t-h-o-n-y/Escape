@@ -4,8 +4,8 @@
 #include <esc/text.hpp>
 #include <ranges>
 #include <vector>
-#include "data/grapheme_break_cases.hpp"
 #include "../../src/detail/layout_data.hpp"
+#include "data/grapheme_break_cases.hpp"
 #include "support/allocations.hpp"
 #include "support/test.hpp"
 using namespace esc;
@@ -37,6 +37,7 @@ TEST(TXT_LAYOUT_all_766_official_unicode17_grapheme_cases)
         CHECK(index == expected.size());
     }
 }
+
 TEST(TXT_LAYOUT_borrowed_views_and_iterator_values)
 {
     std::string_view input = "a\xcc\x81\xe4\xb8\xad";
@@ -52,6 +53,7 @@ TEST(TXT_LAYOUT_borrowed_views_and_iterator_values)
     CHECK(graphemes(std::string_view{}).begin() == std::default_sentinel);
     CHECK(next_grapheme(std::u32string_view{}).empty());
 }
+
 TEST(TXT_LAYOUT_width_goldens_for_text_and_joined_clusters)
 {
     CHECK(cell_width("") == 0);
@@ -72,6 +74,7 @@ TEST(TXT_LAYOUT_width_goldens_for_text_and_joined_clusters)
     CHECK(cell_width(U"\u2764\ufe0e") == 1);
     CHECK(cell_width(U"\U0001f3f4\U000e0067\U000e0062\U000e007f") == 2);
 }
+
 TEST(TXT_LAYOUT_terminal_policies_are_explicit)
 {
     WidthPolicy p;
@@ -96,6 +99,7 @@ TEST(TXT_LAYOUT_terminal_policies_are_explicit)
     CHECK(!cell_width(U"\u0378", p));
     CHECK(cell_width(U"\ue000", p) == 2);  // PUA is assigned and East Asian ambiguous.
 }
+
 TEST(TXT_LAYOUT_overrides_cover_font_and_unicode_version_differences)
 {
     std::array overrides = {ScalarWidthOverride{U'·', 1}, ScalarWidthOverride{0x378, 2},
@@ -110,6 +114,7 @@ TEST(TXT_LAYOUT_overrides_cover_font_and_unicode_version_differences)
     p.overrides = controls;
     CHECK(!cell_width("\t", p));  // Overrides cannot erase cursor-dependent controls.
 }
+
 TEST(TXT_LAYOUT_controls_have_no_fixed_width_and_validation_continues)
 {
     for (char32_t cp = 0; cp < 32; ++cp)
@@ -122,6 +127,7 @@ TEST(TXT_LAYOUT_controls_have_no_fixed_width_and_validation_continues)
     char32_t malformed[] = {U'\n', 0xd800};
     CHECK_THROWS(UnicodeError, cell_width(std::u32string_view{malformed, 2}));
 }
+
 TEST(TXT_LAYOUT_grapheme_width_requires_one_cluster)
 {
     CHECK(grapheme_width(U"") == 0);
@@ -130,6 +136,7 @@ TEST(TXT_LAYOUT_grapheme_width_requires_one_cluster)
     CHECK_THROWS(std::invalid_argument, grapheme_width(U"ab"));
     CHECK_THROWS(std::invalid_argument, grapheme_width("ab"));
 }
+
 TEST(TXT_LAYOUT_invalid_encoding_offsets_are_in_original_units)
 {
     CHECK_THROWS(UnicodeError, next_grapheme(std::string_view{"\xc0\xaf", 2}));
@@ -157,6 +164,7 @@ TEST(TXT_LAYOUT_invalid_encoding_offsets_are_in_original_units)
         CHECK(error.offset() == 2);
     }
 }
+
 TEST(TXT_LAYOUT_invalid_policy_is_rejected_even_for_empty_input)
 {
     WidthPolicy p;
@@ -173,6 +181,7 @@ TEST(TXT_LAYOUT_invalid_policy_is_rejected_even_for_empty_input)
     p.overrides = too_wide;
     CHECK_THROWS(std::invalid_argument, cell_width("", p));
 }
+
 TEST(TXT_LAYOUT_utf8_and_utf32_measurements_agree)
 {
     for (auto const& item : unicode_cases::cases) {
@@ -186,6 +195,7 @@ TEST(TXT_LAYOUT_utf8_and_utf32_measurements_agree)
         }
     }
 }
+
 TEST(TXT_LAYOUT_long_contexts_are_linear_and_allocate_nothing)
 {
     std::u32string text = U"\U0001f469";
@@ -247,18 +257,22 @@ TEST(TXT_LAYOUT_every_scalar_width_matches_the_pinned_properties)
     std::size_t index = 0;
     for (char32_t cp = 0; cp <= 0x10ffff; ++cp) {
         if (cp >= 0xd800 && cp <= 0xdfff) continue;
-        while (index < std::size(ranges) && ranges[index].last < cp) ++index;
+        while (index < std::size(ranges) && ranges[index].last < cp)
+            ++index;
         auto bits = index < std::size(ranges) && ranges[index].first <= cp
-                        ? ranges[index].properties : 0;
+                        ? ranges[index].properties
+                        : 0;
         std::optional<std::size_t> expected;
         if (!(bits & (1u << 13))) {
-            expected = bits & (1u << 8) ? 2
+            expected = bits & (1u << 8)                   ? 2
                        : bits & ((1u << 11) | (1u << 14)) ? 0
-                       : ((bits >> 9) & 3) == 1 ? 2 : 1;
+                       : ((bits >> 9) & 3) == 1           ? 2
+                                                          : 1;
         }
         CHECK(cell_width(std::u32string_view{&cp, 1}) == expected);
     }
 }
+
 TEST(TXT_LAYOUT_ascii_runs_preserve_controls_errors_and_joined_suffixes)
 {
     for (std::size_t alignment = 0; alignment < 16; ++alignment) {

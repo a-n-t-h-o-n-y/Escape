@@ -25,6 +25,7 @@ namespace esc {
 struct DefaultColor {
     [[nodiscard]] constexpr bool operator==(DefaultColor const&) const = default;
 };
+
 inline constexpr DefaultColor default_color{};
 
 // -------------------------------------------------------------------------------------

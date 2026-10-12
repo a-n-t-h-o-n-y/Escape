@@ -1,8 +1,11 @@
 #pragma once
+
 #include <esc/key.hpp>
 #include <esc/point.hpp>
 #include <esc/sequence.hpp>
+
 namespace esc {
+
 enum class MouseButton {
     Left,
     Middle,

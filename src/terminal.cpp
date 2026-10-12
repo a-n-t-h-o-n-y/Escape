@@ -11,22 +11,27 @@ namespace esc {
 namespace {
 std::mutex lease_mutex;
 std::set<std::uint64_t> leases;
+
 auto error_code() -> std::error_code
 { return {errno ? errno : EIO, std::generic_category()}; }
+
 void checked(int result, char const* message)
 {
     if (result < 0) throw std::system_error{error_code(), message};
 }
+
 void require(bool supported, Feature feature)
 {
     if (!supported) throw UnsupportedFeature{feature};
 }
+
 template <class T>
 void valid_optional(std::optional<T> value, T first, T second)
 {
     if (value && *value != first && *value != second)
         throw std::invalid_argument{"Terminal: invalid setting"};
 }
+
 void validate_options(TerminalOptions const& options)
 {
     if (options.restore_modes.synchronized_output != SynchronizedOutput::Off &&
@@ -48,6 +53,7 @@ void validate_options(TerminalOptions const& options)
     if (options.resize_interval && options.resize_interval->count() <= 0)
         throw std::invalid_argument{"Terminal: nonpositive resize interval"};
 }
+
 void validate_restore(ProtocolState const& modes)
 {
     detail::SequenceWriter measure;
@@ -57,12 +63,14 @@ void validate_restore(ProtocolState const& modes)
     detail::encode(measure, modes.focus);
     detail::encode(measure, modes.paste);
 }
+
 auto input_protocols(ProtocolState const& modes) -> InputProtocols
 {
     return {
         modes.mouse.mode == MouseMode::Off ? MouseProtocol::None : modes.mouse.protocol,
         modes.focus == FocusReporting::On, modes.paste == BracketedPaste::On};
 }
+
 void validate_inherited(TerminalProfile const& profile, ProtocolState const& modes)
 {
     if (modes.mouse.mode != MouseMode::Off) {
@@ -74,6 +82,7 @@ void validate_inherited(TerminalProfile const& profile, ProtocolState const& mod
     if (modes.paste == BracketedPaste::On)
         require(profile.bracketed_paste, Feature::BracketedPaste);
 }
+
 auto desired_modes(TerminalProfile const& profile,
                    ProtocolState modes,
                    TerminalOptions const& patch) -> ProtocolState
@@ -89,6 +98,7 @@ auto desired_modes(TerminalProfile const& profile,
     if (patch.paste) modes.paste = *patch.paste;
     return modes;
 }
+
 auto changed_modes(ProtocolState const& before, ProtocolState const& after)
     -> std::array<bool, 5>
 {
@@ -99,6 +109,7 @@ auto changed_modes(ProtocolState const& before, ProtocolState const& after)
     return {before.screen_buffer != after.screen_buffer, before.cursor != after.cursor,
             mouse, before.focus != after.focus, before.paste != after.paste};
 }
+
 void validate_transition(TerminalProfile const& profile,
                          ProtocolState const& before,
                          ProtocolState const& after)
@@ -110,6 +121,7 @@ void validate_transition(TerminalProfile const& profile,
     if (changed[3]) require(profile.focus_reporting, Feature::Focus);
     if (changed[4]) require(profile.bracketed_paste, Feature::BracketedPaste);
 }
+
 void merge_os(TerminalOptions& current, TerminalOptions const& patch)
 {
     if (patch.echo) current.echo = patch.echo;
@@ -117,6 +129,7 @@ void merge_os(TerminalOptions& current, TerminalOptions const& patch)
     if (patch.signals) current.signals = patch.signals;
     if (patch.mouse) current.mouse = patch.mouse;
 }
+
 auto explicit_report(TerminalProfile profile) -> ProfileReport
 {
     ProfileReport result{profile, {}};
@@ -144,26 +157,31 @@ auto explicit_report(TerminalProfile profile) -> ProfileReport
     return result;
 }
 }  // namespace
+
 struct Frame::State {
     Output* output = nullptr;
     bool* usable = nullptr;
     bool open = true, baseline = false, touched = false, synchronized = false;
     unsigned depth = 0;
     std::optional<bool> confirmed;
+
     void command(SynchronizedOutput mode)
     {
         output->write(mode);
         output->flush();
     }
 };
+
 Frame::Frame(std::shared_ptr<State> const& state, bool synchronized) noexcept
     : state_{state}, synchronized_{synchronized}
 {}
+
 Frame::Frame(Frame&& other) noexcept
     : state_{std::move(other.state_)},
       active_{other.active_},
       synchronized_{other.synchronized_}
 { other.active_ = false; }
+
 Frame::~Frame() noexcept
 {
     try {
@@ -172,11 +190,13 @@ Frame::~Frame() noexcept
     catch (...) {
     }
 }
+
 auto Frame::synchronized() const noexcept -> bool
 {
     auto state = state_.lock();
     return active_ && state && state->open && synchronized_;
 }
+
 void Frame::close()
 {
     if (!active_) return;
@@ -216,6 +236,7 @@ struct Terminal::Impl {
     bool replies = false, keyboard_touched = false;
     KeyboardProtocol keyboard = KeyboardProtocol::Legacy;
     unsigned saved_keyboard_flags = 0;
+
     void configure_reader()
     {
         auto protocols = input_protocols(modes);
@@ -223,6 +244,7 @@ struct Terminal::Impl {
         protocols.keyboard = keyboard;
         reader.configure_session(protocols, modes.mouse.mode, output_fd);
     }
+
     void enqueue(Event event) noexcept
     {
         static_assert(std::is_nothrow_move_constructible_v<Event>);
@@ -230,6 +252,7 @@ struct Terminal::Impl {
             std::move(event));
         ++deferred_count;
     }
+
     auto dequeue() -> Event
     {
         auto result = std::move(*deferred[deferred_head]);
@@ -238,6 +261,7 @@ struct Terminal::Impl {
         --deferred_count;
         return result;
     }
+
     void keyboard_command(unsigned flags)
     {
         std::array<char, 32> bytes;
@@ -248,8 +272,10 @@ struct Terminal::Impl {
         output.write(std::string_view{bytes.data(), writer.size()});
         output.flush();
     }
+
     bool leased = false, open = false, usable = true, os_touched = false;
     std::shared_ptr<Frame::State> frames = std::make_shared<Frame::State>();
+
     Impl(Streams s,
          int input,
          int out,
@@ -270,6 +296,7 @@ struct Terminal::Impl {
           captured{attributes},
           current{attributes}
     {}
+
     ~Impl() noexcept
     {
         // Also covers unexpected exceptions while open() is still constructing.
@@ -281,6 +308,7 @@ struct Terminal::Impl {
             }
         }
     }
+
     void reserve()
     {
         std::lock_guard guard{lease_mutex};
@@ -291,6 +319,7 @@ struct Terminal::Impl {
         leased = true;
         open = true;
     }
+
     void release()
     {
         if (leased) {
@@ -300,6 +329,7 @@ struct Terminal::Impl {
         }
         open = false;
     }
+
     void emit(std::size_t index, ProtocolState const& target)
     {
         // Every mode command is bounded by 128 bytes, independently of a pack.
@@ -314,6 +344,7 @@ struct Terminal::Impl {
         }
         output.write(std::string_view{bytes.data(), result.written});
     }
+
     template <class Action>
     static void attempt(std::error_code& first, Action action)
     {
@@ -330,6 +361,7 @@ struct Terminal::Impl {
             if (!first) first = std::make_error_code(std::errc::io_error);
         }
     }
+
     auto restore_transition(ProtocolState const& old_modes,
                             detail::Attributes const& old_attributes,
                             std::array<bool, 5> const& attempted,
@@ -346,6 +378,7 @@ struct Terminal::Impl {
             });
         return error;
     }
+
     void apply(TerminalOptions const& patch)
     {
         validate_options(patch);
@@ -404,6 +437,7 @@ struct Terminal::Impl {
         modes = next;
         configure_reader();
     }
+
     auto cleanup() -> std::error_code
     {
         std::error_code error;
@@ -440,10 +474,13 @@ auto TerminalOptions::interactive() -> TerminalOptions
     result.cursor = CursorMode::Hide;
     return result;
 }
+
 Terminal::Terminal(std::unique_ptr<Impl> implementation) noexcept
     : impl_{std::move(implementation)}
 {}
+
 Terminal::Terminal(Terminal&&) noexcept = default;
+
 Terminal::~Terminal() noexcept
 {
     try {
@@ -452,8 +489,10 @@ Terminal::~Terminal() noexcept
     catch (...) {
     }
 }
+
 auto Terminal::open(TerminalOptions options) -> Terminal
 { return open(Streams{}, options); }
+
 auto Terminal::open(Streams streams, TerminalOptions options) -> Terminal
 {
     if (!streams.input || !streams.output)
@@ -504,44 +543,54 @@ auto Terminal::open(Streams streams, TerminalOptions options) -> Terminal
     }
     return Terminal{std::move(impl)};
 }
+
 void Terminal::require_open() const
 {
     if (!impl_ || !impl_->open || !impl_->usable)
         throw std::logic_error{"Terminal: session is closed or unusable"};
 }
+
 auto Terminal::is_open() const noexcept -> bool { return impl_ && impl_->open; }
+
 auto Terminal::profile() const -> TerminalProfile const&
 {
     require_open();
     return impl_->report.profile;
 }
+
 auto Terminal::profile_report() const -> ProfileReport const&
 {
     require_open();
     return impl_->report;
 }
+
 auto Terminal::output() -> Output&
 {
     require_open();
     return impl_->output;
 }
+
 void Terminal::flush() { output().flush(); }
+
 void Terminal::apply(TerminalOptions const& patch)
 {
     require_open();
     impl_->apply(patch);
 }
+
 auto Terminal::area() const -> Area
 {
     require_open();
     return detail::get_size(impl_->output_fd);
 }
+
 void Terminal::close()
 {
     if (!is_open()) return;
     auto error = impl_->cleanup();
     if (error) throw std::system_error{error, "Terminal: cleanup"};
 }
+
 auto Terminal::frame() -> Frame
 {
     require_open();
@@ -588,6 +637,7 @@ auto Terminal::frame() -> Frame
     ++state.depth;
     return Frame{impl_->frames, state.synchronized};
 }
+
 auto Terminal::confirm_synchronized_output(std::chrono::milliseconds timeout)
     -> QueryResult
 {
@@ -604,6 +654,7 @@ auto Terminal::confirm_synchronized_output(std::chrono::milliseconds timeout)
     }
     return result;
 }
+
 auto Terminal::wait_state() -> WaitState
 {
     require_open();
@@ -625,9 +676,12 @@ auto Terminal::wait_state() -> WaitState
         state.deadline = impl_->next_resize;
     return state;
 }
+
 auto Terminal::read() -> ReadResult { return read_until({}); }
+
 auto Terminal::read(std::chrono::milliseconds timeout) -> ReadResult
 { return read_until(timeout); }
+
 auto Terminal::read_until(std::optional<std::chrono::milliseconds> timeout)
     -> ReadResult
 {
@@ -660,6 +714,7 @@ auto Terminal::read_until(std::optional<std::chrono::milliseconds> timeout)
         if (!std::holds_alternative<Timeout>(result)) return result;
     }
 }
+
 namespace {
 auto matches(Query const& query, Reply const& reply) -> bool
 {
@@ -677,6 +732,7 @@ auto matches(Query const& query, Reply const& reply) -> bool
         },
         query);
 }
+
 auto remaining(detail::Clock::time_point deadline) -> std::chrono::milliseconds
 {
     auto now = detail::Clock::now();
@@ -685,8 +741,10 @@ auto remaining(detail::Clock::time_point deadline) -> std::chrono::milliseconds
                : std::chrono::ceil<std::chrono::milliseconds>(deadline - now);
 }
 }  // namespace
+
 void Terminal::request(Query const& query)
 { request(std::span<Query const>{&query, 1}); }
+
 void Terminal::request(std::span<Query const> queries)
 {
     require_open();
@@ -727,6 +785,7 @@ void Terminal::request(std::span<Query const> queries)
     impl_->output.write(std::string_view{batch.data(), used});
     impl_->output.flush();
 }
+
 auto Terminal::query(Query const& request, std::chrono::milliseconds timeout)
     -> QueryResult
 {
@@ -753,6 +812,7 @@ auto Terminal::query(Query const& request, std::chrono::milliseconds timeout)
         impl_->enqueue(std::move(std::get<Event>(result)));
     }
 }
+
 auto Terminal::probe(std::chrono::milliseconds timeout) -> ProbeReport
 {
     require_open();
@@ -810,6 +870,7 @@ auto Terminal::keyboard_protocol() const -> KeyboardProtocol
     require_open();
     return impl_->keyboard;
 }
+
 void Terminal::disable_keyboard()
 {
     require_open();
@@ -826,6 +887,7 @@ void Terminal::disable_keyboard()
                                                   : KeyboardProtocol::Legacy;
     impl_->configure_reader();
 }
+
 auto Terminal::enable_keyboard(KittyFlags flags, std::chrono::milliseconds timeout)
     -> QueryResult
 {

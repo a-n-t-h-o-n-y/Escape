@@ -5,6 +5,7 @@
 #include "support/encoding.hpp"
 #include "support/test.hpp"
 using namespace esc;
+
 namespace {
 auto extensions_profile() -> TerminalProfile
 {
@@ -20,6 +21,7 @@ auto extensions_profile() -> TerminalProfile
     return p;
 }
 }  // namespace
+
 TEST(ENC_EXT_cursor_styles_have_literal_goldens)
 {
     std::string_view expected[] = {"\x1b[0 q", "\x1b[1 q", "\x1b[2 q", "\x1b[3 q",
@@ -32,6 +34,7 @@ TEST(ENC_EXT_cursor_styles_have_literal_goldens)
           "8");
     CHECK_THROWS(std::invalid_argument, encode(static_cast<CursorStyle>(7)));
 }
+
 TEST(ENC_EXT_scroll_region_uses_inclusive_zero_based_rows)
 {
     CHECK(encode(ScrollRegion{2, 9}, ResetScrollRegion{}) == "\x1b[3;10r\x1b[r");
@@ -40,6 +43,7 @@ TEST(ENC_EXT_scroll_region_uses_inclusive_zero_based_rows)
     CHECK_THROWS(std::invalid_argument, encode(ScrollRegion{2, 2}));
     CHECK_THROWS(std::invalid_argument, encode(ScrollRegion{3, 2}));
 }
+
 TEST(ENC_EXT_scroll_and_edit_counts_do_not_invent_zero_as_one)
 {
     CHECK(encode(ScrollUp{2}, ScrollDown{3}, InsertCharacters{4}, DeleteCharacters{5},
@@ -50,6 +54,7 @@ TEST(ENC_EXT_scroll_and_edit_counts_do_not_invent_zero_as_one)
               .empty());
     CHECK(encode(InsertCharacters{UINT_MAX}) == "\x1b[4294967295@");
 }
+
 TEST(ENC_EXT_osc_literals_preserve_utf8_and_use_ST)
 {
     CHECK(encode(WindowTitle{"Hello 界"}) == "\x1b]2;Hello 界\x1b\\");
@@ -60,6 +65,7 @@ TEST(ENC_EXT_osc_literals_preserve_utf8_and_use_ST)
     CHECK(encode(SynchronizedOutput::On, SynchronizedOutput::Off) ==
           "\x1b[?2026h\x1b[?2026l");
 }
+
 TEST(ENC_EXT_payload_controls_and_invalid_unicode_are_rejected)
 {
     for (unsigned c = 0; c < 32; ++c) {
@@ -80,6 +86,7 @@ TEST(ENC_EXT_payload_controls_and_invalid_unicode_are_rejected)
         CHECK_THROWS(std::invalid_argument,
                      encode(BeginHyperlink{"https://example.com", id}));
 }
+
 TEST(BUF_EXT_bounded_and_reserved_osc_encoding_allocate_nothing)
 {
     std::array<char, 256> storage;
@@ -93,11 +100,12 @@ TEST(BUF_EXT_bounded_and_reserved_osc_encoding_allocate_nothing)
                             BeginHyperlink{"https://example.com", "x"}, EndHyperlink{});
     CHECK(result.written == expected.size());
     CHECK(std::string_view{storage.data(), result.written} == expected);
-    append_encoded(output, WindowTitle{"界"}, BeginHyperlink{"https://example.com", "x"},
-                  EndHyperlink{});
+    append_encoded(output, WindowTitle{"界"},
+                   BeginHyperlink{"https://example.com", "x"}, EndHyperlink{});
     CHECK(std::string_view{output}.substr(6) == expected);
     CHECK(scope.count() == 0);
 }
+
 TEST(BUF_EXT_short_capacity_and_invalid_later_command_preserve_storage)
 {
     std::array<char, 32> storage;
@@ -114,6 +122,7 @@ TEST(BUF_EXT_short_capacity_and_invalid_later_command_preserve_storage)
                  append_encoded(output, SaveCursor{}, WindowTitle{"\xff"}));
     CHECK(output == "prefix");
 }
+
 TEST(BUF_EXT_append_snapshots_aliased_payloads_before_growth)
 {
     std::string output = "https://example.com";
@@ -135,6 +144,7 @@ TEST(BUF_EXT_append_snapshots_aliased_payloads_before_growth)
     }
     CHECK(output == before);
 }
+
 TEST(BUF_EXT_span_encoding_rejects_overlapping_payloads)
 {
     std::array<char, 128> storage{};
@@ -153,6 +163,7 @@ TEST(BUF_EXT_span_encoding_rejects_overlapping_payloads)
     CHECK(result.written == 11 && result.required == 11);
     CHECK(std::string_view{storage.data(), 11} == "\x1b]2;title\x1b\\");
 }
+
 TEST(CAP_EXT_optional_extensions_are_explicit_and_validate_before_fallback)
 {
     TerminalProfile plain;
@@ -171,6 +182,7 @@ TEST(CAP_EXT_optional_extensions_are_explicit_and_validate_before_fallback)
     full.control = false;
     CHECK_THROWS(std::invalid_argument, encode(full, WindowTitle{"x"}));
 }
+
 TEST(CAP_EXT_report_lists_each_new_feature_without_environment_guesses)
 {
     auto report = resolve_profile(Environment{"xterm-256color", "", false}, true);
@@ -198,7 +210,9 @@ TEST(ENC_EXT_ascii_payload_scanning_preserves_validation_at_every_word_offset)
                     static_cast<void>(encode(WindowTitle{payload}));
                     CHECK(false);
                 }
-                catch (UnicodeError const& error) { CHECK(error.offset() == offset + 8); }
+                catch (UnicodeError const& error) {
+                    CHECK(error.offset() == offset + 8);
+                }
             }
             else if (byte < 32 || byte == 127)
                 CHECK_THROWS(std::invalid_argument, encode(WindowTitle{payload}));
@@ -209,7 +223,8 @@ TEST(ENC_EXT_ascii_payload_scanning_preserves_validation_at_every_word_offset)
         CHECK(encode(WindowTitle{payload}) == "\x1b]2;" + payload + "\x1b\\");
         payload += "\xc2\x9f";
         std::string destination = "prefix";
-        CHECK_THROWS(std::invalid_argument, append_encoded(destination, WindowTitle{payload}));
+        CHECK_THROWS(std::invalid_argument,
+                     append_encoded(destination, WindowTitle{payload}));
         CHECK(destination == "prefix");
     }
 }
@@ -221,136 +236,159 @@ TEST(ENC_SOUND_bell_and_melody_have_literal_wire_encodings)
 {
     using namespace std::chrono_literals;
     contract::encodes("\x07", Bell{});
-    contract::encodes("\x1b[4;4;1;5;8,~",
-                     PlayNotes{.notes={Note::C5, Note::E5, Note::G5},
-                               .duration=125ms, .volume=4});
-    contract::encodes("\x1b[7;1;0;25,~",
-                     PlayNotes{.notes={Note::Rest, Note::C7},
-                               .duration=31250us, .volume=7});
-    contract::encodes("\x1b[0;255;1,~",
-                     PlayNotes{.notes={Note::C5}, .duration=7968750us, .volume=0});
-    contract::encodes("\x1b[4;0;1,~", PlayNotes{.notes={Note::C5}, .duration=0us});
+    contract::encodes(
+        "\x1b[4;4;1;5;8,~",
+        PlayNotes{
+            .notes = {Note::C5, Note::E5, Note::G5}, .duration = 125ms, .volume = 4});
+    contract::encodes(
+        "\x1b[7;1;0;25,~",
+        PlayNotes{.notes = {Note::Rest, Note::C7}, .duration = 31250us, .volume = 7});
+    contract::encodes(
+        "\x1b[0;255;1,~",
+        PlayNotes{.notes = {Note::C5}, .duration = 7968750us, .volume = 0});
+    contract::encodes("\x1b[4;0;1,~", PlayNotes{.notes = {Note::C5}, .duration = 0us});
     contract::encodes("", PlayNotes{});
-    std::string expected="\x1b[4;4";
-    for (unsigned i=1; i<=25; ++i) {
+    std::string expected = "\x1b[4;4";
+    for (unsigned i = 1; i <= 25; ++i) {
         contract::encodes("\x1b[4;4;" + std::to_string(i) + ",~",
-                         PlayNotes{.notes={static_cast<Note>(i)}});
+                          PlayNotes{.notes = {static_cast<Note>(i)}});
     }
-    PlayNotes long_melody{.notes=std::vector<Note>(17, Note::C5)};
-    for (unsigned i=0; i<16; ++i) expected += ";1";
+    PlayNotes long_melody{.notes = std::vector<Note>(17, Note::C5)};
+    for (unsigned i = 0; i < 16; ++i)
+        expected += ";1";
     expected += ",~\x1b[4;4;1,~";
     contract::encodes(expected, long_melody);
-    auto owned=sequence(PlayNotes{.notes={Note::C5}});
+    auto owned = sequence(PlayNotes{.notes = {Note::C5}});
     contract::encodes("a\x07\x1b[4;4;1,~z", "a", Bell{}, owned, "z");
 }
+
 TEST(ENC_SOUND_invalid_melodies_validate_before_any_output)
 {
     using namespace std::chrono_literals;
     std::vector<PlayNotes> invalid = {
-        {.notes={Note::C5}, .duration=-31250us},
-        {.notes={Note::C5}, .duration=-1us},
-        {.notes={Note::C5}, .duration=7968751us},
-        {.notes={Note::C5}, .duration=std::chrono::microseconds::min()},
-        {.notes={Note::C5}, .duration=std::chrono::microseconds::max()},
-        {.notes={Note::C5}, .duration=8000000us},
-        {.notes={Note::C5}, .volume=8},
-        {.notes={Note::C5, static_cast<Note>(26)}},
-        {.notes={}, .volume=8}};
+        {.notes = {Note::C5}, .duration = -31250us},
+        {.notes = {Note::C5}, .duration = -1us},
+        {.notes = {Note::C5}, .duration = 7968751us},
+        {.notes = {Note::C5}, .duration = std::chrono::microseconds::min()},
+        {.notes = {Note::C5}, .duration = std::chrono::microseconds::max()},
+        {.notes = {Note::C5}, .duration = 8000000us},
+        {.notes = {Note::C5}, .volume = 8},
+        {.notes = {Note::C5, static_cast<Note>(26)}},
+        {.notes = {}, .volume = 8}};
     for (auto const& value : invalid) {
         CHECK_THROWS(std::invalid_argument, encode(value));
         CHECK_THROWS(std::invalid_argument, encode(TerminalProfile{}, value));
-        std::string output="unchanged";
+        std::string output = "unchanged";
         CHECK_THROWS(std::invalid_argument, append_encoded(output, Bell{}, value));
-        CHECK(output=="unchanged");
-        std::array<char,128> bytes;
+        CHECK(output == "unchanged");
+        std::array<char, 128> bytes;
         bytes.fill('#');
-        auto before=bytes;
+        auto before = bytes;
         CHECK_THROWS(std::invalid_argument, encode_to(bytes, "prefix", value));
-        CHECK(bytes==before);
+        CHECK(bytes == before);
         CHECK_THROWS(std::invalid_argument, encode_to(std::span<char>{}, value));
     }
-    PlayNotes alias{.notes={Note::C5}};
+    PlayNotes alias{.notes = {Note::C5}};
     alias.notes.reserve(128);
-    auto const before=alias.notes;
+    auto const before = alias.notes;
     CHECK_THROWS(std::invalid_argument,
                  encode_to(std::span{reinterpret_cast<char*>(alias.notes.data()),
-                                     alias.notes.capacity()}, alias));
-    CHECK(alias.notes==before);
+                                     alias.notes.capacity()},
+                           alias));
+    CHECK(alias.notes == before);
 }
+
 TEST(ENC_SOUND_duration_rounds_consistently_and_accepts_exact_ticks)
 {
     using namespace std::chrono_literals;
     static_assert(std::chrono::microseconds{NoteDuration{4}} == 125ms);
-    struct Case { std::chrono::microseconds duration; unsigned ticks; };
-    constexpr Case cases[] = {
-        {0us, 0}, {1us, 1}, {15624us, 1}, {15625us, 1},
-        {31250us, 1}, {46874us, 1}, {46875us, 2}, {46876us, 2},
-        {100ms, 3}, {125ms, 4}, {7968749us, 255}, {7968750us, 255}};
+
+    struct Case {
+        std::chrono::microseconds duration;
+        unsigned ticks;
+    };
+
+    constexpr Case cases[] = {{0us, 0},     {1us, 1},         {15624us, 1},
+                              {15625us, 1}, {31250us, 1},     {46874us, 1},
+                              {46875us, 2}, {46876us, 2},     {100ms, 3},
+                              {125ms, 4},   {7968749us, 255}, {7968750us, 255}};
     TerminalProfile profile;
     profile.control = true;
     profile.play_notes = true;
     for (auto c : cases) {
-        PlayNotes melody{.notes={Note::C5}, .duration=c.duration};
-        auto expected="\x1b[4;" + std::to_string(c.ticks) + ";1,~";
+        PlayNotes melody{.notes = {Note::C5}, .duration = c.duration};
+        auto expected = "\x1b[4;" + std::to_string(c.ticks) + ";1,~";
         contract::encodes(expected, melody);
         for (auto policy : {FallbackPolicy::BestEffort, FallbackPolicy::Strict}) {
             profile.fallback = policy;
             CHECK(encode(profile, melody) == expected);
         }
     }
-    for (int ticks=0; ticks<=255; ++ticks)
-        CHECK(encode(PlayNotes{.notes={Note::C5}, .duration=NoteDuration{ticks}}) ==
+    for (int ticks = 0; ticks <= 255; ++ticks)
+        CHECK(encode(PlayNotes{.notes = {Note::C5}, .duration = NoteDuration{ticks}}) ==
               "\x1b[4;" + std::to_string(ticks) + ";1,~");
     TerminalProfile disabled;
-    CHECK(encode(disabled, PlayNotes{.notes={Note::C5}, .duration=100ms}).empty());
+    CHECK(encode(disabled, PlayNotes{.notes = {Note::C5}, .duration = 100ms}).empty());
 }
+
 TEST(CAP_SOUND_bell_and_playback_are_independent_optional_features)
 {
-    PlayNotes melody{.notes={Note::C5}};
+    PlayNotes melody{.notes = {Note::C5}};
     TerminalProfile profile;
     CHECK(encode(profile, Bell{}, melody).empty());
-    profile.bell=true; // BEL does not require cursor/color control.
-    CHECK(encode(profile, Bell{}, melody)=="\x07");
-    profile.fallback=FallbackPolicy::Strict;
-    CHECK(encode(profile, Bell{})=="\x07");
+    profile.bell = true;  // BEL does not require cursor/color control.
+    CHECK(encode(profile, Bell{}, melody) == "\x07");
+    profile.fallback = FallbackPolicy::Strict;
+    CHECK(encode(profile, Bell{}) == "\x07");
     CHECK(encode(profile, PlayNotes{}).empty());
-    try { static_cast<void>(encode(profile, melody)); CHECK(false); }
-    catch (UnsupportedFeature const& e) { CHECK(e.feature()==Feature::PlayNotes); }
-    profile.bell=false;
-    try { static_cast<void>(encode(profile, Bell{})); CHECK(false); }
-    catch (UnsupportedFeature const& e) { CHECK(e.feature()==Feature::Bell); }
-    profile.control=true;
-    profile.play_notes=true;
-    CHECK(encode(profile, melody)=="\x1b[4;4;1,~");
-    profile.control=false;
+    try {
+        static_cast<void>(encode(profile, melody));
+        CHECK(false);
+    }
+    catch (UnsupportedFeature const& e) {
+        CHECK(e.feature() == Feature::PlayNotes);
+    }
+    profile.bell = false;
+    try {
+        static_cast<void>(encode(profile, Bell{}));
+        CHECK(false);
+    }
+    catch (UnsupportedFeature const& e) {
+        CHECK(e.feature() == Feature::Bell);
+    }
+    profile.control = true;
+    profile.play_notes = true;
+    CHECK(encode(profile, melody) == "\x1b[4;4;1,~");
+    profile.control = false;
     CHECK_THROWS(std::invalid_argument, encode(profile, melody));
-    auto report=resolve_profile(Environment{"xterm-256color", "", true}, true);
+    auto report = resolve_profile(Environment{"xterm-256color", "", true}, true);
     CHECK(report.profile.bell && !report.profile.play_notes);
-    CHECK(report.decisions[15].feature==Feature::Bell);
-    CHECK(report.decisions[15].source==EvidenceSource::KnownTerminal);
-    CHECK(report.decisions[16].feature==Feature::PlayNotes);
-    CHECK(report.decisions[16].source==EvidenceSource::Default);
+    CHECK(report.decisions[15].feature == Feature::Bell);
+    CHECK(report.decisions[15].source == EvidenceSource::KnownTerminal);
+    CHECK(report.decisions[16].feature == Feature::PlayNotes);
+    CHECK(report.decisions[16].source == EvidenceSource::Default);
     CHECK(!resolve_profile(Environment{"xterm", "", false}, false).profile.bell);
     CHECK(!resolve_profile(Environment{"unknown", "", false}, true).profile.bell);
 }
+
 TEST(BUF_SOUND_preallocated_encoding_does_not_copy_the_melody)
 {
-    PlayNotes melody{.notes=std::vector<Note>(100, Note::C5)};
+    PlayNotes melody{.notes = std::vector<Note>(100, Note::C5)};
     TerminalProfile profile;
-    profile.control=true;
-    profile.play_notes=true;
-    profile.bell=true;
-    std::array<char,1024> bytes;
+    profile.control = true;
+    profile.play_notes = true;
+    profile.bell = true;
+    std::array<char, 1024> bytes;
     std::string output;
     output.reserve(1024);
     std::size_t allocations;
     {
         contract::AllocationScope scope;
-        auto result=encode_to(bytes, profile, Bell{}, melody);
-        CHECK(result.written==result.required && result.written>0);
+        auto result = encode_to(bytes, profile, Bell{}, melody);
+        CHECK(result.written == result.required && result.written > 0);
         append_encoded(output, profile, Bell{}, melody);
-        allocations=scope.count();
+        allocations = scope.count();
     }
-    CHECK(allocations==0);
-    CHECK(output==encode(Bell{}, melody));
+    CHECK(allocations == 0);
+    CHECK(output == encode(Bell{}, melody));
 }

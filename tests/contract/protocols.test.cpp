@@ -2,6 +2,7 @@
 #include "support/fixtures.hpp"
 using namespace esc;
 using namespace std::literals;
+
 TEST(PAR_QUERY_requests_have_literal_bytes_and_bounded_output)
 {
     CHECK(encode_query(DeviceAttributesQuery{}) == "\x1b[c");
@@ -14,6 +15,7 @@ TEST(PAR_QUERY_requests_have_literal_bytes_and_bounded_output)
     CHECK_THROWS(std::invalid_argument, query_to(bytes, ModeQuery{0}));
     CHECK_THROWS(std::invalid_argument, encode_query(ModeQuery{65536}));
 }
+
 TEST(PAR_QUERY_replies_survive_every_fragment_boundary)
 {
     InputProtocols p{.replies = true};
@@ -29,6 +31,7 @@ TEST(PAR_QUERY_replies_survive_every_fragment_boundary)
                                      KeyEvent{KeyCode::ArrowUp}, KeyEvent{U'b'}},
                                     p);
 }
+
 TEST(PAR_QUERY_reply_parsing_is_explicit_and_does_not_confuse_F3)
 {
     contract::parses_at_every_split(
@@ -36,6 +39,7 @@ TEST(PAR_QUERY_reply_parsing_is_explicit_and_does_not_confuse_F3)
     contract::parses_at_every_split(
         "\x1b[1;2R", {KeyEvent{KeyCode::F3, {.shift = true}}}, {.replies = true});
 }
+
 TEST(PAR_QUERY_invalid_replies_remain_owned_unknown_units)
 {
     for (auto bytes : {"\x1b[?u", "\x1b[?0;1$y", "\x1b[?25;5$y", "\x1b[?25;1;2$y",
@@ -44,6 +48,7 @@ TEST(PAR_QUERY_invalid_replies_remain_owned_unknown_units)
             bytes, {UnknownInput{bytes, InputProblem::Malformed, true}},
             {.replies = true});
 }
+
 TEST(PAR_KITTY_identity_modifiers_actions_and_text_are_separate)
 {
     InputProtocols p{.keyboard = KeyboardProtocol::Kitty};
@@ -68,6 +73,7 @@ TEST(PAR_KITTY_identity_modifiers_actions_and_text_are_separate)
     key.base_layout_key = U'c';
     contract::parses_at_every_split("\x1b[97::99u", {key}, p);
 }
+
 TEST(PAR_KITTY_every_modifier_bit_has_its_own_meaning)
 {
     for (unsigned bits = 0; bits < 256; ++bits) {
@@ -80,12 +86,14 @@ TEST(PAR_KITTY_every_modifier_bit_has_its_own_meaning)
                                         {key}, {.keyboard = KeyboardProtocol::Kitty});
     }
 }
+
 TEST(PAR_KITTY_functional_and_legacy_forms_have_independent_goldens)
 {
     struct Case {
         char const* bytes;
         KeyCode code;
     };
+
     Case cases[] = {{"\x1b[27u", KeyCode::Escape},
                     {"\x1b[13u", KeyCode::Enter},
                     {"\x1b[9u", KeyCode::Tab},
@@ -115,6 +123,7 @@ TEST(PAR_KITTY_functional_and_legacy_forms_have_independent_goldens)
     contract::parses_at_every_split("\x1b[60000u", {key},
                                     {.keyboard = KeyboardProtocol::Kitty});
 }
+
 TEST(PAR_KITTY_invalid_fields_do_not_invent_text_or_keys)
 {
     for (auto bytes :
@@ -128,8 +137,10 @@ TEST(PAR_KITTY_invalid_fields_do_not_invent_text_or_keys)
         "\x1b[1;2R", {UnknownInput{"\x1b[1;2R", InputProblem::Unsupported, true}},
         {.keyboard = KeyboardProtocol::Kitty});
     CHECK_THROWS(std::invalid_argument,
+
                  Parser({}, {.keyboard = static_cast<KeyboardProtocol>(99)}));
 }
+
 TEST(PAR_KITTY_protocol_snapshot_and_plain_text_keep_their_contracts)
 {
     Parser parser{{}, {.keyboard = KeyboardProtocol::Kitty}};
@@ -143,6 +154,7 @@ TEST(PAR_KITTY_protocol_snapshot_and_plain_text_keep_their_contracts)
     contract::parses_at_every_split("x\x1b[97u", {KeyEvent{U'x'}, key},
                                     {.keyboard = KeyboardProtocol::Kitty});
 }
+
 TEST(PAR_KITTY_textless_events_and_small_replies_do_not_allocate)
 {
     Parser parser{{}, {.replies = true, .keyboard = KeyboardProtocol::Kitty}};

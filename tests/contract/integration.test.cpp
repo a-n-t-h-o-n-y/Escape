@@ -1,4 +1,3 @@
-#include "support/results.hpp"
 #include <esc/esc.hpp>
 #include <optional>
 #include <thread>
@@ -6,8 +5,10 @@
 #include "support/capabilities.hpp"
 #include "support/faults.hpp"
 #include "support/posix.hpp"
+#include "support/results.hpp"
 using namespace esc;
 using namespace std::chrono_literals;
+
 namespace {
 auto opts(bool synchronized = true) -> TerminalOptions
 {
@@ -24,9 +25,11 @@ auto opts(bool synchronized = true) -> TerminalOptions
     o.input_buffer = InputBuffer::Immediate;
     return o;
 }
+
 auto open(contract::Pty& pty, bool sync = true) -> Terminal
 { return Terminal::open({pty.input.get(), pty.output.get()}, opts(sync)); }
 }  // namespace
+
 TEST(SES_EXT_frames_nest_and_only_final_close_presents)
 {
     contract::Pty pty;
@@ -46,6 +49,7 @@ TEST(SES_EXT_frames_nest_and_only_final_close_presents)
     inner.close();
     CHECK(pty.drain().empty());
 }
+
 TEST(SES_EXT_frames_unwind_exceptions_and_follow_terminal_moves)
 {
     contract::Pty pty;
@@ -60,6 +64,7 @@ TEST(SES_EXT_frames_unwind_exceptions_and_follow_terminal_moves)
     }
     CHECK(pty.drain() == "\x1b[?2026hx\x1b[?2026l");
 }
+
 TEST(SES_EXT_frame_guard_can_outlive_terminal_and_close)
 {
     contract::Pty pty;
@@ -76,6 +81,7 @@ TEST(SES_EXT_frame_guard_can_outlive_terminal_and_close)
     guard.reset();
     CHECK(pty.drain().empty());
 }
+
 TEST(SES_EXT_inherited_synchronization_is_preserved)
 {
     contract::Pty pty;
@@ -90,6 +96,7 @@ TEST(SES_EXT_inherited_synchronization_is_preserved)
     terminal.close();
     CHECK(pty.drain() == "x");
 }
+
 TEST(SES_EXT_frame_fallback_and_strict_rejection)
 {
     contract::Pty pty;
@@ -107,6 +114,7 @@ TEST(SES_EXT_frame_fallback_and_strict_rejection)
     CHECK_THROWS(UnsupportedFeature, terminal.frame());
     CHECK(pty.drain().empty());
 }
+
 TEST(SES_EXT_frame_blocks_screen_changes_before_output)
 {
     contract::Pty pty;
@@ -119,6 +127,7 @@ TEST(SES_EXT_frame_blocks_screen_changes_before_output)
     frame.close();
     terminal.set(ScreenBuffer::Alternate);
 }
+
 TEST(SES_EXT_frame_partial_begin_rolls_back_and_rejects_further_work)
 {
     contract::Pty pty;
@@ -133,6 +142,7 @@ TEST(SES_EXT_frame_partial_begin_rolls_back_and_rejects_further_work)
     terminal.close();
     CHECK(pty.drain().ends_with("\x1b[?2026l"));
 }
+
 TEST(SES_EXT_frame_end_failure_is_retried_by_terminal_cleanup)
 {
     contract::Pty pty;
@@ -148,6 +158,7 @@ TEST(SES_EXT_frame_end_failure_is_retried_by_terminal_cleanup)
     terminal.close();
     CHECK(pty.drain() == "\x1b[?2026l");
 }
+
 TEST(SES_EXT_frame_creation_and_nesting_allocate_nothing_after_open)
 {
     contract::Pty pty;
@@ -159,6 +170,7 @@ TEST(SES_EXT_frame_creation_and_nesting_allocate_nothing_after_open)
     first.close();
     CHECK(scope.count() == 0);
 }
+
 TEST(SES_EXT_explicit_probe_confirms_sync_and_preserves_ordinary_input)
 {
     contract::Pty pty;
@@ -178,6 +190,7 @@ TEST(SES_EXT_explicit_probe_confirms_sync_and_preserves_ordinary_input)
     }
     CHECK(pty.drain() == "\x1b[?2026$p\x1b[?2026h\x1b[?2026l");
 }
+
 TEST(SES_EXT_permanent_or_unrecognized_sync_is_rejected)
 {
     for (auto status : {0, 3, 4}) {
@@ -196,6 +209,7 @@ TEST(SES_EXT_permanent_or_unrecognized_sync_is_rejected)
         }
     }
 }
+
 TEST(SES_EXT_long_osc_payloads_stream_without_an_intermediate_string)
 {
     contract::Pty pty;
@@ -210,9 +224,10 @@ TEST(SES_EXT_long_osc_payloads_stream_without_an_intermediate_string)
     CHECK(pty.drain() ==
           encode(WindowTitle{title}, BeginHyperlink{uri, "x"}, EndHyperlink{}));
     CHECK_THROWS(std::invalid_argument, terminal.write(SaveCursor{}, WindowTitle{"ok"},
-                                                      BeginHyperlink{"\x1b"}));
+                                                       BeginHyperlink{"\x1b"}));
     CHECK(pty.drain().empty());
 }
+
 TEST(IO_EXT_wait_state_preserves_read_ahead_and_eof)
 {
     contract::Pipe pipe;
@@ -234,6 +249,7 @@ TEST(IO_EXT_wait_state_preserves_read_ahead_and_eof)
     CHECK(reader.wait_state().ready);
     CHECK(contract::status(reader.read()) == contract::Status::EndOfInput);
 }
+
 TEST(IO_EXT_parser_deadlines_are_absolute_and_survive_repeated_snapshots)
 {
     contract::Pipe pipe;
@@ -246,9 +262,11 @@ TEST(IO_EXT_parser_deadlines_are_absolute_and_survive_repeated_snapshots)
     CHECK(second.deadline == first.deadline);
     std::this_thread::sleep_until(*first.deadline + 1ms);
     CHECK(reader.wait_state().ready);
-    CHECK(contract::event(reader.read(0ms)) == std::optional<Event>{KeyEvent{KeyCode::Escape}});
+    CHECK(contract::event(reader.read(0ms)) ==
+          std::optional<Event>{KeyEvent{KeyCode::Escape}});
     CHECK(!reader.wait_state().deadline);
 }
+
 TEST(IO_EXT_host_poll_can_combine_terminal_input_and_shutdown_pipe)
 {
     contract::Pipe input, stop;
@@ -265,6 +283,7 @@ TEST(IO_EXT_host_poll_can_combine_terminal_input_and_shutdown_pipe)
     CHECK(reader.wait_state().ready);
     CHECK(contract::event(reader.read(0ms)) == std::optional<Event>{KeyEvent{U'x'}});
 }
+
 TEST(SES_EXT_wait_state_exposes_resize_and_queued_probe_input)
 {
     contract::Pty pty;
@@ -276,12 +295,15 @@ TEST(SES_EXT_wait_state_exposes_resize_and_queued_probe_input)
     pty.resize(90, 30);
     std::this_thread::sleep_until(*idle.deadline + 1ms);
     CHECK(terminal.wait_state().ready);
-    CHECK(contract::event(terminal.read(0ms)) == std::optional<Event>{Resize{Area{90, 30}}});
+    CHECK(contract::event(terminal.read(0ms)) ==
+          std::optional<Event>{Resize{Area{90, 30}}});
     pty.write("x");
-    CHECK(contract::status(terminal.query(ModeQuery{25}, 10ms)) == contract::Status::Timeout);
+    CHECK(contract::status(terminal.query(ModeQuery{25}, 10ms)) ==
+          contract::Status::Timeout);
     CHECK(terminal.wait_state().ready);
     CHECK(contract::event(terminal.read(0ms)) == std::optional<Event>{KeyEvent{U'x'}});
 }
+
 TEST(IO_EXT_wait_snapshot_is_allocation_free_and_moves_with_reader)
 {
     contract::Pipe pipe;
@@ -319,6 +341,7 @@ TEST(IO_EXT_incomplete_large_units_do_not_hide_remaining_kernel_readiness)
     auto tail = reader.read(0ms);
     CHECK(std::get<PasteChunk>(*contract::event(tail)).bytes == std::string(1904, 'p'));
 }
+
 TEST(SES_EXT_frame_guard_unwinds_while_terminal_remains_usable)
 {
     contract::Pty pty;
@@ -348,7 +371,8 @@ TEST(SES_EXT_confirmed_on_baseline_and_timeout_preserve_inherited_mode)
     reply.join();
     CHECK(contract::status(result) == contract::Status::Reply);
     CHECK(!terminal.profile().synchronized_output);
-    CHECK(contract::status(terminal.confirm_synchronized_output(1ms)) == contract::Status::Timeout);
+    CHECK(contract::status(terminal.confirm_synchronized_output(1ms)) ==
+          contract::Status::Timeout);
     {
         auto frame = terminal.frame();
         CHECK(frame.synchronized());
@@ -361,23 +385,23 @@ TEST(SES_EXT_confirmed_on_baseline_and_timeout_preserve_inherited_mode)
 TEST(SES_SOUND_profile_controls_bell_and_playback_without_changing_modes)
 {
     contract::Pty pty;
-    auto options=opts(false);
-    options.profile->bell=true;
-    options.profile->play_notes=true;
-    auto terminal=Terminal::open({pty.input.get(), pty.output.get()}, options);
+    auto options = opts(false);
+    options.profile->bell = true;
+    options.profile->play_notes = true;
+    auto terminal = Terminal::open({pty.input.get(), pty.output.get()}, options);
     static_cast<void>(pty.drain());
-    terminal.write("ready", Bell{},
-                   PlayNotes{.notes={Note::C5, Note::E5, Note::G5}});
+    terminal.write("ready", Bell{}, PlayNotes{.notes = {Note::C5, Note::E5, Note::G5}});
     terminal.flush();
-    CHECK(pty.drain()=="ready\x07\x1b[4;4;1;5;8,~");
-    CHECK(terminal.profile_report().decisions.size()==17);
-    CHECK(terminal.profile_report().decisions[15].feature==Feature::Bell);
-    CHECK(terminal.profile_report().decisions[16].feature==Feature::PlayNotes);
-    auto no_sound=opts(false);
+    CHECK(pty.drain() == "ready\x07\x1b[4;4;1;5;8,~");
+    CHECK(terminal.profile_report().decisions.size() == 17);
+    CHECK(terminal.profile_report().decisions[15].feature == Feature::Bell);
+    CHECK(terminal.profile_report().decisions[16].feature == Feature::PlayNotes);
+    auto no_sound = opts(false);
     contract::Pty quiet_pty;
-    auto quiet=Terminal::open({quiet_pty.input.get(), quiet_pty.output.get()}, no_sound);
+    auto quiet =
+        Terminal::open({quiet_pty.input.get(), quiet_pty.output.get()}, no_sound);
     static_cast<void>(quiet_pty.drain());
-    quiet.write("ready", Bell{}, PlayNotes{.notes={Note::C5}});
+    quiet.write("ready", Bell{}, PlayNotes{.notes = {Note::C5}});
     quiet.flush();
-    CHECK(quiet_pty.drain()=="ready");
+    CHECK(quiet_pty.drain() == "ready");
 }

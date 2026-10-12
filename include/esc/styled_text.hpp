@@ -15,22 +15,29 @@ template <class... Values>
 struct Sequence {
     std::tuple<Values...> values;
 };
+
 template <class Content, Attribute Appearance = StylePatch>
 struct StyledText {
     Content content;
     Appearance appearance;
 };
+
 namespace detail {
 template <class T>
 struct IsSequence : std::false_type {};
+
 template <class... T>
 struct IsSequence<Sequence<T...>> : std::true_type {};
+
 template <class T>
 struct IsStyledText : std::false_type {};
+
 template <class T, Attribute A>
 struct IsStyledText<StyledText<T, A>> : std::true_type {};
+
 template <class T>
 concept ByteText = std::convertible_to<T const&, std::string_view>;
+
 template <class T>
 concept ScalarText = std::convertible_to<T const&, std::u32string_view>;
 
@@ -82,6 +89,7 @@ template <class Content, Attribute A>
 // Borrowing from an owning temporary is almost always an accidental dangling view.
 template <class Char, class TraitsType, class Allocator, Attribute A>
 auto styled_view(std::basic_string<Char, TraitsType, Allocator>&&, A const&) = delete;
+
 template <class Char, class TraitsType, class Allocator, Attribute A>
 auto styled_view(std::basic_string<Char, TraitsType, Allocator> const&&,
                  A const&) = delete;
@@ -97,6 +105,7 @@ template <Attribute A>
     else
         return StyledText<std::string_view>{content, detail::patch(appearance)};
 }
+
 template <Attribute A>
 [[nodiscard]] auto styled_view(std::u32string_view content, A const& appearance)
 {
@@ -107,12 +116,15 @@ template <Attribute A>
     else
         return StyledText<std::u32string_view>{content, detail::patch(appearance)};
 }
+
 template <Attribute A>
 [[nodiscard]] auto operator|(std::string_view text, A const& appearance)
 { return styled(text, appearance); }
+
 template <Attribute A>
 [[nodiscard]] auto operator|(std::u32string_view text, A const& appearance)
 { return styled(text, appearance); }
+
 template <class Content, Attribute A, Attribute B>
 [[nodiscard]] auto operator|(StyledText<Content, A> text, B const& appearance)
 {

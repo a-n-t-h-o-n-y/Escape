@@ -9,7 +9,8 @@ int main(int argc, char** argv)
     int failed = 0;
     int selected = 0;
     for (auto const& test : contract::tests()) {
-        if (std::string_view{test.name}.find(filter) == std::string_view::npos) continue;
+        if (std::string_view{test.name}.find(filter) == std::string_view::npos)
+            continue;
         ++selected;
         try {
             test.run();

@@ -1,4 +1,3 @@
-#include "support/results.hpp"
 #include <fcntl.h>
 #include <io.h>
 #include <windows.h>
@@ -9,12 +8,15 @@
 #include <thread>
 #include <utility>
 #include "support/faults.hpp"
+#include "support/results.hpp"
 #include "support/test.hpp"
 
 namespace {
 using namespace std::chrono_literals;
+
 struct Console {
     bool owned = false;
+
     Console()
     {
         // Keep console injection isolated from the invoking shell.
@@ -22,18 +24,22 @@ struct Console {
         CHECK(::AllocConsole());
         owned = true;
     }
+
     ~Console()
     {
         if (owned) ::FreeConsole();
     }
 };
+
 auto console() -> Console&
 {
     static Console result;
     return result;
 }
+
 struct File {
     std::FILE* stream = nullptr;
+
     explicit File(HANDLE handle, int flags)
     {
         CHECK(handle != INVALID_HANDLE_VALUE);
@@ -49,17 +55,22 @@ struct File {
             CHECK(false);
         }
     }
+
     File(File const&) = delete;
+
     ~File()
     {
         if (stream) std::fclose(stream);
     }
+
     auto handle() const -> HANDLE
     { return reinterpret_cast<HANDLE>(::_get_osfhandle(::_fileno(stream))); }
 };
+
 struct Fixture {
     File input;
     File output;
+
     explicit Fixture(bool initialize = true)
         : input{(console(),
                  ::CreateFileW(L"CONIN$",
@@ -85,25 +96,30 @@ struct Fixture {
             input.handle(), (mode | ENABLE_LINE_INPUT) &
                                 ~(ENABLE_ECHO_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT)));
     }
+
     auto streams() -> esc::Streams { return {input.stream, output.stream}; }
+
     auto input_mode() const -> DWORD
     {
         DWORD mode = 0;
         CHECK(::GetConsoleMode(input.handle(), &mode));
         return mode;
     }
+
     auto output_mode() const -> DWORD
     {
         DWORD mode = 0;
         CHECK(::GetConsoleMode(output.handle(), &mode));
         return mode;
     }
+
     void record(INPUT_RECORD record)
     {
         DWORD written = 0;
         CHECK(::WriteConsoleInputW(input.handle(), &record, 1, &written));
         CHECK(written == 1);
     }
+
     void key(wchar_t scalar,
              WORD code = 0,
              DWORD modifiers = 0,
@@ -117,6 +133,7 @@ struct Fixture {
         record(event);
     }
 };
+
 auto key(esc::Reader& reader, esc::Key expected, esc::Modifiers modifiers = {}) -> void
 {
     auto result = reader.read(100ms);
@@ -124,6 +141,7 @@ auto key(esc::Reader& reader, esc::Key expected, esc::Modifiers modifiers = {}) 
     CHECK(contract::event(result) ==
           std::optional<esc::Event>{esc::KeyEvent{expected, modifiers}});
 }
+
 auto immediate(Fixture& fixture) -> esc::Terminal
 {
     esc::TerminalOptions options;
@@ -131,24 +149,30 @@ auto immediate(Fixture& fixture) -> esc::Terminal
     options.echo = esc::Echo::Off;
     return esc::Terminal::open(fixture.streams(), options);
 }
+
 struct Pipe {
     File input;
     HANDLE output = INVALID_HANDLE_VALUE;
+
     static auto create(HANDLE& output) -> HANDLE
     {
         HANDLE input = nullptr;
         CHECK(::CreatePipe(&input, &output, nullptr, 0));
         return input;
     }
+
     // output must be initialized before create writes it.
     Pipe(HANDLE read, HANDLE write) : input{read, _O_RDONLY}, output{write} {}
+
     static auto make() -> Pipe
     {
         HANDLE write = nullptr;
         auto read = create(write);
         return Pipe{read, write};
     }
+
     ~Pipe() { close(); }
+
     void close()
     {
         if (output != INVALID_HANDLE_VALUE) {
@@ -156,6 +180,7 @@ struct Pipe {
             output = INVALID_HANDLE_VALUE;
         }
     }
+
     void write(std::string_view bytes)
     {
         DWORD count = 0;
@@ -186,6 +211,7 @@ TEST(WIN_SESSION_restores_input_output_modes_and_codepages)
     CHECK(::GetConsoleCP() == input_cp);
     CHECK(::GetConsoleOutputCP() == output_cp);
 }
+
 TEST(WIN_SESSION_move_transfers_cleanup)
 {
     Fixture fixture;
@@ -198,6 +224,7 @@ TEST(WIN_SESSION_move_transfers_cleanup)
     }
     CHECK(fixture.input_mode() == before);
 }
+
 TEST(WIN_SESSION_shared_console_has_one_owner)
 {
     Fixture fixture;
@@ -210,12 +237,14 @@ TEST(WIN_SESSION_shared_console_has_one_owner)
     auto next = immediate(other);
     CHECK(next.is_open());
 }
+
 TEST(WIN_SESSION_redirected_streams_rejected)
 {
     auto pipe = Pipe::make();
     CHECK_THROWS(std::system_error,
                  esc::Terminal::open(esc::Streams{pipe.input.stream, stdout}));
 }
+
 TEST(WIN_SESSION_explicit_profile_does_not_override_drawing_limits)
 {
     Fixture fixture;
@@ -225,6 +254,7 @@ TEST(WIN_SESSION_explicit_profile_does_not_override_drawing_limits)
     CHECK(!terminal.profile().control);
     CHECK_THROWS(esc::UnsupportedFeature, terminal.write(esc::Cursor{}));
 }
+
 TEST(WIN_SESSION_conservative_default_rejects_unverified_protocols)
 {
     Fixture fixture;
@@ -233,6 +263,7 @@ TEST(WIN_SESSION_conservative_default_rejects_unverified_protocols)
     CHECK_THROWS(esc::UnsupportedFeature, terminal.set(esc::FocusReporting::On));
     CHECK_THROWS(esc::UnsupportedFeature, terminal.set(esc::BracketedPaste::On));
 }
+
 TEST(WIN_SESSION_failed_validation_does_not_change_modes)
 {
     Fixture fixture;
@@ -244,6 +275,7 @@ TEST(WIN_SESSION_failed_validation_does_not_change_modes)
     CHECK(fixture.input_mode() == in);
     CHECK(fixture.output_mode() == out);
 }
+
 TEST(WIN_SESSION_signals_preserve_unrelated_flags)
 {
     Fixture fixture;
@@ -256,6 +288,7 @@ TEST(WIN_SESSION_signals_preserve_unrelated_flags)
     terminal.close();
     CHECK(fixture.input_mode() == before);
 }
+
 TEST(WIN_INPUT_unicode_surrogate_pair)
 {
     Fixture fixture;
@@ -265,6 +298,7 @@ TEST(WIN_INPUT_unicode_surrogate_pair)
     fixture.key(0xdc7d);
     key(reader, char32_t{0x1f47d});
 }
+
 TEST(WIN_INPUT_altgr_is_text)
 {
     Fixture fixture;
@@ -273,6 +307,7 @@ TEST(WIN_INPUT_altgr_is_text)
     fixture.key(L'€', 0, LEFT_CTRL_PRESSED | RIGHT_ALT_PRESSED);
     key(reader, U'€');
 }
+
 TEST(WIN_INPUT_alt_text)
 {
     Fixture fixture;
@@ -281,6 +316,7 @@ TEST(WIN_INPUT_alt_text)
     fixture.key(L'x', 0, LEFT_ALT_PRESSED);
     key(reader, U'x', {.alt = true});
 }
+
 TEST(WIN_INPUT_arrows_and_modifiers)
 {
     Fixture fixture;
@@ -289,6 +325,7 @@ TEST(WIN_INPUT_arrows_and_modifiers)
     fixture.key(0, VK_UP, SHIFT_PRESSED | LEFT_CTRL_PRESSED);
     key(reader, esc::KeyCode::ArrowUp, {.shift = true, .ctrl = true});
 }
+
 TEST(WIN_INPUT_function_keys)
 {
     Fixture fixture;
@@ -302,6 +339,7 @@ TEST(WIN_INPUT_function_keys)
             {.shift = true, .ctrl = true});
     }
 }
+
 TEST(WIN_INPUT_canonical_echo_uses_session_buffer_without_leaking_handles)
 {
     Fixture fixture;
@@ -328,6 +366,7 @@ TEST(WIN_INPUT_canonical_echo_uses_session_buffer_without_leaking_handles)
     for (auto character : text)
         CHECK(character == L'x');
 }
+
 TEST(WIN_INPUT_repeats_do_not_require_more_os_records)
 {
     Fixture fixture;
@@ -339,6 +378,7 @@ TEST(WIN_INPUT_repeats_do_not_require_more_os_records)
     key(reader, U'x');
     CHECK(contract::status(reader.read(0ms)) == contract::Status::Timeout);
 }
+
 TEST(WIN_INPUT_keyup_and_window_events_do_not_block)
 {
     Fixture fixture;
@@ -352,6 +392,7 @@ TEST(WIN_INPUT_keyup_and_window_events_do_not_block)
     CHECK(contract::status(reader.read(10ms)) == contract::Status::Timeout);
     CHECK(std::chrono::steady_clock::now() - start < 500ms);
 }
+
 TEST(WIN_INPUT_canonical_waits_for_enter_and_edits_backspace)
 {
     Fixture fixture;
@@ -364,6 +405,7 @@ TEST(WIN_INPUT_canonical_waits_for_enter_and_edits_backspace)
     key(reader, U'a');
     key(reader, esc::KeyCode::Enter);
 }
+
 TEST(WIN_INPUT_pipe_timeout_then_data_then_eof)
 {
     auto pipe = Pipe::make();
@@ -375,6 +417,7 @@ TEST(WIN_INPUT_pipe_timeout_then_data_then_eof)
     CHECK(contract::status(reader.read(100ms)) == contract::Status::EndOfInput);
     CHECK(contract::status(reader.read(0ms)) == contract::Status::EndOfInput);
 }
+
 TEST(WIN_INPUT_pipe_deadline_wakes_on_later_data)
 {
     auto pipe = Pipe::make();
@@ -385,6 +428,7 @@ TEST(WIN_INPUT_pipe_deadline_wakes_on_later_data)
     }};
     key(reader, U'x');
 }
+
 TEST(WIN_INPUT_pipe_eof_finishes_incomplete_utf8)
 {
     auto pipe = Pipe::make();
@@ -397,6 +441,7 @@ TEST(WIN_INPUT_pipe_eof_finishes_incomplete_utf8)
           esc::InputProblem::Truncated);
     CHECK(contract::status(reader.read(0ms)) == contract::Status::EndOfInput);
 }
+
 TEST(WIN_OUTPUT_binary_file_preserves_bytes_and_unicode)
 {
     auto* stream = std::tmpfile();
@@ -413,6 +458,7 @@ TEST(WIN_OUTPUT_binary_file_preserves_bytes_and_unicode)
           std::string_view{"a\0\n\xe7\x95\x8c", 6});
     CHECK(std::fclose(stream) == 0);
 }
+
 TEST(WIN_INPUT_enabled_focus_and_sgr_mouse)
 {
     Fixture fixture;
@@ -423,7 +469,8 @@ TEST(WIN_INPUT_enabled_focus_and_sgr_mouse)
     focus.EventType = FOCUS_EVENT;
     focus.Event.FocusEvent.bSetFocus = TRUE;
     fixture.record(focus);
-    CHECK(contract::event(reader.read(100ms)) == std::optional<esc::Event>{esc::Focus{true}});
+    CHECK(contract::event(reader.read(100ms)) ==
+          std::optional<esc::Event>{esc::Focus{true}});
     INPUT_RECORD mouse{};
     mouse.EventType = MOUSE_EVENT;
     mouse.Event.MouseEvent.dwMousePosition = {4, 2};
@@ -444,8 +491,10 @@ TEST(WIN_INPUT_zero_poll_drains_already_available_records)
     esc::Reader reader{fixture.input.stream};
     fixture.key(L'x', 0, 0, 1, false);
     fixture.key(L'z');
-    CHECK(contract::event(reader.read(0ms)) == std::optional<esc::Event>{esc::KeyEvent{U'z'}});
+    CHECK(contract::event(reader.read(0ms)) ==
+          std::optional<esc::Event>{esc::KeyEvent{U'z'}});
 }
+
 TEST(WIN_INPUT_zero_poll_combines_available_surrogates)
 {
     Fixture fixture;
@@ -463,6 +512,7 @@ TEST(WIN_HEADERS_preserve_host_RGB_macro)
     CHECK(color.red == 1 && color.green == 2 && color.blue == 3);
     CHECK(RGB(1, 2, 3) == static_cast<COLORREF>(0x030201));
 }
+
 TEST(WIN_SESSION_restores_borrowed_CRT_output_mode)
 {
     Fixture fixture;
@@ -491,6 +541,7 @@ TEST(WIN_FAILURE_capture_has_no_side_effects_or_lease)
     auto next = immediate(fixture);
     CHECK(next.is_open());
 }
+
 TEST(WIN_FAILURE_os_transition_rolls_back_and_remains_usable)
 {
     Fixture fixture;
@@ -507,6 +558,7 @@ TEST(WIN_FAILURE_os_transition_rolls_back_and_remains_usable)
     terminal.set(esc::Signals::Off);
     terminal.close();
 }
+
 TEST(WIN_FAILURE_partial_protocol_write_marks_session_unusable)
 {
     Fixture fixture;
@@ -525,6 +577,7 @@ TEST(WIN_FAILURE_partial_protocol_write_marks_session_unusable)
     terminal.close();
     CHECK(fixture.input_mode() == before);
 }
+
 TEST(WIN_FAILURE_cleanup_continues_and_releases_ownership)
 {
     Fixture fixture;
@@ -542,6 +595,7 @@ TEST(WIN_FAILURE_cleanup_continues_and_releases_ownership)
     auto next = immediate(fixture);
     CHECK(next.is_open());
 }
+
 TEST(WIN_SESSION_incompatible_echo_validates_before_effects)
 {
     Fixture fixture;
@@ -565,6 +619,7 @@ TEST(WIN_INPUT_malformed_native_surrogate_does_not_hide_next_key)
     key(reader, char32_t{0xfffd});
     key(reader, esc::KeyCode::ArrowRight);
 }
+
 TEST(WIN_INPUT_mouse_tracking_filters_hover_and_drag)
 {
     Fixture fixture;
@@ -597,6 +652,7 @@ TEST(WIN_INPUT_mouse_tracking_filters_hover_and_drag)
     CHECK(contract::event(terminal.read(100ms)) ==
           std::optional<esc::Event>{esc::MouseMove{{2, 1}, {}}});
 }
+
 TEST(WIN_SESSION_resize_reports_visible_viewport)
 {
     Fixture fixture;
@@ -616,6 +672,7 @@ TEST(WIN_SESSION_resize_reports_visible_viewport)
     CHECK(contract::event(terminal.read(100ms)) ==
           std::optional<esc::Event>{esc::Resize{{before.width - 1, before.height}}});
 }
+
 TEST(WIN_INPUT_disk_file_reports_eof_without_polling_forever)
 {
     auto* stream = std::tmpfile();
@@ -646,11 +703,13 @@ TEST(WIN_QUERY_transport_is_explicit_and_restores_native_modes_and_codepages)
     CHECK(fixture.input_mode() & ENABLE_VIRTUAL_TERMINAL_INPUT);
     CHECK(::GetConsoleCP() == CP_UTF8);
     fixture.key(L'x');
-    CHECK(contract::event(terminal.read(500ms)) == std::optional<esc::Event>{esc::KeyEvent{U'x'}});
+    CHECK(contract::event(terminal.read(500ms)) ==
+          std::optional<esc::Event>{esc::KeyEvent{U'x'}});
     terminal.close();
     CHECK(fixture.input_mode() == mode);
     CHECK(::GetConsoleCP() == codepage);
 }
+
 TEST(WIN_QUERY_idle_worker_is_cancelled_before_close_without_handle_leaks)
 {
     Fixture fixture;
@@ -669,6 +728,7 @@ TEST(WIN_QUERY_idle_worker_is_cancelled_before_close_without_handle_leaks)
     CHECK(::GetProcessHandleCount(::GetCurrentProcess(), &after));
     CHECK(before == after);
 }
+
 TEST(WIN_QUERY_vt_reply_bytes_are_typed_and_user_input_is_preserved)
 {
     Fixture fixture;
@@ -677,10 +737,12 @@ TEST(WIN_QUERY_vt_reply_bytes_are_typed_and_user_input_is_preserved)
     fixture.key(L'x');
     for (auto c : std::wstring_view{L"\x1b[?3u"})
         fixture.key(c);
-    CHECK(contract::event(terminal.read(500ms)) == std::optional<esc::Event>{esc::KeyEvent{U'x'}});
+    CHECK(contract::event(terminal.read(500ms)) ==
+          std::optional<esc::Event>{esc::KeyEvent{U'x'}});
     CHECK(contract::event(terminal.read(500ms)) ==
           std::optional<esc::Event>{esc::TerminalReply{esc::KeyboardReply{3}}});
 }
+
 TEST(WIN_QUERY_failed_transport_change_rolls_back_and_remains_usable)
 {
     Fixture fixture;
@@ -692,7 +754,8 @@ TEST(WIN_QUERY_failed_transport_change_rolls_back_and_remains_usable)
     CHECK_THROWS(std::system_error, terminal.request(esc::KeyboardQuery{}));
     CHECK(fixture.input_mode() == mode && ::GetConsoleCP() == codepage);
     fixture.key(L'z');
-    CHECK(contract::event(terminal.read(500ms)) == std::optional<esc::Event>{esc::KeyEvent{U'z'}});
+    CHECK(contract::event(terminal.read(500ms)) ==
+          std::optional<esc::Event>{esc::KeyEvent{U'z'}});
 }
 
 TEST(WIN_QUERY_partial_native_surrogate_is_preserved_before_transport_switch)
@@ -724,8 +787,10 @@ TEST(WIN_WAIT_native_console_handle_and_buffered_event_are_preserved)
           WAIT_OBJECT_0);
     CHECK(terminal.wait_state().ready);
     CHECK(terminal.wait_state().ready);
-    CHECK(contract::event(terminal.read(0ms)) == std::optional<esc::Event>{esc::KeyEvent{U'x'}});
+    CHECK(contract::event(terminal.read(0ms)) ==
+          std::optional<esc::Event>{esc::KeyEvent{U'x'}});
 }
+
 TEST(WIN_WAIT_vt_transport_exposes_completion_event)
 {
     Fixture fixture;
@@ -738,9 +803,11 @@ TEST(WIN_WAIT_vt_transport_exposes_completion_event)
     CHECK(::WaitForSingleObject(reinterpret_cast<HANDLE>(idle.source.value), 500) ==
           WAIT_OBJECT_0);
     CHECK(terminal.wait_state().ready);
-    CHECK(contract::event(terminal.read(0ms)) == std::optional<esc::Event>{esc::KeyEvent{U'z'}});
+    CHECK(contract::event(terminal.read(0ms)) ==
+          std::optional<esc::Event>{esc::KeyEvent{U'z'}});
     terminal.close();  // completion source is borrowed, closed by Escape.
 }
+
 TEST(WIN_WAIT_synchronous_pipe_has_timer_fallback_and_reports_eof)
 {
     HANDLE input = nullptr, output = nullptr;
@@ -756,12 +823,14 @@ TEST(WIN_WAIT_synchronous_pipe_has_timer_fallback_and_reports_eof)
     stream.write("a");
     stream.flush();
     CHECK(reader.wait_state().ready);
-    CHECK(contract::event(reader.read(0ms)) == std::optional<esc::Event>{esc::KeyEvent{U'a'}});
+    CHECK(contract::event(reader.read(0ms)) ==
+          std::optional<esc::Event>{esc::KeyEvent{U'a'}});
     CHECK(std::fclose(writer_file.stream) == 0);
     writer_file.stream = nullptr;
     CHECK(reader.wait_state().ready);
     CHECK(contract::status(reader.read(0ms)) == contract::Status::EndOfInput);
 }
+
 TEST(WIN_FRAME_scopes_preserve_console_modes_and_cleanup_after_move)
 {
     Fixture fixture;

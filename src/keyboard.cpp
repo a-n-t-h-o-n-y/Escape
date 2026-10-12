@@ -2,6 +2,7 @@
 #include <charconv>
 #include <esc/detail/unicode.hpp>
 #include "detail/protocol.hpp"
+
 namespace esc::detail {
 namespace {
 auto number(std::string_view text, unsigned& value) -> bool
@@ -10,6 +11,7 @@ auto number(std::string_view text, unsigned& value) -> bool
     auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
     return error == std::errc{} && end == text.data() + text.size();
 }
+
 template <std::size_t N>
 auto split(std::string_view text,
            char delimiter,
@@ -24,6 +26,7 @@ auto split(std::string_view text,
         text.remove_prefix(at + 1);
     }
 }
+
 constexpr KeyCode functional[] = {
     KeyCode::CapsLock,
     KeyCode::ScrollLock,
@@ -123,6 +126,7 @@ constexpr KeyCode functional[] = {
     KeyCode::IsoLevel3Shift,
     KeyCode::IsoLevel5Shift,
 };
+
 auto identity(unsigned value) -> std::optional<Key>
 {
     switch (value) {
@@ -136,6 +140,7 @@ auto identity(unsigned value) -> std::optional<Key>
     if (value > 0x10ffff || (value >= 0xd800 && value <= 0xdfff)) return {};
     return Key{static_cast<char32_t>(value)};
 }
+
 auto legacy_identity(unsigned number, char final) -> std::optional<Key>
 {
     if (final == '~') {
@@ -178,6 +183,7 @@ auto legacy_identity(unsigned number, char final) -> std::optional<Key>
     return {};
 }
 }  // namespace
+
 void validate_kitty_flags(KittyFlags flags)
 {
     auto bits = static_cast<unsigned>(flags);
@@ -185,6 +191,7 @@ void validate_kitty_flags(KittyFlags flags)
         throw std::invalid_argument{
             "Kitty: invalid flags; associated text requires all keys"};
 }
+
 auto parse_kitty(std::string_view fields, char final) -> std::optional<KeyEvent>
 {
     std::array<std::string_view, 3> parameters{}, keys{};

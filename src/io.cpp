@@ -10,10 +10,12 @@ namespace {
 void io_error(char const* message)
 { throw std::system_error{errno ? errno : EIO, std::generic_category(), message}; }
 }  // namespace
+
 Output::Output(std::FILE* stream) : stream_{stream}
 {
     if (!stream) throw std::invalid_argument{"Output: null stream"};
 }
+
 void Output::write_one(std::string_view bytes)
 {
     while (!bytes.empty()) {
@@ -35,6 +37,7 @@ void Output::write_one(std::string_view bytes)
         io_error("Output: write");
     }
 }
+
 void Output::flush()
 {
     while (true) {
@@ -47,6 +50,7 @@ void Output::flush()
         io_error("Output: flush");
     }
 }
+
 void flush() { Output{}.flush(); }
 
 struct Reader::Impl {
@@ -59,6 +63,7 @@ struct Reader::Impl {
     std::optional<ReadResult> ready;
     std::optional<PendingTimeout> pending;
     std::optional<detail::Clock::time_point> origin, deadline;
+
     Impl(std::FILE* input, ParserOptions opts, InputProtocols protocols)
         : input{detail::descriptor(input)}, parser{opts, protocols}, options{opts}
     {
@@ -70,6 +75,7 @@ struct Reader::Impl {
         parser.native_function_keys_ = terminal;
 #endif
     }
+
     void update_deadline()
     {
         auto next = parser.pending_timeout();
@@ -87,6 +93,7 @@ struct Reader::Impl {
             pending = next;
         }
     }
+
     auto read(std::optional<std::chrono::milliseconds> timeout) -> ReadResult
     {
         if (timeout && timeout->count() < 0)
@@ -147,12 +154,16 @@ struct Reader::Impl {
         }
     }
 };
+
 Reader::Reader(std::FILE* input, ParserOptions options, InputProtocols protocols)
     : impl_{std::make_unique<Impl>(input, options, protocols)}
 {}
+
 Reader::~Reader() = default;
 Reader::Reader(Reader&&) noexcept = default;
+
 auto Reader::operator=(Reader&&) noexcept -> Reader& = default;
+
 auto Reader::read() -> ReadResult
 {
     if (!impl_) throw std::logic_error{"Reader: moved from"};
@@ -163,6 +174,7 @@ auto Reader::read() -> ReadResult
     }
     return impl_->read({});
 }
+
 auto Reader::read(std::chrono::milliseconds timeout) -> ReadResult
 {
     if (!impl_) throw std::logic_error{"Reader: moved from"};
@@ -174,6 +186,7 @@ auto Reader::read(std::chrono::milliseconds timeout) -> ReadResult
     }
     return impl_->read(timeout);
 }
+
 auto Reader::wait_state() -> WaitState
 {
     if (!impl_) throw std::logic_error{"Reader: moved from"};
@@ -197,6 +210,7 @@ auto Reader::wait_state() -> WaitState
     }
     return state;
 }
+
 void Reader::configure(InputProtocols protocols)
 {
     if (!impl_) throw std::logic_error{"Reader: moved from"};
@@ -215,10 +229,12 @@ void Reader::prepare_queries()
     // Preserve native records already normalized before switching transport.
 #endif
 }
+
 void Reader::stop_queries() noexcept
 {
     if (impl_) detail::stop_queries(impl_->input);
 }
+
 void Reader::configure_session(InputProtocols protocols,
                                MouseMode mode,
                                int output_descriptor)
