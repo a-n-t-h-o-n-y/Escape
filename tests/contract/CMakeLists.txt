@@ -3,37 +3,16 @@ add_executable(escape.tests.contract.capabilities EXCLUDE_FROM_ALL
 target_link_libraries(escape.tests.contract.capabilities PRIVATE escape)
 target_compile_features(escape.tests.contract.capabilities PRIVATE cxx_std_20)
 target_compile_options(escape.tests.contract.capabilities PRIVATE -Wall -Wextra -Wpedantic)
-foreach(group CAP BUF ENC)
-    add_test(NAME escape.contract.capabilities.${group} COMMAND escape.tests.contract.capabilities "${group}_")
-    set_tests_properties(escape.contract.capabilities.${group} PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
-endforeach()
-
-# Unicode and glyph behavior, independently of future parser/session APIs.
-add_executable(escape.tests.contract.text EXCLUDE_FROM_ALL
-    main.cpp text.test.cpp text-allocation.test.cpp support/allocations.cpp)
-target_link_libraries(escape.tests.contract.text PRIVATE escape)
-target_compile_features(escape.tests.contract.text PRIVATE cxx_std_20)
-target_compile_options(escape.tests.contract.text PRIVATE -Wall -Wextra -Wpedantic)
-foreach(group TXT GLY BUF)
-    add_test(NAME escape.contract.text.${group} COMMAND escape.tests.contract.text "${group}_")
-    set_tests_properties(escape.contract.text.${group} PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
-endforeach()
-
-# Independently runnable implementation slice. Expectations are shared with the
-# full suite; parser and session APIs remain in that suite.
 add_executable(escape.tests.contract.encoding EXCLUDE_FROM_ALL
     main.cpp sequence.test.cpp values.test.cpp encoding-allocation.test.cpp support/allocations.cpp)
 target_link_libraries(escape.tests.contract.encoding PRIVATE escape)
-target_compile_features(escape.tests.contract.encoding PRIVATE cxx_std_20)
-target_compile_options(escape.tests.contract.encoding PRIVATE -Wall -Wextra -Wpedantic)
-foreach(group ENC BUF COL)
-    add_test(NAME escape.contract.encoding.${group} COMMAND escape.tests.contract.encoding "${group}_")
-    set_tests_properties(escape.contract.encoding.${group} PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
-endforeach()
+add_executable(escape.tests.contract.text EXCLUDE_FROM_ALL
+    main.cpp text.test.cpp text-allocation.test.cpp support/allocations.cpp)
+target_link_libraries(escape.tests.contract.text PRIVATE escape)
 
-# Opt-in executable specifications of docs/interface-proposal.md.
-# Missing proposed headers/APIs are expected to fail compilation during the refactor.
-add_executable(escape.tests.contract EXCLUDE_FROM_ALL
+# Executable specifications of docs/interface-proposal.md.
+# Core expectations are independent of POSIX session behavior.
+add_executable(escape.tests.contract
     main.cpp sequence.test.cpp values.test.cpp capabilities.test.cpp
     text.test.cpp parser.test.cpp allocation.test.cpp capability-allocation.test.cpp text-allocation.test.cpp encoding-allocation.test.cpp support/allocations.cpp)
 target_link_libraries(escape.tests.contract PRIVATE escape)
@@ -46,13 +25,13 @@ foreach(group ENC BUF CAP TXT GLY COL PAR)
 endforeach()
 
 if(UNIX)
-    add_executable(escape.tests.contract.posix EXCLUDE_FROM_ALL
-        main.cpp output.test.cpp reader.test.cpp session.test.cpp failures.test.cpp)
+    add_executable(escape.tests.contract.posix
+        main.cpp output.test.cpp reader.test.cpp session.test.cpp failures.test.cpp support/allocations.cpp)
     target_link_libraries(escape.tests.contract.posix PRIVATE escape)
     target_compile_features(escape.tests.contract.posix PRIVATE cxx_std_20)
     target_compile_options(escape.tests.contract.posix PRIVATE -Wall -Wextra -Wpedantic)
 
-    # Future I/O backend adapter uses this flag to supply support/faults.hpp's seam.
+    # Private fault injection adapter uses this flag to supply support/faults.hpp's seam.
     # Neither this flag nor that header belongs to the installed public interface.
     target_compile_definitions(escape PRIVATE ESCAPE_CONTRACT_TEST_HOOKS=1)
     target_include_directories(escape PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/support")

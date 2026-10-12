@@ -1,93 +1,85 @@
 #pragma once
-
+#include <chrono>
 #include <concepts>
+#include <cstdio>
+#include <esc/detail/unicode.hpp>
+#include <esc/parser.hpp>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <type_traits>
 
-#include <esc/event.hpp>
-
 namespace esc {
-
-// ------------------------------ Write to Screen --------------------------------------
-
-/**
- * Write a single byte to the console via stdout.
- * @param c The char to write.
- */
-void write(char c);
-
-/**
- * Write a 4 byte char32_t to the console via stdout.
- * @param c The char to write.
- */
-void write(char32_t c);
-
-/**
- * Write a string_view to the console via stdout.
- * @param sv The string_view to write.
- */
-void write(std::string_view sv);
-
-/**
- * Write a string to the console via stdout.
- * @details This is an optimization over the std::string_view overload since null
- * terminators are required in std::string but not in std::string_view.
- * @param s The string to write.
- */
-void write(std::string const& s);
-
-/**
- * Write a null-terminated string to the console via stdout.
- * @param s The string to write.
- */
-void write(char const* s);
-
-/**
- * Write a u32string_view to the console via stdout.
- * @details Calls write(char32_t) for each element of \p sv.
- * @param sv The u32string_view to write.
- */
-void write(std::u32string_view sv);
-
-// CONVENIENCE -------------------------------------------------------------------------
-
-template <typename T>
+template <class T>
 concept Writable =
-    std::convertible_to<T, char32_t> || std::convertible_to<T, std::string_view> ||
-    std::convertible_to<T, std::u32string_view>;
+    std::same_as<std::remove_cvref_t<T>, char> ||
+    std::same_as<std::remove_cvref_t<T>, char32_t> ||
+    std::same_as<std::remove_cvref_t<T>, std::string> ||
+    std::same_as<std::remove_cvref_t<T>, std::string_view> ||
+    std::same_as<std::remove_cvref_t<T>, std::u32string> ||
+    std::same_as<std::remove_cvref_t<T>, std::u32string_view> ||
+    std::same_as<std::remove_cvref_t<T>, char*> ||
+    std::same_as<std::remove_cvref_t<T>, char const*> ||
+    (std::is_array_v<std::remove_reference_t<T>> &&
+     (std::same_as<std::remove_cv_t<std::remove_extent_t<std::remove_reference_t<T>>>,
+                   char> ||
+      std::same_as<std::remove_cv_t<std::remove_extent_t<std::remove_reference_t<T>>>,
+                   char32_t>));
 
-/**
- * Write any number of writable objects to the console, in parameter order.
- * @tparam Args The types of the objects to write.
- * @param args The objects to write.
- */
-template <Writable... Args, typename = std::enable_if_t<(sizeof...(Args) > 1), void>>
-void write(Args&&... args)
-{
-    (write(args), ...);
-}
+class Output {
+   public:
+    explicit Output(std::FILE* stream = stdout);
+    template <Writable... Values>
+    void write(Values const&... values)
+    {
+        (validate(values), ...);
+        (write_one(values), ...);
+    }
+    void flush();
 
-/**
- * Flush the stdout buffer.
- * @details Sends all buffered bytes from calls to write(...) to the console.
- */
+   private:
+    std::FILE* stream_;
+    static void validate(char) noexcept {}
+    static void validate(char32_t value) { detail::validate_scalar(value, 0); }
+    static void validate(std::string_view) noexcept {}
+    static void validate(std::u32string_view value) { detail::validate_utf32(value); }
+    static void validate(char const* value)
+    {
+        if (!value) throw std::invalid_argument{"Output: null string"};
+    }
+    void write_one(char byte);
+    void write_one(char32_t scalar);
+    void write_one(std::string_view bytes);
+    void write_one(std::u32string_view text);
+    void write_one(char const* text) { write_one(std::string_view{text}); }
+};
+template <Writable... Values>
+void write(Values const&... values)
+{ Output{}.write(values...); }
 void flush();
 
-// --------------------------------- Reading -------------------------------------------
+enum class ReadStatus { Event, Timeout, EndOfInput };
+struct ReadResult {
+    ReadStatus status;
+    std::optional<Event> event;
+};
+class Reader {
+   public:
+    explicit Reader(std::FILE* input = stdin,
+                    ParserOptions options = {},
+                    InputProtocols protocols = {});
+    ~Reader();
+    Reader(Reader&&) noexcept;
+    auto operator=(Reader&&) noexcept -> Reader&;
+    Reader(Reader const&) = delete;
+    auto operator=(Reader const&) -> Reader& = delete;
+    auto read() -> ReadResult;
+    auto read(std::chrono::milliseconds timeout) -> ReadResult;
+    void configure(InputProtocols protocols);
 
-/**
- * Blocks until a single input Event is read from stdin.
- * @return The Event read from stdin.
- */
-auto read() -> Event;
-
-/**
- * Timeout version of read().
- * @param millisecond_timeout The maximum time to wait for input.
- * @return The Event read from stdin, or std::nullopt if the timeout is reached.
- */
-auto read(int millisecond_timeout) -> std::optional<Event>;
-
+   private:
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+};
 }  // namespace esc

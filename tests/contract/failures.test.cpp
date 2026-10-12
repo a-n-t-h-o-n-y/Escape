@@ -1,6 +1,7 @@
 #include "support/fixtures.hpp"
 #include "support/posix.hpp"
 #include "support/faults.hpp"
+#include "support/allocations.hpp"
 
 using namespace esc;
 using namespace esc::testing;
@@ -202,4 +203,23 @@ TEST(SES_04_close_error_still_marks_closed_and_releases_device_ownership)
     pty.settings(before); // Test cleanup after the intentionally failed OS restoration.
     auto replacement=Terminal::open(streams(pty),config());
     replacement.close();
+}
+
+TEST(SES_03_exception_allocation_failure_still_rolls_back_input_settings)
+{
+    contract::Pty pty;
+    auto opts=TerminalOptions{};
+    opts.profile=contract::full_profile();
+    opts.resize_interval=std::nullopt;
+    auto before=pty.settings();
+    auto terminal=Terminal::open(streams(pty),opts);
+    {
+        FaultScope faults{{.operation=Operation::Write,.error=error(std::errc::io_error),.after_bytes=2}};
+        contract::AllocationScope allocation_failure{true};
+        CHECK_THROWS(std::bad_alloc,terminal.set(Echo::Off,CursorMode::Hide));
+    }
+    CHECK(contract::same_settings(before,pty.settings()));
+    CHECK(terminal.is_open());
+    CHECK_THROWS(std::logic_error,terminal.write("x"));
+    terminal.close();
 }

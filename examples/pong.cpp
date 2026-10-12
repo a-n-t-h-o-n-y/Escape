@@ -1,6 +1,8 @@
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <csignal>
 #include <cstddef>
 #include <exception>
 #include <iostream>
@@ -27,6 +29,35 @@ constexpr auto logo = std::string_view{
 // This is a std::variant based state machine, one struct per screen type with
 // get_display_bytes() to retrieve the display for each state type and process()
 // to handle events for each state.
+
+// The host application owns termination policy; the library never installs handlers.
+volatile std::sig_atomic_t sigint_flag = 0;
+void request_shutdown(int) { sigint_flag = 1; }
+struct SignalGuard {
+    using Handler = void (*)(int);
+    Handler previous = std::signal(SIGINT, request_shutdown);
+    ~SignalGuard() { std::signal(SIGINT, previous); }
+};
+enum class Action { Enter, Up, Down, Back, LeftUp, LeftDown, Other };
+auto action(Key const& key) -> Action
+{
+    if (auto named = std::get_if<KeyCode>(&key)) {
+        switch (*named) {
+            case KeyCode::Enter: return Action::Enter;
+            case KeyCode::Escape: return Action::Back;
+            case KeyCode::ArrowUp: return Action::Up;
+            case KeyCode::ArrowDown: return Action::Down;
+            default: return Action::Other;
+        }
+    }
+    switch (std::get<char32_t>(key)) {
+        case U'k': return Action::Up;
+        case U'j': return Action::Down;
+        case U'w': return Action::LeftUp;
+        case U's': return Action::LeftDown;
+        default: return Action::Other;
+    }
+}
 
 // STATES ------------------------------------------------------------------------------
 
@@ -172,29 +203,27 @@ using EventResponse = std::optional<State>;
 
 [[nodiscard]] auto process(KeyPress event, SplashScreen state) -> EventResponse
 {
-    switch (event.key) {
-        case Key::Enter: return Menu{};
+    switch (action(event.key)) {
+        case Action::Enter: return Menu{};
         default: return state;
     }
 }
 
 [[nodiscard]] auto process(KeyPress event, Menu state) -> EventResponse
 {
-    switch (event.key) {
-        case Key::ArrowUp:
-        case Key::k: {
+    switch (action(event.key)) {
+        case Action::Up: {
             state.selected =
                 (state.selected + state.options.size() - 1) % state.options.size();
             return state;
         }
 
-        case Key::ArrowDown:
-        case Key::j: {
+        case Action::Down: {
             state.selected = (state.selected + 1) % state.options.size();
             return state;
         }
 
-        case Key::Enter:
+        case Action::Enter:
             switch (state.selected) {
                 case 0: return PlayerSelectMenu{};
                 case 1: return HowTo{};
@@ -214,12 +243,8 @@ using EventResponse = std::optional<State>;
     auto rng = std::mt19937{std::random_device{}()};
     auto dx = float_dist{0.5, 0.8}(rng);
     auto dy = float_dist{0.1, 0.4}(rng);
-    if (int_dist{0, 1}(rng) == 0) {
-        dx = -dx;
-    }
-    if (int_dist{0, 1}(rng) == 0) {
-        dy = -dy;
-    }
+    if (int_dist{0, 1}(rng) == 0) { dx = -dx; }
+    if (int_dist{0, 1}(rng) == 0) { dy = -dy; }
     return {dx, dy};
 }
 
@@ -227,10 +252,10 @@ using EventResponse = std::optional<State>;
 {
     constexpr auto speed_increment = 0.5f;
 
-    switch (event.key) {
-        case Key::Escape: return Menu{};
+    switch (action(event.key)) {
+        case Action::Back: return Menu{};
 
-        case Key::Enter: {
+        case Action::Enter: {
             auto& ball = state.ball;
             if (ball.velocity.dx == 0 && ball.velocity.dy == 0) {
                 ball.velocity = generate_initial_velocity();
@@ -238,20 +263,20 @@ using EventResponse = std::optional<State>;
             return state;
         }
 
-        case Key::ArrowUp: {
+        case Action::Up: {
             state.right.paddle.dy -= speed_increment;
             return state;
         }
-        case Key::ArrowDown: {
+        case Action::Down: {
             state.right.paddle.dy += speed_increment;
             return state;
         }
 
-        case Key::w: {
+        case Action::LeftUp: {
             state.left.paddle.dy -= speed_increment;
             return state;
         }
-        case Key::s: {
+        case Action::LeftDown: {
             state.left.paddle.dy += speed_increment;
             return state;
         }
@@ -262,23 +287,21 @@ using EventResponse = std::optional<State>;
 
 [[nodiscard]] auto process(KeyPress event, PlayerSelectMenu state) -> EventResponse
 {
-    switch (event.key) {
-        case Key::Escape: return Menu{};
+    switch (action(event.key)) {
+        case Action::Back: return Menu{};
 
-        case Key::ArrowUp:
-        case Key::k: {
+        case Action::Up: {
             state.selected =
                 (state.selected + state.options.size() - 1) % state.options.size();
             return state;
         }
 
-        case Key::ArrowDown:
-        case Key::j: {
+        case Action::Down: {
             state.selected = (state.selected + 1) % state.options.size();
             return state;
         }
 
-        case Key::Enter: {
+        case Action::Enter: {
             if (state.left_selected) {
                 state.left_player = state.options[state.selected];
                 state.left_selected = false;
@@ -298,8 +321,8 @@ using EventResponse = std::optional<State>;
 
 [[nodiscard]] auto process(KeyPress event, HowTo state) -> EventResponse
 {
-    switch (event.key) {
-        case Key::Escape: return Menu{};
+    switch (action(event.key)) {
+        case Action::Back: return Menu{};
         default: return state;
     }
 }
@@ -358,9 +381,7 @@ using EventResponse = std::optional<State>;
     bytes += padding;
     for (char c : logo) {
         bytes += c;
-        if (c == '\n') {
-            bytes += padding;
-        }
+        if (c == '\n') { bytes += padding; }
     }
 
     for (std::size_t i = 0; i < state.options.size(); ++i) {
@@ -368,9 +389,7 @@ using EventResponse = std::optional<State>;
             .x = (dimensions.width - (int)state.options[i].size()) / 2,
             .y = 14 + (int)i,
         });
-        if (i == state.selected) {
-            bytes += escape(Trait::Standout);
-        }
+        if (i == state.selected) { bytes += escape(Trait::Standout); }
         bytes += state.options[i] + escape(Trait::None);
     }
 
@@ -407,7 +426,8 @@ using EventResponse = std::optional<State>;
     {  // Net
         bytes += escape(Trait::Dim);
         for (int i = 0; i < display_space.height; ++i) {
-            bytes += escape(esc::cursor(offset + Point{display_space.width / 2, i})) + "╳";
+            bytes +=
+                escape(esc::cursor(offset + Point{display_space.width / 2, i})) + "╳";
         }
         bytes += escape(Trait::None);
     }
@@ -419,8 +439,9 @@ using EventResponse = std::optional<State>;
             return std::array{"▄", "▃", "▂", "▁", "█", "▇", "▆", "▅"}[i];
         }();
 
-        auto cursor = esc::cursor(offset + Point{.x = (int)std::round(state.ball.at.x),
-                                                 .y = (int)std::round(state.ball.at.y)});
+        auto cursor =
+            esc::cursor(offset + Point{.x = (int)std::round(state.ball.at.x),
+                                       .y = (int)std::round(state.ball.at.y)});
 
         bytes += escape(fg(velocity_to_color(state.ball.velocity)));
         bytes += escape(cursor, Trait::Inverse) + glyph;
@@ -465,7 +486,8 @@ using EventResponse = std::optional<State>;
         bytes += std::to_string(state.left.score);
 
         auto const rhs = state.right.player.name + ": ";
-        bytes += escape(esc::cursor(offset + Point{
+        bytes += escape(
+            esc::cursor(offset + Point{
                                      .x = display_space.width - (int)rhs.size() - 1,
                                      .y = -2,
                                  }));
@@ -487,11 +509,13 @@ using EventResponse = std::optional<State>;
             bytes += escape(esc::cursor(offset + Point{.x = -1, .y = i}));
             bytes += "│";
 
-            bytes += escape(esc::cursor(offset + Point{.x = display_space.width, .y = i}));
+            bytes +=
+                escape(esc::cursor(offset + Point{.x = display_space.width, .y = i}));
             bytes += "│";
         }
 
-        bytes += escape(esc::cursor(offset + Point{.x = -1, .y = display_space.height}));
+        bytes +=
+            escape(esc::cursor(offset + Point{.x = -1, .y = display_space.height}));
         bytes += "╰";
 
         for (int i = 0; i < display_space.width; ++i) {
@@ -527,17 +551,13 @@ using EventResponse = std::optional<State>;
 
     bytes += escape(Cursor{.x = (dimensions.width) / 2 - 25, .y = 4});
     bytes += "Left Player: ";
-    if (state.left_selected) {
-        bytes += escape(Trait::Standout);
-    }
+    if (state.left_selected) { bytes += escape(Trait::Standout); }
     bytes += state.left_player.name;
     bytes += escape(Trait::None);
 
     bytes += escape(Cursor{.x = (dimensions.width) / 2 + 10, .y = 4});
     bytes += "Right Player: ";
-    if (!state.left_selected) {
-        bytes += escape(Trait::Standout);
-    }
+    if (!state.left_selected) { bytes += escape(Trait::Standout); }
     bytes += state.right_player.name;
     bytes += escape(Trait::None);
 
@@ -546,9 +566,7 @@ using EventResponse = std::optional<State>;
             .x = (dimensions.width - (int)state.options[i].name.size()) / 2,
             .y = 6 + (int)i,
         });
-        if (i == state.selected) {
-            bytes += escape(Trait::Standout);
-        }
+        if (i == state.selected) { bytes += escape(Trait::Standout); }
         bytes += state.options[i].name;
         bytes += escape(Trait::None);
     }
@@ -758,8 +776,9 @@ auto try_main() -> int
 {
     constexpr auto init_timeout = std::chrono::milliseconds{30};
 
-    initialize_interactive_terminal();
-    screen_dimensions = terminal_area();
+    SignalGuard signal_guard;
+    auto terminal = Terminal::open(TerminalOptions::interactive());
+    screen_dimensions = terminal.area();
 
     std::optional<State> state = SplashScreen{};
 
@@ -775,12 +794,14 @@ auto try_main() -> int
         flush();
 
         auto const begin = std::chrono::steady_clock::now();
-        if (auto const event = read(timeout.count()); event.has_value()) {
+        if (auto const event =
+                terminal.read(std::max(timeout, std::chrono::milliseconds{0}));
+            event.status == ReadStatus::Event) {
             state = std::visit(
                 [](auto event, auto current_state) {
                     return process(event, std::move(current_state));
                 },
-                *event, std::move(*state));
+                *event.event, std::move(*state));
             timeout -= std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - begin);
         }
@@ -798,7 +819,7 @@ auto try_main() -> int
         }
     }
 
-    uninitialize_terminal();
+    terminal.close();
     return 0;
 }
 
@@ -808,12 +829,10 @@ auto main() -> int
         return try_main();
     }
     catch (const std::exception& e) {
-        uninitialize_terminal();
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }
     catch (...) {
-        uninitialize_terminal();
         std::cerr << "Unknown error" << std::endl;
         return 1;
     }

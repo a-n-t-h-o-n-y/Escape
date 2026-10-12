@@ -11,6 +11,12 @@ CONSUMER = r'''#include <esc/esc.hpp>
 int main() {
     if (esc::escape(esc::Cursor{}) != "\x1b[1;1H") return 1;
     if (esc::utf32_to_utf8(U"界") != "\xe7\x95\x8c") return 2;
+    esc::Parser parser;
+    auto result=parser.next(std::span<char const>{"\x1b[A",3});
+    if(result.event != std::optional<esc::Event>{esc::KeyPress{esc::KeyCode::ArrowUp}}) return 3;
+    auto options=esc::TerminalOptions::interactive();
+    if(options.echo != std::optional{esc::Echo::Off}) return 4;
+    esc::Output{}.write(std::string_view{});
     return 0;
 }
 '''

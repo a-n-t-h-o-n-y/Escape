@@ -822,7 +822,9 @@ void flush();                                                   // stdout
 ```
 
 `Writable` is restricted to char, char32_t, string/string_view, u32string/
-u32string_view, and null-terminated char pointers/arrays. No arbitrary integer
+u32string_view, and null-terminated char pointers/arrays or UTF-32 literal arrays. UTF-32
+arrays use null-terminated semantics; an explicit u32string_view preserves embedded
+nulls. No arbitrary integer
 or bool becomes a character through implicit convertibility. String and u32string
 arguments use their full sizes via views. Pointer/array overloads have conventional
 C-string semantics; use an explicit view to include embedded nulls in an array.
@@ -1084,7 +1086,9 @@ For an alternate-screen session, leave/restore the buffer state as configured;
 normal-screen drawing cannot be undone. Style and screen contents changed by
 drawing commands are not part of automatic restoration.
 
-Exact OS restoration is possible because settings were captured. Protocol-mode
+Captured OS settings are restored. On macOS, a checked FIONREAD query completes
+the kernel's pending canonical-mode reprocessing without consuming or flushing
+input, so the transient PENDIN flag does not remain set after restoration. Protocol-mode
 restoration depends on the supplied initial state and terminal behavior. It is
 not a blanket guarantee of restoring an unknown preexisting emulator state.
 No library destructor can recover from SIGKILL, process crashes without stack

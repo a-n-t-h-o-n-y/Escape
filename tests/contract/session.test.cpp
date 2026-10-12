@@ -1,5 +1,6 @@
 #include "support/fixtures.hpp"
 #include "support/posix.hpp"
+#include "support/allocations.hpp"
 
 #include <type_traits>
 
@@ -338,7 +339,7 @@ TEST(SES_04_session_preserves_process_signal_dispositions)
         if (current.sa_flags&SA_SIGINFO) CHECK(current.sa_sigaction==before[i].sa_sigaction);
         else CHECK(current.sa_handler==before[i].sa_handler);
         for (int signal=1;signal<NSIG;++signal)
-            CHECK(::sigismember(&current.sa_mask,signal)==::sigismember(&before[i].sa_mask,signal));
+            CHECK(sigismember(&current.sa_mask,signal)==sigismember(&before[i].sa_mask,signal));
     }
     terminal.close();
 }
@@ -355,4 +356,75 @@ TEST(SES_05_queued_input_precedes_resize_without_reordering_keys)
     pty.resize(100,40);
     CHECK(terminal.read(100ms).event==std::optional<Event>{KeyPress{U'b'}});
     CHECK(terminal.read(100ms).event==std::optional<Event>{Resize{{100,40}}});
+}
+
+TEST(SES_01_inherited_protocols_configure_input_without_mode_output)
+{
+    contract::Pty pty;
+    auto config=options();
+    config.echo=Echo::Off;
+    config.input_buffer=InputBuffer::Immediate;
+    config.restore_modes.mouse={MouseMode::Basic,MouseProtocol::Sgr};
+    config.restore_modes.focus=FocusReporting::On;
+    config.restore_modes.paste=BracketedPaste::On;
+    auto terminal=Terminal::open(streams(pty),config);
+    CHECK(pty.drain().empty());
+    pty.send("\x1b[I\x1b[<0;1;1M\x1b[200~abc\x1b[201~");
+    CHECK(terminal.read(100ms).event==std::optional<Event>{Focus{true}});
+    CHECK(terminal.read(100ms).event==std::optional<Event>{MousePress{{0,0},MouseButton::Left}});
+    CHECK(terminal.read(100ms).event==std::optional<Event>{PasteChunk{"abc",true,true,false}});
+    terminal.close();
+    CHECK(pty.drain().empty());
+}
+TEST(SES_02_inherited_unsupported_mouse_encoding_is_rejected_without_changes)
+{
+    contract::Pty pty;
+    auto before=pty.settings();
+    auto config=options();
+    config.restore_modes.mouse={MouseMode::Basic,MouseProtocol::Legacy};
+    CHECK_THROWS(UnsupportedFeature,Terminal::open(streams(pty),config));
+    CHECK(contract::same_settings(before,pty.settings()));
+    CHECK(pty.drain().empty());
+}
+TEST(SES_02_plain_profile_accepts_disabled_baseline_noops)
+{
+    contract::Pty pty;
+    auto config=options();
+    config.profile=TerminalProfile{};
+    auto terminal=Terminal::open(streams(pty),config);
+    terminal.set(ScreenBuffer::Normal,CursorMode::Show,MouseMode::Off,FocusReporting::Off,BracketedPaste::Off);
+    CHECK(pty.drain().empty());
+    CHECK_THROWS(UnsupportedFeature,terminal.set(ScreenBuffer::Alternate));
+    terminal.close();
+}
+TEST(SES_04_canonical_restoration_preserves_queued_input)
+{
+    contract::Pty pty;
+    auto before=pty.settings();
+    auto config=options();
+    config.echo=Echo::Off;
+    config.input_buffer=InputBuffer::Immediate;
+    auto terminal=Terminal::open(streams(pty),config);
+    pty.send("queued\n");
+    terminal.close();
+    CHECK(contract::same_settings(before,pty.settings()));
+    Reader reader{pty.input.get()};
+    for(auto scalar : {U'q',U'u',U'e',U'u',U'e',U'd',U'\n'})
+        CHECK(reader.read(100ms).event==std::optional<Event>{KeyPress{scalar}});
+}
+
+TEST(SES_01_send_and_unicode_output_have_no_intermediate_cpp_allocation)
+{
+    contract::Pty pty;
+    auto terminal=Terminal::open(streams(pty),options());
+    std::size_t allocations=0;
+    {
+        contract::AllocationScope scope;
+        terminal.send(Cursor{},Brush{.foreground=TColor{0x123456},.traits=Trait::Bold});
+        terminal.write(U"界👽",std::u32string_view{U"plain"});
+        allocations=scope.count();
+    }
+    CHECK(allocations==0);
+    terminal.flush();
+    CHECK(pty.drain().ends_with("界👽plain"));
 }

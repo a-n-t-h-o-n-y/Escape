@@ -344,3 +344,102 @@ TEST(PAR_01_text_scalar_does_not_guess_named_key_text)
     CHECK(!text_scalar(Key{KeyCode::Enter}).has_value());
     CHECK(!text_scalar(Key{KeyCode::F1}).has_value());
 }
+
+TEST(PAR_04_already_invalid_unicode_prefix_does_not_wait_for_eof)
+{
+    for(auto bytes : {"\xe0\x80"sv,"\xed\xa0"sv,"\xf0\x80"sv,"\xf4\x90"sv}) {
+        Parser parser;
+        auto result=parser.next(std::span<char const>{bytes.data(),bytes.size()});
+        CHECK(result.status==ParseStatus::Event);
+        CHECK(std::get<UnknownInput>(*result.event).problem==InputProblem::InvalidUtf8);
+        CHECK(std::get<UnknownInput>(*result.event).bytes==bytes);
+        CHECK(!parser.finish());
+    }
+}
+TEST(PAR_05_partial_and_false_paste_delimiters_preserve_every_byte)
+{
+    auto payload="a\x1b[20x\x1b[201X\x1b\x1b[201"sv;
+    auto input=std::string{"\x1b[200~"}+std::string{payload}+"\x1b[201~";
+    for(std::size_t chunk=1;chunk<=8;++chunk) {
+        Parser parser{{.paste_chunk_size=chunk},{.bracketed_paste=true}};
+        std::vector<Event> events;
+        for(auto byte:input) contract::feed(parser,std::string_view{&byte,1},events);
+        std::string joined;
+        for(std::size_t i=0;i<events.size();++i) {
+            auto const& event=std::get<PasteChunk>(events[i]);
+            CHECK(event.bytes.size()<=chunk);
+            CHECK(event.first==(i==0) && event.last==(i+1==events.size()));
+            joined+=event.bytes;
+        }
+        CHECK(joined==payload);
+    }
+}
+TEST(PAR_04_overflow_then_expiry_or_eof_closes_the_same_opaque_unit)
+{
+    for(bool finish:{false,true}) {
+        Parser parser{{.sequence_limit=16}};
+        std::vector<Event> events;
+        std::string input="\x1b]"+std::string(100,'a');
+        contract::feed(parser,input,events);
+        auto final=finish?parser.finish():parser.expire();
+        CHECK(final.has_value());
+        events.push_back(*final);
+        CHECK(contract::unknown_bytes(events)==input);
+        for(std::size_t i=0;i<events.size();++i) {
+            auto const& unknown=std::get<UnknownInput>(events[i]);
+            CHECK(unknown.bytes.size()<=16 && unknown.problem==InputProblem::TooLong);
+            CHECK(unknown.final==(i+1==events.size()));
+        }
+    }
+}
+TEST(PAR_04_reset_and_configuration_validation_preserve_contract)
+{
+    Parser parser{{},{.focus=true}};
+    CHECK_THROWS(std::invalid_argument,parser.configure(InputProtocols{.mouse=static_cast<MouseProtocol>(99)}));
+    CHECK(contract::parse("\x1b[I",{.focus=true})==std::vector<Event>{Focus{true}});
+    std::vector<Event> events;
+    contract::feed(parser,"\x1b[I",events);
+    CHECK(events==std::vector<Event>{Focus{true}});
+    parser.finish();
+    parser.reset();
+    events.clear();
+    contract::feed(parser,"\x1b[I",events);
+    CHECK(events==std::vector<Event>{Focus{true}});
+}
+
+TEST(PAR_02_deterministic_mixed_streams_match_independent_event_goldens)
+{
+    struct Fixture { std::string_view bytes; Event event; };
+    std::array fixtures={
+        Fixture{"a",KeyPress{U'a'}},Fixture{"界",KeyPress{U'界'}},
+        Fixture{"\x1b[1;5A",KeyPress{KeyCode::ArrowUp,Modifiers{.ctrl=true}}},
+        Fixture{"\x1bOP",KeyPress{KeyCode::F1}},
+        Fixture{"\x1b[I",Focus{true}},Fixture{"\x1b[O",Focus{false}},
+        Fixture{"\x1b[<0;12;8M",MousePress{{11,7},MouseButton::Left}},
+        Fixture{"\x1b[<0;12;8m",MouseRelease{{11,7},MouseButton::Left}},
+        Fixture{"\x1b[<65;1;1M",MouseWheel{{0,0},0,1}},
+        Fixture{"\x1b]reply\a",UnknownInput{"\x1b]reply\a",InputProblem::Unsupported,true}},
+        Fixture{"\xff",UnknownInput{"\xff",InputProblem::InvalidUtf8,true}},
+        Fixture{"\x1b\t",KeyPress{KeyCode::Tab,Modifiers{.alt=true}}}
+    };
+    std::uint32_t seed=0x12345678;
+    auto random=[&] { seed=seed*1664525u+1013904223u; return seed; };
+    for(int trial=0;trial<40;++trial) {
+        std::string input;
+        std::vector<Event> expected;
+        for(int i=0;i<100;++i) {
+            auto const& fixture=fixtures[random()%fixtures.size()];
+            input+=fixture.bytes;
+            expected.push_back(fixture.event);
+        }
+        Parser parser{{},{.mouse=MouseProtocol::Sgr,.focus=true}};
+        std::vector<Event> actual;
+        for(std::size_t offset=0;offset<input.size();) {
+            auto size=std::min<std::size_t>(1+random()%13,input.size()-offset);
+            contract::feed(parser,std::string_view{input}.substr(offset,size),actual);
+            offset+=size;
+        }
+        CHECK(actual==expected);
+        CHECK(!parser.finish());
+    }
+}

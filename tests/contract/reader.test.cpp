@@ -2,6 +2,7 @@
 #include "support/posix.hpp"
 
 #include <thread>
+#include <atomic>
 #include <type_traits>
 
 using namespace esc;
@@ -102,4 +103,40 @@ TEST(IO_01_configure_does_not_drop_queued_keys)
     CHECK(reader.read(100ms).event==std::optional<Event>{KeyPress{U'b'}});
     pipe.write("\x1b[I");
     CHECK(reader.read(100ms).event==std::optional<Event>{Focus{true}});
+}
+
+TEST(IO_01_regular_files_are_read_in_blocks_and_eof_is_persistent)
+{
+    contract::File file;
+    CHECK(std::fwrite("ab",1,2,file.get())==2);
+    CHECK(std::fflush(file.get())==0);
+    std::rewind(file.get());
+    Reader reader{file.get()};
+    CHECK(reader.read(0ms).event==std::optional<Event>{KeyPress{U'a'}});
+    CHECK(reader.read(0ms).event==std::optional<Event>{KeyPress{U'b'}});
+    CHECK(reader.read(0ms).status==ReadStatus::EndOfInput);
+    CHECK(reader.read().status==ReadStatus::EndOfInput);
+}
+TEST(IO_01_sequence_deadline_is_not_extended_by_trickling_bytes)
+{
+    contract::Pipe pipe;
+    Reader reader{pipe.reader.get(),ParserOptions{.escape_timeout=500ms,.sequence_timeout=90ms}};
+    pipe.write("\x1b[");
+    std::atomic<bool> stop=false;
+    std::thread writer{[&] {
+        for(int i=0;i<100 && !stop.load();++i) {
+            std::this_thread::sleep_for(10ms);
+            pipe.write("1");
+        }
+    }};
+    struct Join {
+        std::atomic<bool>& stop;
+        std::thread& writer;
+        ~Join() { stop=true; if(writer.joinable()) writer.join(); }
+    } join{stop,writer};
+    auto result=reader.read(500ms);
+    CHECK(result.status==ReadStatus::Event);
+    auto const& unknown=std::get<UnknownInput>(*result.event);
+    CHECK(unknown.bytes.starts_with("\x1b[") && unknown.bytes.size()<100);
+    CHECK(unknown.problem==InputProblem::Truncated);
 }

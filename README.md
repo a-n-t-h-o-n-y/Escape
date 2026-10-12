@@ -1,40 +1,70 @@
 # Escape 🕳️
 
-__Terminal Escape Sequence Library__
+Escape is a C++20 library for terminal byte encoding, Unicode text, incremental
+input parsing, and scoped POSIX terminal sessions. The refactor on this branch
+is a breaking interface revision; the complete contract is in
+[docs/interface-proposal.md](docs/interface-proposal.md).
 
-`Escape` provides support for generating and interpreting terminal escape sequences.
-These can be written to the terminal to control cursor movement, text formatting, and
-colors. It also includes a `read()` function to produce keyboard input, mouse input, and
-window resize events.
+## Encoding
+
+Raw encoding is pure and does not read the environment or retain drawing state:
 
 ```cpp
-#include <iostream>
 #include <esc/esc.hpp>
 
-using namespace esc;
+auto bytes = esc::escape(esc::Cursor{0, 0}, esc::fg(esc::XColor::Cyan));
+std::string frame;
+frame.reserve(4096);
+esc::append_escape(frame, esc::Cursor{4, 2}, esc::Trait::Bold);
 
-int main()
-{
-    std::cout
-        << escape(Brush{
-                .background = XColor::Cyan,
-                .foreground = TColor{0xF02127},
-                .traits     = Trait::Italic,
-           }) << "Hello"
-
-        << escape(Brush{}) << " 👽 "
-
-        << escape(
-                fg(TColor{0x76F09C}),
-                Trait::Bold | Trait::Underline
-           ) << "World!"
-
-        << escape(Brush{}) << std::endl;
-}
+std::array<char, 128> buffer;
+auto result = esc::escape_to(buffer, esc::Cursor{4, 2});
+// result.required reports the complete size. An undersized span is unchanged.
 ```
 
-Strict Unicode conversion and glyph styling are available through `<esc/text.hpp>`
-and `<esc/glyph.hpp>`:
+Pass a `TerminalProfile` before commands for capability-aware encoding.
+Best effort adapts colors and traits; strict mode rejects losses. Unsupported
+geometry and protocol modes throw. Profiles and caller-supplied palettes are
+ordinary values. `resolve_profile(environment, output_is_terminal)` is pure;
+`snapshot_environment()` explicitly reads current environment values. Exact
+TERM matches use the documented heuristic table and return per-feature evidence.
+
+## Sessions and input
+
+```cpp
+auto terminal = esc::Terminal::open(esc::TerminalOptions::interactive());
+terminal.send(esc::BlankScreen{}, esc::Cursor{});
+terminal.write("Hello 👽");
+terminal.flush();
+
+auto result = terminal.read(std::chrono::milliseconds{100});
+if (result.status == esc::ReadStatus::Event) {
+    // Visit *result.event: keys, mouse, resize, focus, paste, or unknown input.
+}
+terminal.close(); // Reports cleanup errors; destruction also attempts cleanup.
+```
+
+Sessions borrow input/output streams referring to the same terminal device.
+Only one session owns a device's modes in this process. Passive options preserve
+modes; interactive options request immediate input, echo off, alternate screen,
+and a hidden cursor. Mouse, focus, and paste are explicit opt-ins. Closing restores
+captured input settings and changed protocol modes to the supplied initial state.
+The host application owns signal handling.
+
+`Output` also writes directly to a borrowed FILE* without a terminal session.
+Raw byte views preserve their full length, including nulls. UTF-32 output is
+validated before a variadic write and encoded in bounded chunks. No output API
+adds separators, newlines, private buffering, or automatic flushing.
+
+`Parser` owns bounded incomplete input and performs no I/O or clock access.
+`Reader` combines it with descriptor reads, monotonic deadlines, and explicit
+Event/Timeout/EndOfInput results. A Reader's input must not have unread stdio
+buffering or concurrent fread/getchar/iostreams users. Parser protocol changes
+apply only to new sequence beginnings. Unknown input stays owned and bounded;
+paste preserves original bytes. Ordinary keys and mouse events allocate nothing
+after parser construction.
+
+## Unicode and glyphs
 
 ```cpp
 auto scalars = esc::utf8_to_utf32("Hello 👽");
@@ -43,81 +73,45 @@ auto highlighted = text | esc::fg(esc::XColor::Cyan); // text is unchanged
 esc::style_in_place(text, esc::Trait::Bold);
 ```
 
-`GlyphString` is `std::vector<Glyph>`; a glyph represents a Unicode scalar without
-an implied terminal cell width. Invalid Unicode throws `UnicodeError` with the
-input offset. Pipes return owned values; named append and mutation APIs support
-reusable buffers and mutable ranges. See the [interface proposal](docs/interface-proposal.md)
-and [contract-test instructions](tests/contract/README.md) for the refactor's scope.
+Conversions are strict. `UnicodeError::offset()` identifies invalid input.
+`GlyphString` is a vector of styled Unicode scalars; a glyph does not promise
+one screen cell. Pipes return values; named append and mutation APIs support
+reusable storage. Grapheme layout and terminal cell width remain outside the API.
 
-See [TermOx](https://github.com/a-n-t-h-o-n-y/TermOx) for a more full-featured widget
-based library that uses `Escape` under the hood.
+## Build and install
 
-## Features
-
-- **Dynamic Terminal Control**: Generate escape sequences for cursor movement, text formatting, and colors.
-- **Event Handling**: Includes a `read()` function to handle keyboard, mouse input, and window resize events, enabling interactive terminal applications.
-- **Cross-Terminal Compatibility**: Designed to work across various terminals without relying on a terminfo database.
-
-## Dependencies
-
-- [zzz Library](https://github.com/a-n-t-h-o-n-y/zzz)
-    - Utilities and Tests.
-    - CMake fetches this on configure.
-
-## Build Instructions
-
-    git clone https://github.com/a-n-t-h-o-n-y/Escape.git
-    mkdir Escape/build && cd Escape/build
-    cmake ..
-    make escape                                 # Build Library
-    make escape.examples.pong                   # Build PONG Game (Optional)
-
-Capability-aware encoding is available through `<esc/capabilities.hpp>`.
-Pass a `TerminalProfile` before commands to `escape`, `append_escape`, or
-`escape_to`. Best effort adapts colors and traits; strict mode rejects losses.
-Unsupported geometry and protocol modes throw in either policy.
-`resolve_profile(environment, output_is_terminal)` is pure; call
-`snapshot_environment()` explicitly to read the process environment. TERM
-resolution uses the exact heuristic table in the interface proposal, with
-per-feature evidence; live terminal verification remains future work.
-
-The implemented contract-test slices are opt-in:
+Requires a C++20 compiler, CMake 3.16+, and macOS/Linux for Reader and Terminal.
+No third-party library is fetched or required. Python 3 enables package/header
+verification tests.
 
 ```sh
-cmake -DESCAPE_BUILD_CONTRACT_TESTS=ON ..
-make escape.tests.contract.encoding escape.tests.contract.text escape.tests.contract.capabilities
-ctest -R '^escape\.contract\.(encoding|text|capabilities)\.' --output-on-failure
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+cmake --build build --target termcaps escape.examples.pong
 ```
 
-The legacy glyph tests remain for migration review and no longer compile against
-the new interface. Parser and session contracts are specified but
-remain under implementation; see the contract-test README for their status.
+`ESCAPE_BUILD_TESTS` and `ESCAPE_BUILD_EXAMPLES` default on for a top-level
+build and off for add_subdirectory consumers. `ESCAPE_BUILD_CONTRACT_TESTS`
+remains an opt-in compatibility switch. Fault injection is private to test builds.
 
-## Example Code
+```sh
+cmake -S . -B build-install -DESCAPE_BUILD_TESTS=OFF -DESCAPE_BUILD_EXAMPLES=OFF \
+    -DCMAKE_INSTALL_PREFIX=/your/prefix
+cmake --build build-install
+cmake --install build-install
+```
 
-- [tools/termcaps.cpp](./tools/termcaps.cpp)
-- [examples/pong.cpp](./examples/pong.cpp)
-- [tests/contract/text.test.cpp](./tests/contract/text.test.cpp)
-- [tests/contract/sequence.test.cpp](./tests/contract/sequence.test.cpp)
+Consumers use `Escape::escape` after either `add_subdirectory(Escape)` or
+`find_package(Escape CONFIG REQUIRED)`. The development package version is
+0.2.0; this branch has not been published as a release.
 
-## TODO
+See [contract tests](tests/contract/README.md) for verification and
+[the acceptance matrix](tests/contract/live-terminals.md) for real terminal
+validation. Synthetic fixtures and PTYs check library behavior, not emulator
+rendering or every terminal's advertised capabilities. Windows sessions, active
+probing, enhanced keyboard protocols, width calculation, and benchmarks remain
+deferred.
 
-- **Focus Events**: Integrate `TerminalFocusIn` and `TerminalFocusOut` events for focus
-tracking. Events are triggered on `CSI I` and `CSI O` input sequences, enabled by Focus
-Event Mouse 1004. Dependent on widespread terminal emulator support.
-- **BELL Sequences**: Add BELL sequences to adjust alert frequency and duration.
-
-## Current Limitations
-
-- **Incompatible Terminals**: Known issues with `aterm` and `eterm`.
-- **Mouse Input Handling**: In Konsole, mouse input is limited to `MouseMode::Drag`.
-
-## Contributing
-
-Feedback and contributions are appreciated. If you encounter any issues or have
-suggestions for improvements, please open an issue on our repository.
-
-## Note
-
-Terminal features and support vary significantly across emulators. It's recommended to
-test functionality in your target environments.
+[TermOx](https://github.com/a-n-t-h-o-n-y/TermOx) provides a higher-level widget
+library; its callers need migration to this revised interface.

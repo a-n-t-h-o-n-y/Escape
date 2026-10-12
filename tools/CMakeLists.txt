@@ -1,5 +1,5 @@
 # TermCaps Executable
-add_executable(termcaps EXCLUDE_FROM_ALL
+add_executable(termcaps
     termcaps.cpp
 )
 

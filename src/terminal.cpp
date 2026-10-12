@@ -1,251 +1,479 @@
-#include <esc/terminal.hpp>
-
-#include <cstdlib>
-#include <iostream>
-#include <stdexcept>
-#include <string>
-#include <utility>
-
-#include <sys/ioctl.h>
-#include <termios.h>
+#include <sys/stat.h>
 #include <unistd.h>
-
-#include <esc/detail/console_file.hpp>
-#include <esc/detail/is_urxvt.hpp>
-#include <esc/detail/signals.hpp>
-#include <esc/detail/tty_file.hpp>
-#include <esc/io.hpp>
-#include <esc/mouse.hpp>
-#include <esc/terminfo.hpp>
-
-namespace {
-
-[[nodiscard]] auto current_termios() -> ::termios
-{
-    auto current = ::termios{};
-    ::tcgetattr(STDIN_FILENO, &current);
-    return current;
-}
-
-void fix_ctrl_m()
-{
-    auto settings = current_termios();
-    settings.c_iflag &= ~(ICRNL);
-    ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &settings);
-}
-
-[[nodiscard]] auto turn_off_auto_wrap() -> std::string { return "\033[?7l"; }
-
-[[nodiscard]] auto turn_on_auto_wrap() -> std::string { return "\033[?7h"; }
-
-auto original_termios = ::termios{};
-
-}  // namespace
+#include <array>
+#include <cerrno>
+#include <esc/terminal.hpp>
+#include <mutex>
+#include <set>
+#include "detail/backend.hpp"
 
 namespace esc {
-
-void set(Echo x)
+namespace {
+std::mutex lease_mutex;
+std::set<dev_t> leases;
+auto error_code() -> std::error_code
+{ return {errno ? errno : EIO, std::generic_category()}; }
+void checked(int result, char const* message)
 {
-    auto const echo_flag = (x == Echo::On) ? ECHO : ~ECHO;
-
-    auto settings = current_termios();
-    settings.c_lflag &= echo_flag;
-    ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &settings);
+    if (result < 0) throw std::system_error{error_code(), message};
 }
-
-void set(InputBuffer x)
+void require(bool supported, Feature feature)
 {
-    auto const canon_flag = (x == InputBuffer::Canonical) ? ICANON : ~(ICANON);
-
-    auto settings = current_termios();
-    settings.c_lflag &= canon_flag;
-    if (x == InputBuffer::Immediate) {
-        settings.c_cc[VMIN] = 1;  // Min. number of bytes before sending.
-    }
-    ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &settings);
+    if (!supported) throw UnsupportedFeature{feature};
 }
-
-void set(Signals x)
+template <class T>
+void valid_optional(std::optional<T> value, T first, T second)
 {
-    // ctrl-c, ctrl-z, ctrl-s, ctrl-q, ctrl-v all send their ctrl byte value rather than
-    // changing the terminal's behaviour.
-    auto const [lflags, iflags] = [x] {
-        auto const lflags = ISIG | IEXTEN;
-        auto const iflags = IXON;
-        return (x == Signals::On) ? std::pair{lflags, iflags}
-                                  : std::pair{~lflags, ~iflags};
-    }();
-
-    auto settings = current_termios();
-    settings.c_lflag &= lflags;
-    settings.c_iflag &= iflags;
-    ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &settings);
+    if (value && *value != first && *value != second)
+        throw std::invalid_argument{"Terminal: invalid setting"};
 }
-
-void set(ScreenBuffer x)
+void validate_options(TerminalOptions const& options)
 {
-    switch (x) {
-        case ScreenBuffer::Normal:
-            write(
-                "\033["
-                "?1049l");
-            break;
-        case ScreenBuffer::Alternate:
-            write(
-                "\033["
-                "?1049h");
-            break;
-    }
+    valid_optional(options.echo, Echo::On, Echo::Off);
+    valid_optional(options.input_buffer, InputBuffer::Canonical,
+                   InputBuffer::Immediate);
+    valid_optional(options.signals, Signals::On, Signals::Off);
+    valid_optional(options.screen_buffer, ScreenBuffer::Normal,
+                   ScreenBuffer::Alternate);
+    valid_optional(options.cursor, CursorMode::Show, CursorMode::Hide);
+    valid_optional(options.focus, FocusReporting::Off, FocusReporting::On);
+    valid_optional(options.paste, BracketedPaste::Off, BracketedPaste::On);
+    if (options.mouse && *options.mouse != MouseMode::Off &&
+        *options.mouse != MouseMode::Basic && *options.mouse != MouseMode::Drag &&
+        *options.mouse != MouseMode::Move)
+        throw std::invalid_argument{"Terminal: invalid mouse mode"};
+    if (options.resize_interval && options.resize_interval->count() <= 0)
+        throw std::invalid_argument{"Terminal: nonpositive resize interval"};
 }
-
-void set(KeyMode x)
+void validate_restore(ProtocolState const& modes)
 {
-    // TODO implementation is messy, depends on call order.
-
-    // from linux/kd.h
-    constexpr auto k_xlate = 0x01;
-    constexpr auto k_raw = 0x00;
-    switch (x) {
-        case KeyMode::Normal:
-            if (detail::tty_file_descriptor.has_value()) {
-                detail::set_keyboard_mode(*detail::tty_file_descriptor, k_xlate);
-            }
-            break;
-        case KeyMode::Raw:
-            detail::tty_file_descriptor = detail::open_console_file();
-            detail::set_keyboard_mode(*detail::tty_file_descriptor, k_raw);
-            break;
-    }
+    detail::SequenceWriter measure;
+    detail::encode(measure, modes.screen_buffer);
+    detail::encode(measure, modes.cursor);
+    detail::encode(measure, modes.mouse);
+    detail::encode(measure, modes.focus);
+    detail::encode(measure, modes.paste);
 }
-
-void set(CursorMode x)
-{
-    switch (x) {
-        case CursorMode::Show:
-            write(
-                "\033["
-                "?25h");
-            break;
-        case CursorMode::Hide:
-            write(
-                "\033["
-                "?25l");
-            break;
-    }
-}
-
-void set(MouseMode x)
-{
-    auto const ext_mode = detail::is_urxvt(TERM_var()) ? "1015" : "1006";
-
-    auto result = std::string{};
-    switch (x) {
-        case MouseMode::Off:
-            result.append("\033[?1000;1002;1003;").append(ext_mode).append("l");
-            break;
-        case MouseMode::Basic:
-            result.append("\033[?1002;1003l");  // Off
-            result.append("\033[?1000;").append(ext_mode).append("h");
-            break;
-        case MouseMode::Drag:
-            result.append("\033[?1000;1003l");  // Off
-            result.append("\033[?1002;").append(ext_mode).append("h");
-            break;
-        case MouseMode::Move:
-            result.append("\033[?1000;1002l");  // Off
-            result.append("\033[?1003;").append(ext_mode).append("h");
-            break;
-    }
-    write(result);
-}
-
-void initialize_terminal(ScreenBuffer screen_buffer,
-                         MouseMode mouse_mode,
-                         CursorMode cursor,
-                         Echo echo,
-                         InputBuffer input_buffer,
-                         Signals signals,
-                         KeyMode key_mode,
-                         bool sigint_uninit)
-{
-    auto constexpr stdout_buf_size = 4'096;
-    // TODO record current settings before calling set, this is ioctl things and
-    // tcsetaddr things. termios? probably from tcsetaddr
-
-    original_termios = current_termios();
-
-    std::setvbuf(stdout, nullptr, _IOFBF, stdout_buf_size);
-    detail::register_signals(sigint_uninit);
-
-    fix_ctrl_m();
-    write(turn_off_auto_wrap());
-
-    try {
-        set(echo, input_buffer, signals, screen_buffer, mouse_mode, cursor, key_mode);
-    }
-    catch (std::runtime_error const& e) {
-        uninitialize_terminal();
-        std::cerr << "Error: " << e.what() << '\n';
-        std::exit(1);
-    }
-    flush();
-}
-
-void initialize_normal_terminal()
-{
-    initialize_terminal(ScreenBuffer::Normal, MouseMode::Off, CursorMode::Show,
-                        Echo::On, InputBuffer::Canonical, Signals::On, KeyMode::Normal);
-}
-
-void initialize_interactive_terminal(MouseMode mouse_mode,
-                                     KeyMode key_mode,
-                                     Signals signals)
-{
-    initialize_terminal(ScreenBuffer::Alternate, mouse_mode, CursorMode::Hide,
-                        Echo::Off, InputBuffer::Immediate, signals, key_mode);
-}
-
-void uninitialize_terminal()
-{
-    // TODO take settings parameter and use that to reset the terminal to settings
-    // before.
-    write(turn_on_auto_wrap());
-    set(ScreenBuffer::Normal, MouseMode::Off, CursorMode::Show, KeyMode::Normal);
-    flush();
-    ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &original_termios);
-    if (detail::tty_file_descriptor.has_value()) {
-        close(detail::tty_file_descriptor.value());
-    }
-}
-
-auto terminal_width() -> int
-{
-    auto w = ::winsize{};
-    auto const result = ::ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-    if (result == -1) {
-        throw std::runtime_error{
-            "terminal.cpp terminal_width(): Can't Read Window Size."};
-    }
-    return w.ws_col;
-}
-
-auto terminal_height() -> int
-{
-    auto w = ::winsize{};
-    auto const result = ::ioctl(STDIN_FILENO, TIOCGWINSZ, &w);
-    if (result == -1) {
-        throw std::runtime_error{
-            "terminal.cpp terminal_height(): Can't Read Window Size."};
-    }
-    return w.ws_row;
-}
-
-auto terminal_area() -> Area
+auto input_protocols(ProtocolState const& modes) -> InputProtocols
 {
     return {
-        .width = terminal_width(),
-        .height = terminal_height(),
-    };
+        modes.mouse.mode == MouseMode::Off ? MouseProtocol::None : modes.mouse.protocol,
+        modes.focus == FocusReporting::On, modes.paste == BracketedPaste::On};
 }
+void validate_inherited(TerminalProfile const& profile, ProtocolState const& modes)
+{
+    if (modes.mouse.mode != MouseMode::Off) {
+        require(modes.mouse.protocol == profile.mouse_protocol, Feature::Mouse);
+        (void)detail::prepare(profile, modes.mouse);
+    }
+    if (modes.focus == FocusReporting::On)
+        require(profile.focus_reporting, Feature::Focus);
+    if (modes.paste == BracketedPaste::On)
+        require(profile.bracketed_paste, Feature::BracketedPaste);
+}
+auto desired_modes(TerminalProfile const& profile,
+                   ProtocolState modes,
+                   TerminalOptions const& patch) -> ProtocolState
+{
+    if (patch.screen_buffer) modes.screen_buffer = *patch.screen_buffer;
+    if (patch.cursor) modes.cursor = *patch.cursor;
+    if (patch.mouse) {
+        modes.mouse.mode = *patch.mouse;
+        modes.mouse.protocol = *patch.mouse == MouseMode::Off ? MouseProtocol::None
+                                                              : profile.mouse_protocol;
+    }
+    if (patch.focus) modes.focus = *patch.focus;
+    if (patch.paste) modes.paste = *patch.paste;
+    return modes;
+}
+auto changed_modes(ProtocolState const& before, ProtocolState const& after)
+    -> std::array<bool, 5>
+{
+    // Off does not select a protocol, so harmless disabling is a no-op.
+    bool mouse = before.mouse.mode != after.mouse.mode ||
+                 (after.mouse.mode != MouseMode::Off &&
+                  before.mouse.protocol != after.mouse.protocol);
+    return {before.screen_buffer != after.screen_buffer, before.cursor != after.cursor,
+            mouse, before.focus != after.focus, before.paste != after.paste};
+}
+void validate_transition(TerminalProfile const& profile,
+                         ProtocolState const& before,
+                         ProtocolState const& after)
+{
+    auto changed = changed_modes(before, after);
+    if (changed[0]) require(profile.alternate_screen, Feature::AlternateScreen);
+    if (changed[1]) require(profile.cursor_visibility, Feature::CursorVisibility);
+    if (changed[2]) (void)detail::prepare(profile, after.mouse);
+    if (changed[3]) require(profile.focus_reporting, Feature::Focus);
+    if (changed[4]) require(profile.bracketed_paste, Feature::BracketedPaste);
+}
+auto desired_attributes(termios captured, TerminalOptions const& options) -> termios
+{
+    if (options.echo) {
+        if (*options.echo == Echo::On)
+            captured.c_lflag |= ECHO;
+        else
+            captured.c_lflag &= ~(ECHO | ECHONL);
+    }
+    if (options.input_buffer) {
+        if (*options.input_buffer == InputBuffer::Canonical)
+            captured.c_lflag |= ICANON;
+        else {
+            captured.c_lflag &= ~(ICANON | IEXTEN);
+            captured.c_iflag &= ~(ICRNL | INLCR | IGNCR | ISTRIP | IXON | IXOFF);
+            captured.c_cc[VMIN] = 0;
+            captured.c_cc[VTIME] = 0;
+        }
+    }
+    if (options.signals) {
+        if (*options.signals == Signals::On)
+            captured.c_lflag |= ISIG;
+        else {
+            captured.c_lflag &= ~(ISIG | IEXTEN);
+            captured.c_iflag &= ~(IXON | IXOFF);
+        }
+    }
+    return captured;
+}
+void merge_os(TerminalOptions& current, TerminalOptions const& patch)
+{
+    if (patch.echo) current.echo = patch.echo;
+    if (patch.input_buffer) current.input_buffer = patch.input_buffer;
+    if (patch.signals) current.signals = patch.signals;
+}
+auto explicit_report(TerminalProfile profile) -> ProfileReport
+{
+    ProfileReport result{profile, {}};
+    constexpr Feature features[] = {
+        Feature::Control,         Feature::Colors,           Feature::Traits,
+        Feature::AlternateScreen, Feature::CursorVisibility, Feature::Mouse,
+        Feature::Focus,           Feature::BracketedPaste};
+    result.decisions.reserve(8);
+    for (auto feature : features)
+        result.decisions.push_back(
+            {feature, EvidenceSource::Explicit, "Caller-supplied terminal profile"});
+    return result;
+}
+}  // namespace
+struct Terminal::Impl {
+    Streams streams;
+    int input_fd, output_fd;
+    dev_t device;
+    ProfileReport report;
+    TerminalOptions options;
+    ProtocolState modes, restore;
+    Output output;
+    Reader reader;
+    termios captured{}, current{};
+    Area last_size{};
+    detail::Clock::time_point next_resize{};
+    std::array<bool, 5> touched{};
+    bool leased = false, open = false, usable = true, os_touched = false;
+    Impl(Streams s,
+         int input,
+         int out,
+         dev_t dev,
+         ProfileReport r,
+         TerminalOptions o,
+         termios attributes)
+        : streams{s},
+          input_fd{input},
+          output_fd{out},
+          device{dev},
+          report{std::move(r)},
+          options{o},
+          modes{o.restore_modes},
+          restore{o.restore_modes},
+          output{s.output},
+          reader{s.input, o.parser, input_protocols(o.restore_modes)},
+          captured{attributes},
+          current{attributes}
+    {}
+    ~Impl() noexcept
+    {
+        // Also covers unexpected exceptions while open() is still constructing.
+        if (open) {
+            try {
+                cleanup();
+            }
+            catch (...) {
+            }
+        }
+    }
+    void reserve()
+    {
+        std::lock_guard guard{lease_mutex};
+        if (!leases.insert(device).second)
+            throw std::system_error{
+                std::make_error_code(std::errc::device_or_resource_busy),
+                "Terminal: device owned"};
+        leased = true;
+        open = true;
+    }
+    void release()
+    {
+        if (leased) {
+            std::lock_guard guard{lease_mutex};
+            leases.erase(device);
+            leased = false;
+        }
+        open = false;
+    }
+    void emit(std::size_t index, ProtocolState const& target)
+    {
+        // Every mode command is bounded by 128 bytes, independently of a pack.
+        std::array<char, 128> bytes;
+        EncodeResult result{};
+        switch (index) {
+            case 0: result = escape_to(bytes, target.screen_buffer); break;
+            case 1: result = escape_to(bytes, target.cursor); break;
+            case 2: result = escape_to(bytes, target.mouse); break;
+            case 3: result = escape_to(bytes, target.focus); break;
+            case 4: result = escape_to(bytes, target.paste); break;
+        }
+        output.write(std::string_view{bytes.data(), result.written});
+    }
+    template <class Action>
+    static void attempt(std::error_code& first, Action action)
+    {
+        try {
+            action();
+        }
+        catch (std::system_error const& error) {
+            if (!first) first = error.code();
+        }
+        catch (std::bad_alloc const&) {
+            if (!first) first = std::make_error_code(std::errc::not_enough_memory);
+        }
+        catch (...) {
+            if (!first) first = std::make_error_code(std::errc::io_error);
+        }
+    }
+    auto restore_transition(ProtocolState const& old_modes,
+                            termios const& old_attributes,
+                            std::array<bool, 5> const& attempted,
+                            bool os) -> std::error_code
+    {
+        std::error_code error;
+        for (std::size_t i = 5; i > 0; --i)
+            if (attempted[i - 1]) attempt(error, [&] { emit(i - 1, old_modes); });
+        attempt(error, [&] { output.flush(); });
+        if (os)
+            attempt(error, [&] {
+                checked(detail::set_attributes(input_fd, &old_attributes),
+                        "Terminal: rollback input");
+            });
+        return error;
+    }
+    void apply(TerminalOptions const& patch)
+    {
+        validate_options(patch);
+        auto next = desired_modes(report.profile, modes, patch);
+        validate_transition(report.profile, modes, next);
+        auto new_options = options;
+        merge_os(new_options, patch);
+        auto attributes = desired_attributes(captured, new_options);
+        bool os = patch.echo.has_value() || patch.input_buffer.has_value() ||
+                  patch.signals.has_value();
+        auto changed = changed_modes(modes, next);
+        std::array<bool, 5> attempted{};
+        if (os) {
+            os_touched = true;
+            if (detail::set_attributes(input_fd, &attributes) < 0) {
+                auto primary = error_code();
+                if (detail::set_attributes(input_fd, &current) < 0) {
+                    usable = false;
+                    throw SessionError{primary, error_code()};
+                }
+                throw std::system_error{primary, "Terminal: apply input"};
+            }
+        }
+        try {
+            for (std::size_t i = 0; i < 5; ++i)
+                if (changed[i]) {
+                    attempted[i] = true;
+                    touched[i] = true;
+                    emit(i, next);
+                }
+            output.flush();
+        }
+        catch (std::system_error const& primary) {
+            usable = false;
+            auto rollback = restore_transition(modes, current, attempted, os);
+            throw SessionError{primary.code(), rollback};
+        }
+        catch (...) {
+            // Even constructing an I/O exception can fail under memory pressure.
+            usable = false;
+            (void)restore_transition(modes, current, attempted, os);
+            throw;
+        }
+        current = attributes;
+        options.echo = new_options.echo;
+        options.input_buffer = new_options.input_buffer;
+        options.signals = new_options.signals;
+        modes = next;
+        reader.configure(input_protocols(modes));
+    }
+    auto cleanup() -> std::error_code
+    {
+        std::error_code error;
+        attempt(error, [&] { output.flush(); });
+        for (std::size_t i = 5; i > 0; --i)
+            if (touched[i - 1]) attempt(error, [&] { emit(i - 1, restore); });
+        attempt(error, [&] { output.flush(); });
+        if (os_touched)
+            attempt(error, [&] {
+                checked(detail::set_attributes(input_fd, &captured),
+                        "Terminal: restore input");
+            });
+        release();
+        return error;
+    }
+};
 
+auto TerminalOptions::interactive() -> TerminalOptions
+{
+    TerminalOptions result;
+    result.echo = Echo::Off;
+    result.input_buffer = InputBuffer::Immediate;
+    result.screen_buffer = ScreenBuffer::Alternate;
+    result.cursor = CursorMode::Hide;
+    return result;
+}
+Terminal::Terminal(std::unique_ptr<Impl> implementation) noexcept
+    : impl_{std::move(implementation)}
+{}
+Terminal::Terminal(Terminal&&) noexcept = default;
+Terminal::~Terminal() noexcept
+{
+    try {
+        close();
+    }
+    catch (...) {
+    }
+}
+auto Terminal::open(TerminalOptions options) -> Terminal
+{ return open(Streams{}, options); }
+auto Terminal::open(Streams streams, TerminalOptions options) -> Terminal
+{
+    if (!streams.input || !streams.output)
+        throw std::invalid_argument{"Terminal: null stream"};
+    validate_options(options);
+    validate_restore(options.restore_modes);
+    int input = ::fileno(streams.input), output = ::fileno(streams.output);
+    if (input < 0 || output < 0 || !::isatty(input) || !::isatty(output))
+        throw std::system_error{
+            std::make_error_code(std::errc::inappropriate_io_control_operation),
+            "Terminal: requires terminal streams"};
+    struct stat in{}, out{};
+    checked(::fstat(input, &in), "Terminal: input identity");
+    checked(::fstat(output, &out), "Terminal: output identity");
+    if (in.st_rdev != out.st_rdev)
+        throw std::system_error{std::make_error_code(std::errc::invalid_argument),
+                                "Terminal: streams refer to different devices"};
+    auto report = options.profile ? explicit_report(*options.profile)
+                                  : resolve_profile(detail::environment(), true);
+    detail::validate_profile(report.profile);
+    validate_inherited(report.profile, options.restore_modes);
+    auto target = desired_modes(report.profile, options.restore_modes, options);
+    validate_transition(report.profile, options.restore_modes, target);
+    // Allocate parser/session storage and validate limits before OS changes.
+    auto impl = std::make_unique<Impl>(streams, input, output, in.st_rdev,
+                                       std::move(report), options, termios{});
+    checked(detail::get_attributes(input, &impl->captured), "Terminal: capture input");
+    impl->current = impl->captured;
+    impl->last_size = detail::get_size(output);
+    impl->next_resize = detail::deadline_after(
+        detail::Clock::now(),
+        options.resize_interval.value_or(std::chrono::milliseconds{100}));
+    impl->reserve();
+    try {
+        impl->apply(options);
+    }
+    catch (SessionError const& primary) {
+        auto cleanup = impl->cleanup();
+        throw SessionError{primary.code(), primary.rollback_error()
+                                               ? primary.rollback_error()
+                                               : cleanup};
+    }
+    catch (std::system_error const& primary) {
+        auto cleanup = impl->cleanup();
+        if (cleanup) throw SessionError{primary.code(), cleanup};
+        throw;
+    }
+    return Terminal{std::move(impl)};
+}
+void Terminal::require_open() const
+{
+    if (!impl_ || !impl_->open || !impl_->usable)
+        throw std::logic_error{"Terminal: session is closed or unusable"};
+}
+auto Terminal::is_open() const noexcept -> bool { return impl_ && impl_->open; }
+auto Terminal::profile() const -> TerminalProfile const&
+{
+    require_open();
+    return impl_->report.profile;
+}
+auto Terminal::profile_report() const -> ProfileReport const&
+{
+    require_open();
+    return impl_->report;
+}
+auto Terminal::output() -> Output&
+{
+    require_open();
+    return impl_->output;
+}
+void Terminal::flush() { output().flush(); }
+void Terminal::apply(TerminalOptions const& patch)
+{
+    require_open();
+    impl_->apply(patch);
+}
+auto Terminal::area() const -> Area
+{
+    require_open();
+    return detail::get_size(impl_->output_fd);
+}
+void Terminal::close()
+{
+    if (!is_open()) return;
+    auto error = impl_->cleanup();
+    if (error) throw std::system_error{error, "Terminal: cleanup"};
+}
+auto Terminal::read() -> ReadResult { return read_until({}); }
+auto Terminal::read(std::chrono::milliseconds timeout) -> ReadResult
+{ return read_until(timeout); }
+auto Terminal::read_until(std::optional<std::chrono::milliseconds> timeout)
+    -> ReadResult
+{
+    require_open();
+    if (timeout && timeout->count() < 0)
+        throw std::invalid_argument{"Terminal: negative timeout"};
+    auto deadline = timeout ? detail::deadline_after(detail::Clock::now(), *timeout)
+                            : detail::Clock::time_point::max();
+    while (true) {
+        auto pending = impl_->reader.read(std::chrono::milliseconds{0});
+        if (pending.status != ReadStatus::Timeout) return pending;
+        auto now = detail::Clock::now();
+        if (impl_->options.resize_interval && now >= impl_->next_resize) {
+            auto size = area();
+            impl_->next_resize =
+                detail::deadline_after(now, *impl_->options.resize_interval);
+            if (size != impl_->last_size) {
+                impl_->last_size = size;
+                return {ReadStatus::Event, Resize{size}};
+            }
+        }
+        if (now >= deadline) return {ReadStatus::Timeout, {}};
+        auto until = impl_->options.resize_interval
+                         ? std::min(deadline, impl_->next_resize)
+                         : deadline;
+        if (until == detail::Clock::time_point::max()) return impl_->reader.read();
+        auto wait = std::chrono::ceil<std::chrono::milliseconds>(until - now);
+        auto result = impl_->reader.read(wait);
+        if (result.status != ReadStatus::Timeout) return result;
+    }
+}
 }  // namespace esc

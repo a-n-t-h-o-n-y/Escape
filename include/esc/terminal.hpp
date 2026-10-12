@@ -1,241 +1,161 @@
 #pragma once
-
-#include <utility>
-
-#include <esc/area.hpp>
-#include <esc/detail/any_of.hpp>
-#include <esc/mouse.hpp>
-#include <esc/sequence.hpp>
+#include <array>
+#include <chrono>
+#include <esc/capabilities.hpp>
+#include <esc/io.hpp>
+#include <memory>
+#include <optional>
+#include <system_error>
 
 namespace esc {
+enum class Echo { On, Off };
+enum class InputBuffer { Canonical, Immediate };
+enum class Signals { On, Off };
+struct Streams {
+    std::FILE* input = stdin;
+    std::FILE* output = stdout;
+};
+struct ProtocolState {
+    ScreenBuffer screen_buffer = ScreenBuffer::Normal;
+    CursorMode cursor = CursorMode::Show;
+    MouseReporting mouse = {MouseMode::Off, MouseProtocol::None};
+    FocusReporting focus = FocusReporting::Off;
+    BracketedPaste paste = BracketedPaste::Off;
+};
+struct TerminalOptions {
+    std::optional<Echo> echo;
+    std::optional<InputBuffer> input_buffer;
+    std::optional<Signals> signals;
+    std::optional<ScreenBuffer> screen_buffer;
+    std::optional<CursorMode> cursor;
+    std::optional<MouseMode> mouse;
+    std::optional<FocusReporting> focus;
+    std::optional<BracketedPaste> paste;
+    std::optional<TerminalProfile> profile;
+    ProtocolState restore_modes = {};
+    ParserOptions parser = {};
+    std::optional<std::chrono::milliseconds> resize_interval =
+        std::chrono::milliseconds{100};
+    static auto interactive() -> TerminalOptions;
+};
+class SessionError : public std::system_error {
+   public:
+    SessionError(std::error_code primary, std::error_code rollback)
+        : std::system_error{primary, "Terminal: transition failed"}, rollback_{rollback}
+    {}
+    auto rollback_error() const noexcept -> std::error_code { return rollback_; }
 
-// ECHO --------------------------------------------------------------------------------
+   private:
+    std::error_code rollback_;
+};
+template <class T>
+concept Setting = detail::AnyOf<T,
+                                Echo,
+                                InputBuffer,
+                                Signals,
+                                ScreenBuffer,
+                                CursorMode,
+                                MouseMode,
+                                FocusReporting,
+                                BracketedPaste>;
 
-/**
- * `On` will print keypresses to the screen; `Off` will not.
- */
-enum class Echo : bool { On, Off };
+class Terminal {
+   public:
+    static auto open(TerminalOptions options = {}) -> Terminal;
+    static auto open(Streams streams, TerminalOptions options = {}) -> Terminal;
+    Terminal(Terminal&&) noexcept;
+    auto operator=(Terminal&&) -> Terminal& = delete;
+    Terminal(Terminal const&) = delete;
+    auto operator=(Terminal const&) -> Terminal& = delete;
+    ~Terminal() noexcept;
+    auto profile() const -> TerminalProfile const&;
+    auto profile_report() const -> ProfileReport const&;
+    auto output() -> Output&;
+    template <Writable... Values>
+    void write(Values const&... values)
+    { output().write(values...); }
+    template <DrawingCommand... Commands>
+    void send(Commands const&... commands)
+    {
+        auto const prepared = detail::prepare_pack(profile(), commands...);
+        auto& stream = output();
+        std::apply(
+            [&](auto const&... command) {
+                auto emit = [&](auto const& value) {
+                    std::array<char, 256> bytes;
+                    detail::SequenceWriter measure;
+                    detail::encode(measure, value);
+                    if (measure.size() > bytes.size())
+                        throw std::length_error{
+                            "Terminal: command exceeds encoder bound"};
+                    detail::SequenceWriter writer{bytes.data()};
+                    detail::encode(writer, value);
+                    stream.write(std::string_view{bytes.data(), writer.size()});
+                };
+                (emit(command), ...);
+            },
+            prepared);
+    }
+    void flush();
+    template <Setting... Settings>
+    void set(Settings const&... settings)
+    {
+        require_open();
+        TerminalOptions patch;
+        unsigned seen = 0;
+        auto assign = [&](auto value) {
+            unsigned bit = 0;
+            using T = decltype(value);
+            if constexpr (std::same_as<T, Echo>) {
+                bit = 1;
+                patch.echo = value;
+            }
+            else if constexpr (std::same_as<T, InputBuffer>) {
+                bit = 2;
+                patch.input_buffer = value;
+            }
+            else if constexpr (std::same_as<T, Signals>) {
+                bit = 4;
+                patch.signals = value;
+            }
+            else if constexpr (std::same_as<T, ScreenBuffer>) {
+                bit = 8;
+                patch.screen_buffer = value;
+            }
+            else if constexpr (std::same_as<T, CursorMode>) {
+                bit = 16;
+                patch.cursor = value;
+            }
+            else if constexpr (std::same_as<T, MouseMode>) {
+                bit = 32;
+                patch.mouse = value;
+            }
+            else if constexpr (std::same_as<T, FocusReporting>) {
+                bit = 64;
+                patch.focus = value;
+            }
+            else {
+                bit = 128;
+                patch.paste = value;
+            }
+            if (seen & bit) throw std::invalid_argument{"Terminal: duplicate setting"};
+            seen |= bit;
+        };
+        (assign(settings), ...);
+        if constexpr (sizeof...(Settings) > 0) apply(patch);
+    }
+    auto area() const -> Area;
+    auto read() -> ReadResult;
+    auto read(std::chrono::milliseconds timeout) -> ReadResult;
+    void close();
+    auto is_open() const noexcept -> bool;
 
-/**
- * Set whether the terminal echos input text or not.
- * @param x The Echo value to set.
- */
-void set(Echo x);
-
-// INPUT BUFFER ------------------------------------------------------------------------
-
-/**
- * `Canonical` will buffer input and wait to send it until 'Enter' is pressed;
- * `Immediate` sends every input byte immediatly to your application.
- */
-enum class InputBuffer : bool { Canonical, Immediate };
-
-/**
- * Sest the input buffer mode.
- * @param x The InputBuffer value to set.
- */
-void set(InputBuffer x);
-
-// SIGNALS -----------------------------------------------------------------------------
-
-/**
- * `On` will generate signals from ctrl-[key] presses; `Off` will not.
- */
-enum class Signals : bool { On, Off };
-
-/**
- * Set whether or not signals are generated from ctrl-[key] presses.
- * @details With Signals off, all ctrl-[key] presses generate the value of the letter in
- * the alphabet that was pressed. ctrl-a return 1, ctrl-z returns 26, etc...
- * @param x The Signals value to set.
- */
-void set(Signals x);
-
-// SCREEN BUFFER -----------------------------------------------------------------------
-
-/**
- * `Normal` will display the existing terminal screen; `Alternate` will display a blank
- * screen.
- */
-// ScreenBuffer is declared in sequence.hpp.
-
-/**
- * Set the screen buffer to the given value.
- * @details Calls on write internally, but does not call flush().
- * @param x The ScreenBuffer value to set.
- */
-void set(ScreenBuffer x);
-
-// KEY RELEASE -------------------------------------------------------------------------
-
-/**
- * `Normal` will generate KeyPress Events and auto-repeat if key is held down;
- * `Raw` will generate KeyPress and KeyRelease Events, the shift key is not applied with
- * other keys, each key press and release is its own event, all letters are lowercase.
- * @details `Raw` mode is experimental, typically requiring superuser privileges, should
- * be avoided.
- */
-enum class KeyMode : bool { Normal, Raw };
-
-/**
- * Set the key mode to the given value.
- * @details Calls on ioctl internally.
- * @param x The KeyMode value to set.
- */
-void set(KeyMode x);
-
-// CURSOR ------------------------------------------------------------------------------
-
-/**
- * `Show` will display the cursor on screen; `Hide` will not.
- */
-// CursorMode is declared in sequence.hpp.
-
-/**
- * Set the cursor to the given value.
- * @details Calls on write internally, but does not call flush().
- * @param x The CursorMode to set.
- */
-void set(CursorMode x);
-
-// MOUSE MODE --------------------------------------------------------------------------
-
-/**
- * Set the mouse mode to the given value.
- * @details Calls on write internally, but does not call flush().
- * @param x The MouseMode value to set.
- */
-void set(MouseMode x);
-
-// CONVENIENCE -------------------------------------------------------------------------
-
-/**
- * Types that represent a setting on the terminal.
- */
-template <typename T>
-concept Setable = detail::
-    AnyOf<T, Echo, InputBuffer, Signals, ScreenBuffer, CursorMode, MouseMode, KeyMode>;
-
-/**
- * Convenience function to set multiple properties at once.
- * @tparam Args The types of the properties to set.
- * @param args The properties to set.
- */
-template <Setable... Args>
-void set(Args&&... args)
-{
-    static_assert(sizeof...(Args) > 0, "set(...): Must have at least one argument.");
-    (set(std::forward<Args>(args)), ...);
-}
-
-// INITIALIZE --------------------------------------------------------------------------
-
-/**
- * Prepare the terminal for input/output and display with the given settings.
- * @details Call this function before performing any calls to write(), and call
- * uninitialize_terminal() on application exit. Installs sigterm handler to uninitialize
- * the terminal, if sigint_uninit is true.
- *
- * @param ScreenBuffer
- *     Alternate: Provides a blank terminal screen.
- *     Normal:    Provides the existing terminal display.
- *
- *     The Normal buffer can be set at shutdown after using the Alternate buffer in
- *     order to restore the terminal screen to how it was before the application
- *     started.
- *
- * @param MouseMode
- *     Off:   Generates no Mouse Events.
- *     Basic: Generate Mouse Press and Release Events for all buttons and the
- *            scroll wheel.
- *     Drag:  Basic, plus Mouse Move Events while a button is pressed.
- *     Move:  Basic, plus Mouse Move Events are generated with or without a
- *            button pressed.
- *
- * @param CursorMode
- *     Show: The Cursor will be displayed on screen.
- *     Hide: The Cursor will not be displayed on screen.
- *
- * @param Echo
- *     On:  Text characters will immediatly appear on screen at the cursor position on
- *          key presses.
- *     Off: Text will not be automatically displayed on key press.
- *
- * @param InputBuffer
- *     Canonical: Keyboard input will be buffered until the 'Enter' key is pressed, or
- *                the buffer is filled.
- *     Immediate: Each input event is immediately sent readable.
- *
- * @param Signals
- *     On:  Signals can be generated from ctrl-[key] presses, for instance ctrl-c will
- *          send SIGINT instead of byte 3.
- *     Off: Signals will not be generated on ctrl-[key] presses, sending the byte value
- *          of the ctrl character instead.
- *
- * @param KeyMode
- *     Normal: KeyPress Events generated and auto-repeated if key is held down.
- *     Raw:    KeyPress and KeyRelease Events are generated, the shift key is not
- *             applied with other keys, each key press and release is its own event, all
- *             letters are lowercase.
- */
-void initialize_terminal(ScreenBuffer,
-                         MouseMode,
-                         CursorMode,
-                         Echo,
-                         InputBuffer,
-                         Signals,
-                         KeyMode,
-                         bool sigint_uninit = true);
-
-/**
- * Initialize the terminal with 'normal' settings.
- * @details This is for typical console applications, the normal screen buffer is set,
- * key press echo is on, and the input buffer is canonical.
- */
-void initialize_normal_terminal();
-
-/**
- * Initialize the terminal with 'interactive' settings.
- * @details This is for typical console full-screen applications, the alternate screen
- * buffer is set, key press echo is off, and the input buffer is immediate.
- */
-void initialize_interactive_terminal(MouseMode mouse_mode = MouseMode::Basic,
-                                     KeyMode key_mode = KeyMode::Normal,
-                                     Signals signals = Signals::On);
-
-// UNINITIALIZE ------------------------------------------------------------------------
-
-/**
- * Restore terminal state to before any initialize...() functions were called.
- * @details This resets Input/Output settings. This also sets the normal screen buffer,
- * displays the cursor, and disables mouse input.
- */
-void uninitialize_terminal();
-
-// QUERY -------------------------------------------------------------------------------
-
-/**
- * Get the width of the terminal screen.
- * @details Uses ioctl to get the terminal width.
- * @return The width of the terminal screen.
- * @throws std::runtime_error if ioctl fails.
- */
-[[nodiscard]] auto terminal_width() -> int;
-
-/**
- * Get the height of the terminal screen.
- * @details Uses ioctl to get the terminal height.
- * @return The height of the terminal screen.
- * @throws std::runtime_error if ioctl fails.
- */
-[[nodiscard]] auto terminal_height() -> int;
-
-/**
- * Get the width and height of the terminal screen.
- * @details Uses ioctl to get the terminal width and height.
- * @return The Area (width and height) of the terminal screen.
- * @throws std::runtime_error if ioctl fails.
- */
-[[nodiscard]] auto terminal_area() -> Area;
-
+   private:
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+    explicit Terminal(std::unique_ptr<Impl> implementation) noexcept;
+    void require_open() const;
+    void apply(TerminalOptions const& patch);
+    auto read_until(std::optional<std::chrono::milliseconds> timeout) -> ReadResult;
+};
 }  // namespace esc

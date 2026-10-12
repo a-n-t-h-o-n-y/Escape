@@ -32,8 +32,9 @@ public:
     FaultScope(FaultScope const&)=delete;
     auto operator=(FaultScope const&) -> FaultScope& = delete;
     auto calls(Operation) const -> std::size_t;
-private:
+public:
     struct Impl;
+private:
     std::unique_ptr<Impl> implementation_;
 };
 } // namespace esc::testing

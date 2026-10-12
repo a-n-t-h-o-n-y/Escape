@@ -1,75 +1,46 @@
 cmake_minimum_required(VERSION 3.16)
-project(Escape LANGUAGES CXX)
-
-# Utility Library Dependency
-include(FetchContent)
-FetchContent_Declare(
-    zzz
-    GIT_REPOSITORY https://github.com/a-n-t-h-o-n-y/zzz.git
-    GIT_TAG 9d7c047f47c81a95a5ea824075253618356593a2
-)
-FetchContent_MakeAvailable(zzz)
-
-# Escape Library
-add_library(escape STATIC
-    include/esc/area.hpp
-    include/esc/brush.hpp
-    include/esc/color.hpp
-    include/esc/esc.hpp
-    include/esc/event.hpp
-    include/esc/glyph.hpp
-    include/esc/text.hpp
-    include/esc/detail/unicode.hpp
-    include/esc/io.hpp
-    include/esc/key.hpp
-    include/esc/mouse.hpp
-    include/esc/point.hpp
-    include/esc/capabilities.hpp
-    include/esc/sequence.hpp
-    include/esc/terminal.hpp
-    include/esc/terminfo.hpp
-    include/esc/trait.hpp
-    include/esc/detail/any_of.hpp
-    include/esc/detail/console_file.hpp
-    include/esc/detail/is_urxvt.hpp
-    include/esc/detail/mask.hpp
-    include/esc/detail/signals.hpp
-    include/esc/detail/transcode.hpp
-    include/esc/detail/tty_file.hpp
-
-    src/text.cpp
-    src/glyph.cpp
-    src/io.cpp
-    src/terminfo.cpp
-    src/terminal.cpp
-    src/capabilities.cpp
-    src/sequence.cpp
-    src/detail/is_urxvt.cpp
-    src/detail/transcode.cpp
-    src/detail/console_file.cpp
-    src/detail/signals.cpp
-)
-
-target_include_directories(escape
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-target_link_libraries(escape
-    PUBLIC
-        zzz
-)
-
-target_compile_features(escape
-    PUBLIC
-        cxx_std_20
-)
-
-add_subdirectory(tools)
-add_subdirectory(examples)
-option(ESCAPE_BUILD_CONTRACT_TESTS "Build proposed-interface behavior tests" OFF)
-if(ESCAPE_BUILD_CONTRACT_TESTS)
-    enable_testing()
+project(Escape VERSION 0.2.0 LANGUAGES CXX)
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    set(ESCAPE_TOP_LEVEL ON)
+else()
+    set(ESCAPE_TOP_LEVEL OFF)
 endif()
+option(ESCAPE_BUILD_TESTS "Build behavior tests" ${ESCAPE_TOP_LEVEL})
+option(ESCAPE_BUILD_EXAMPLES "Build examples and tools" ${ESCAPE_TOP_LEVEL})
+option(ESCAPE_BUILD_CONTRACT_TESTS "Build behavior tests (compatibility option)" OFF)
 
-add_subdirectory(tests)
+add_library(escape
+    src/text.cpp src/glyph.cpp src/sequence.cpp src/capabilities.cpp
+    src/parser.cpp src/io.cpp src/terminal.cpp src/detail/backend.cpp)
+add_library(Escape::escape ALIAS escape)
+target_compile_features(escape PUBLIC cxx_std_20)
+target_include_directories(escape PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+find_package(Threads REQUIRED)
+target_link_libraries(escape PRIVATE Threads::Threads)
+
+if(ESCAPE_BUILD_TESTS OR ESCAPE_BUILD_CONTRACT_TESTS)
+    enable_testing()
+    add_subdirectory(tests/contract)
+endif()
+if(ESCAPE_BUILD_EXAMPLES)
+    add_subdirectory(tools)
+    add_subdirectory(examples)
+endif()
+install(TARGETS escape EXPORT EscapeTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(DIRECTORY include/esc DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(EXPORT EscapeTargets NAMESPACE Escape:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Escape)
+configure_package_config_file(cmake/EscapeConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/EscapeConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Escape)
+write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/EscapeConfigVersion.cmake
+    VERSION ${PROJECT_VERSION} COMPATIBILITY SameMinorVersion)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/EscapeConfig.cmake
+              ${CMAKE_CURRENT_BINARY_DIR}/EscapeConfigVersion.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Escape)
