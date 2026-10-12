@@ -25,6 +25,12 @@ if(UNIX AND (ESCAPE_BUILD_TESTS OR ESCAPE_BUILD_CONTRACT_TESTS))
                 --event-loop "$<TARGET_FILE:escape.examples.event-loop>")
         set_tests_properties(escape.contract.EXAMPLES.smoke
             PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
+        add_test(NAME escape.contract.LUMEN.interactive
+            COMMAND "${Python3_EXECUTABLE}"
+                "${PROJECT_SOURCE_DIR}/tests/contract/smoke_lumen.py"
+                --lumen "$<TARGET_FILE:escape.examples.lumen>")
+        set_tests_properties(escape.contract.LUMEN.interactive
+            PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
         add_test(NAME escape.contract.TERMCAPS.interactive
             COMMAND "${Python3_EXECUTABLE}"
                 "${PROJECT_SOURCE_DIR}/tests/contract/smoke_termcaps.py"
@@ -37,3 +43,7 @@ endif()
 add_executable(escape.examples.event-loop event-loop.cpp)
 target_compile_options(escape.examples.event-loop PRIVATE ${ESCAPE_WARNINGS})
 target_link_libraries(escape.examples.event-loop PRIVATE escape)
+
+add_executable(escape.examples.lumen lumen.cpp)
+target_compile_options(escape.examples.lumen PRIVATE ${ESCAPE_WARNINGS})
+target_link_libraries(escape.examples.lumen PRIVATE escape)

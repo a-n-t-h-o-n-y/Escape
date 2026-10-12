@@ -127,8 +127,22 @@ cmake --build build --config Release --target termcaps escape.examples.pong
 
 Run `./build/tools/termcaps` for the interactive capability tester: color and
 Unicode samples, input events, cursor controls, links, sound, and terminal queries.
-Mark visual pass/fail results and get a summary on exit. See the
+See the
 [termcaps guide](docs/termcaps.md) for controls and plain reports.
+
+Run the true-color mouse demo:
+
+```sh
+cmake --build build --target escape.examples.lumen
+./build/examples/escape.examples.lumen
+```
+
+Lumen is a glowing liquid comet with a spring-driven trail. Move the mouse to steer,
+click for ripples, scroll to shift colors, and press Space to pause or `q` to quit.
+It uses half-block pixels and requests SGR mouse motion and true color explicitly,
+including when NO_COLOR is set. Before mouse input it follows an animated path.
+Frames use synchronized output when the terminal confirms support. The animation
+is capped at 160 columns by 60 rows, targeting 60 frames per second.
 
 `ESCAPE_BUILD_TESTS` and `ESCAPE_BUILD_EXAMPLES` default on for a top-level
 build and off for add_subdirectory consumers. `ESCAPE_BUILD_CONTRACT_TESTS`
