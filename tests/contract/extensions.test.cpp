@@ -248,8 +248,10 @@ TEST(ENC_SOUND_invalid_melodies_validate_before_any_output)
     using namespace std::chrono_literals;
     std::vector<PlayNotes> invalid = {
         {.notes={Note::C5}, .duration=-31250us},
-        {.notes={Note::C5}, .duration=1us},
-        {.notes={Note::C5}, .duration=100ms},
+        {.notes={Note::C5}, .duration=-1us},
+        {.notes={Note::C5}, .duration=7968751us},
+        {.notes={Note::C5}, .duration=std::chrono::microseconds::min()},
+        {.notes={Note::C5}, .duration=std::chrono::microseconds::max()},
         {.notes={Note::C5}, .duration=8000000us},
         {.notes={Note::C5}, .volume=8},
         {.notes={Note::C5, static_cast<Note>(26)}},
@@ -274,6 +276,33 @@ TEST(ENC_SOUND_invalid_melodies_validate_before_any_output)
                  encode_to(std::span{reinterpret_cast<char*>(alias.notes.data()),
                                      alias.notes.capacity()}, alias));
     CHECK(alias.notes==before);
+}
+TEST(ENC_SOUND_duration_rounds_consistently_and_accepts_exact_ticks)
+{
+    using namespace std::chrono_literals;
+    static_assert(std::chrono::microseconds{NoteDuration{4}} == 125ms);
+    struct Case { std::chrono::microseconds duration; unsigned ticks; };
+    constexpr Case cases[] = {
+        {0us, 0}, {1us, 1}, {15624us, 1}, {15625us, 1},
+        {31250us, 1}, {46874us, 1}, {46875us, 2}, {46876us, 2},
+        {100ms, 3}, {125ms, 4}, {7968749us, 255}, {7968750us, 255}};
+    TerminalProfile profile;
+    profile.control = true;
+    profile.play_notes = true;
+    for (auto c : cases) {
+        PlayNotes melody{.notes={Note::C5}, .duration=c.duration};
+        auto expected="\x1b[4;" + std::to_string(c.ticks) + ";1,~";
+        contract::encodes(expected, melody);
+        for (auto policy : {FallbackPolicy::BestEffort, FallbackPolicy::Strict}) {
+            profile.fallback = policy;
+            CHECK(encode(profile, melody) == expected);
+        }
+    }
+    for (int ticks=0; ticks<=255; ++ticks)
+        CHECK(encode(PlayNotes{.notes={Note::C5}, .duration=NoteDuration{ticks}}) ==
+              "\x1b[4;" + std::to_string(ticks) + ";1,~");
+    TerminalProfile disabled;
+    CHECK(encode(disabled, PlayNotes{.notes={Note::C5}, .duration=100ms}).empty());
 }
 TEST(CAP_SOUND_bell_and_playback_are_independent_optional_features)
 {

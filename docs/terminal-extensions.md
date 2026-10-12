@@ -248,9 +248,15 @@ auto bytes = encode(chime); // Pure encoding; no sound is played here.
 
 Notes run chromatically from `C5` through `C7`. Sharps use `Cs5`, `Ds5`, `Fs5`,
 `Gs5`, `As5`, and the corresponding octave-6 names. `Rest` is silence. Duration
-is per note (including rests), stored in `std::chrono::microseconds`; it must be
-an exact multiple of 31,250 microseconds, between zero and 7,968,750 inclusive
-(0..255 DECPS ticks). Volume is 0..7; zero requests silent playback. Invalid
+is per note (including rests), stored in `std::chrono::microseconds`. Ordinary
+chrono durations are accepted: `100ms` rounds to 93.75ms (three DECPS ticks).
+Encoding rounds to the nearest 31,250-microsecond tick; halfway values round up,
+positive durations use at least one tick, and zero stays zero. Negative values
+and durations above 7,968,750 microseconds are rejected before rounding. This
+conversion is identical for raw encoding, `BestEffort`, and `Strict` profiles.
+For exact timing, `NoteDuration` is a chrono duration with a 1/32-second period:
+`.duration = NoteDuration{4}` means exactly 125ms. Its valid tick range is 0..255.
+Volume is 0..7; zero requests silent playback. Invalid
 parameters throw `std::invalid_argument` before destination mutation or output,
 even when playback would be omitted by a profile. Empty melodies emit nothing;
 their duration and volume still validate. Melodies longer than 16 notes are split

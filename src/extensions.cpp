@@ -64,9 +64,13 @@ void encode(SequenceWriter& out, Bell) { out.text("\x07"); }
 void encode(SequenceWriter& out, PlayNotes const& value)
 {
     auto const duration = value.duration.count();
-    if (duration < 0 || duration > 255 * 31250 || duration % 31250 != 0)
+    if (duration < 0 || duration > 255 * 31250)
         throw std::invalid_argument{
-            "PlayNotes: duration must be 0..255 exact 31,250us ticks"};
+            "PlayNotes: duration must be 0..7,968,750 microseconds"};
+    // Bounds are checked before addition; zero remains zero and a positive
+    // duration cannot disappear when rounded below half a protocol tick.
+    auto const ticks = duration == 0 ? 0 : (std::max)(decltype(duration){1},
+                                                     (duration + 15625) / 31250);
     if (value.volume > 7)
         throw std::invalid_argument{"PlayNotes: volume must be 0..7"};
     for (auto note : value.notes)
@@ -77,7 +81,7 @@ void encode(SequenceWriter& out, PlayNotes const& value)
         out.text("\x1b[");
         out.number(value.volume);
         out.text(";");
-        out.number(static_cast<std::uint64_t>(duration / 31250));
+        out.number(static_cast<std::uint64_t>(ticks));
         for (; start < end; ++start) {
             out.text(";");
             out.number(static_cast<unsigned>(value.notes[start]));

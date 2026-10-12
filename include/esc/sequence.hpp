@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <ratio>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -55,8 +56,12 @@ enum class Note : std::uint8_t {
     C6, Cs6, D6, Ds6, E6, F6, Fs6, G6, Gs6, A6, As6, B6, C7
 };
 
+// Exact DECPS timing: one tick is 1/32 second (31,250 microseconds).
+using NoteDuration = std::chrono::duration<int, std::ratio<1, 32>>;
+
 // Owns the melody. Duration is per note, including rests; no application sleeps.
-// Require 0..255 exact 31,250us ticks and volume 0..7. Empty notes emit nothing.
+// Duration rounds to the nearest tick, ties up; positive values use at least one.
+// Require 0..7,968,750us and volume 0..7. Empty notes emit nothing.
 // Long melodies are encoded as consecutive DECPS commands of up to 16 notes.
 struct PlayNotes {
     std::vector<Note> notes;
