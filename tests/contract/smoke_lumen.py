@@ -28,6 +28,14 @@ def run(binary, width=100, height=30, quit_key=b"q", synchronize=False):
         assert marker in output[start:], (marker, bytes(output[-300:]))
         return bytes(output[start:])
 
+    def complete_frame(data, rows, marker):
+        # A read can also contain the beginning of the next, faster frame.
+        marker_at = data.find(marker)
+        end = data.rfind(f"\x1b[{rows};1H".encode(), 0, marker_at + len(marker))
+        start = data.rfind(b"\x1b[1;1H", 0, end)
+        assert start >= 0 and end > start
+        return data[start:end]
+
     def send(keys, marker):
         start = len(output)
         os.write(master, keys)
@@ -60,8 +68,8 @@ def run(binary, width=100, height=30, quit_key=b"q", synchronize=False):
                               (b"3", b"mouse steer | click boost"),
                               (b"4", b"mouse morph | click recenter")]:
                 data = send(key, hint)
-                frame = data[data.rfind(b"\x1b[1;1H"):]
-                images.append(frame[frame.find(b"\x1b[2;1H"):frame.find(b"\x1b[30;1H")])
+                frame = complete_frame(data, height, hint)
+                images.append(frame[frame.find(b"\x1b[2;1H"):])
                 send(b"\x1b[<35;65;14M\x1b[<0;65;14M\x1b[<64;65;14M", hint)
             assert len(set(images)) == 4
             send(b"\t", b"mouse steer | click ripple")
@@ -77,18 +85,18 @@ def run(binary, width=100, height=30, quit_key=b"q", synchronize=False):
             resize(80, 24)
             until(b"\x1b[24;1H", start)
             start = len(output)
-            resize(240, 80)
-            large = until(b"\x1b[80;1H", start)
-            frame = large[large.rfind(b"\x1b[1;1H"):]
-            assert b"\x1b[79;1H" in frame
-            assert frame.count("▀".encode()) == 239 * 78
-            send(b"\x1b[<35;220;70M", b"space pause")
+            resize(480, 140)
+            large = until(b"\x1b[140;1H", start)
+            frame = complete_frame(large, 140, b"\x1b[140;1H")
+            assert b"\x1b[139;1H" in frame
+            assert frame.count("▀".encode()) == 479 * 138
+            send(b"\x1b[<35;450;130M", b"space pause")
             for key, hint in [(b"2", b"mouse disturb"), (b"3", b"click boost"),
                               (b"4", b"mouse morph"), (b"1", b"click ripple")]:
                 data = send(key, hint)
-                frame = data[data.rfind(b"\x1b[1;1H"):]
-                assert b"\x1b[79;1H" in frame
-                assert frame.count("▀".encode()) == 239 * 78
+                frame = complete_frame(data, 140, hint)
+                assert b"\x1b[139;1H" in frame
+                assert frame.count("▀".encode()) == 479 * 138
             start = len(output)
             resize(1, 1)
             until(b"\x1b[2J", start)

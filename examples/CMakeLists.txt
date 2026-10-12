@@ -47,3 +47,12 @@ target_link_libraries(escape.examples.event-loop PRIVATE escape)
 add_executable(escape.examples.lumen lumen.cpp)
 target_compile_options(escape.examples.lumen PRIVATE ${ESCAPE_WARNINGS})
 target_link_libraries(escape.examples.lumen PRIVATE escape)
+
+if(ESCAPE_BUILD_TESTS OR ESCAPE_BUILD_CONTRACT_TESTS)
+    add_executable(escape.tests.lumen-canvas
+        ../tests/contract/main.cpp ../tests/contract/lumen_canvas.test.cpp)
+    target_link_libraries(escape.tests.lumen-canvas PRIVATE escape)
+    target_compile_options(escape.tests.lumen-canvas PRIVATE ${ESCAPE_WARNINGS})
+    add_test(NAME escape.contract.LUMEN.canvas COMMAND escape.tests.lumen-canvas)
+    set_tests_properties(escape.contract.LUMEN.canvas PROPERTIES TIMEOUT 30)
+endif()

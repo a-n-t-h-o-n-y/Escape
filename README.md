@@ -151,6 +151,10 @@ Each scene keeps its state when switching tabs. The gallery uses half-block pixe
 and requests SGR mouse motion and true color explicitly, including when NO_COLOR
 is set. Frames use synchronized output when the terminal confirms support. All
 scenes fill the terminal and follow resizing, targeting 60 frames per second.
+The renderer repaints changed cells and always redraws on resize or a tab change.
+Large frames use a reusable worker pool to calculate and encode rows in parallel.
+Scene buffers are allocated when first opened and resized when next visited.
+Use a Release build for smooth animation in large windows.
 
 `ESCAPE_BUILD_TESTS` and `ESCAPE_BUILD_EXAMPLES` default on for a top-level
 build and off for add_subdirectory consumers. `ESCAPE_BUILD_CONTRACT_TESTS`
