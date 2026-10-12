@@ -10,7 +10,7 @@ add_executable(escape.tests.contract.text EXCLUDE_FROM_ALL
     main.cpp text.test.cpp text-allocation.test.cpp support/allocations.cpp)
 target_link_libraries(escape.tests.contract.text PRIVATE escape)
 
-# Executable specifications of docs/interface-proposal.md.
+# Public API behavior, independent of terminal emulators.
 # Core expectations are independent of POSIX session behavior.
 add_executable(escape.tests.contract
     main.cpp sequence.test.cpp composition.test.cpp values.test.cpp capabilities.test.cpp

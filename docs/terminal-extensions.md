@@ -1,8 +1,7 @@
 # Terminal controls, OSC payloads, frames, and event loops
 
-These additions extend [the interface contract](interface-proposal.md). Public
-APIs remain C++20 and do not expose platform headers. Encoding is pure; session
-operations explicitly own I/O and state. There is no terminfo dependency.
+Drawing controls, titles, links, frames, event-loop readiness, and sound use the
+same encoders as text. Include `<esc/esc.hpp>` or the relevant headers.
 
 ## Capability selection
 
@@ -207,19 +206,6 @@ Zero-timeout parsing does not turn synchronous output, canonical echo, regular
 file reads, or filesystem/device operations into hard real-time operations.
 This API supplies input readiness and timer integration, not a nonblocking output
 queue. Application signals and shutdown policy remain owned by the host.
-
-## Verification
-
-Core cases check literal encodings, boundaries, invalid UTF-8 and control payloads,
-capability fallbacks, short spans, aliasing, and allocation contracts. POSIX PTYs,
-pipes, and files check frame nesting/lifetime, inherited state, explicit probing,
-partial writes and cleanup, long OSC streaming, cached input/EOF, absolute parser
-and resize deadlines, large partial paste, and combined input/shutdown polling.
-Windows cases cover console and VT completion handles, pipe timer fallback,
-cached input, and frame mode restoration. See [test status](../tests/contract/README.md)
-and [live acceptance checks](../tests/contract/live-terminals.md). Cross-builds
-establish compilation/linking; native Windows/Linux and emulator rendering checks
-remain separate pending evidence.
 
 ## Bell and note playback
 

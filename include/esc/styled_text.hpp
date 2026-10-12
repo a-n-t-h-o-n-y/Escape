@@ -11,11 +11,13 @@
 
 namespace esc {
 // Composable values own their children. Views require an explicit borrowed API.
+/// A composition that owns ordinary text and child values.
 template <class... Values>
 struct Sequence {
     std::tuple<Values...> values;
 };
 
+/// Content plus an appearance restored after the scoped run is encoded.
 template <class Content, Attribute Appearance = StylePatch>
 struct StyledText {
     Content content;
@@ -62,6 +64,7 @@ auto owned(T&& value)
 }
 }  // namespace detail
 
+/// Own and combine values; explicit borrowed children retain their lifetimes.
 template <class... Values>
 [[nodiscard]] auto sequence(Values&&... values)
 {
@@ -69,6 +72,7 @@ template <class... Values>
         {detail::owned(std::forward<Values>(values))...}};
 }
 
+/// Return owning styled content. Scoped runs restore their surrounding appearance.
 template <class Content, Attribute A>
     requires(!std::ranges::range<Content> || detail::ByteText<Content> ||
              detail::ScalarText<Content>)
@@ -95,6 +99,7 @@ auto styled_view(std::basic_string<Char, TraitsType, Allocator> const&&,
                  A const&) = delete;
 
 // Explicit borrowing: the source must outlive every use of the returned value.
+/// Borrow validated UTF-8. The source must outlive every encoding use.
 template <Attribute A>
 [[nodiscard]] auto styled_view(std::string_view content, A const& appearance)
 {
@@ -106,6 +111,7 @@ template <Attribute A>
         return StyledText<std::string_view>{content, detail::patch(appearance)};
 }
 
+/// Borrow validated UTF-32. The source must outlive every encoding use.
 template <Attribute A>
 [[nodiscard]] auto styled_view(std::u32string_view content, A const& appearance)
 {
@@ -117,14 +123,17 @@ template <Attribute A>
         return StyledText<std::u32string_view>{content, detail::patch(appearance)};
 }
 
+/// Create owning styled UTF-8 text.
 template <Attribute A>
 [[nodiscard]] auto operator|(std::string_view text, A const& appearance)
 { return styled(text, appearance); }
 
+/// Create owning styled UTF-32 text.
 template <Attribute A>
 [[nodiscard]] auto operator|(std::u32string_view text, A const& appearance)
 { return styled(text, appearance); }
 
+/// Compose another appearance into styled text without changing the original.
 template <class Content, Attribute A, Attribute B>
 [[nodiscard]] auto operator|(StyledText<Content, A> text, B const& appearance)
 {

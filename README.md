@@ -1,206 +1,79 @@
-# Escape 🕳️
+# Escape
 
-Escape is a C++20 library for terminal byte encoding, Unicode text, incremental
-input parsing, and scoped terminal sessions for Linux, macOS, and Windows. The refactor on this branch
-is a breaking interface revision; start with the
-[functional API contract](docs/functional-api.md) and the
-[session/protocol contract](docs/interface-proposal.md).
+C++20 terminal I/O for Linux, macOS, and Windows. Compose styles and commands as
+values, read typed input events, and let a session restore the terminal on exit.
+No third-party runtime dependencies.
 
-## Encoding
+Here's a small destination picker:
 
-Raw encoding is pure and does not read the environment or retain drawing state:
-
+<!-- example: examples/tutorials/picker.cpp -->
 ```cpp
+#include <array>
 #include <esc/esc.hpp>
+#include <string_view>
 
-auto warning = esc::fg(esc::colors::yellow) | esc::bold;
-auto label = esc::styled("Warning 👽", warning);
-auto bytes = esc::encode(esc::Cursor{0, 0}, label);
-std::string frame;
-frame.reserve(4096);
-esc::append_encoded(frame, esc::Cursor{4, 2}, label, "\n");
+int main()
+{
+    using namespace esc;
+    constexpr std::array<std::string_view, 3> choices = {"Local", "Staging",
+                                                         "Production"};
+    auto accent = fg(colors::cyan) | bold;
+    auto terminal = Terminal::open(TerminalOptions::interactive());
+    unsigned selected = 0;
 
-std::array<char, 128> buffer;
-auto result = esc::encode_to(buffer, esc::Cursor{4, 2});
-// result.required reports the complete size. An undersized span is unchanged.
+    for (;;) {
+        auto frame = terminal.frame();
+        terminal.write(Cursor{}, styled("Choose a destination", bold),
+                       BlankRow{Erase::ToEnd}, "\r\n");
+        for (unsigned i = 0; i < choices.size(); ++i)
+            terminal.write(styled(sequence(i == selected ? "> " : "  ", choices[i]),
+                                  i == selected ? accent : StylePatch{}),
+                           BlankRow{Erase::ToEnd}, "\r\n");
+        terminal.write(styled("Up/Down choose · Enter accept · q cancel", dim),
+                       BlankRow{Erase::ToEnd});
+        frame.close();
+
+        auto input = terminal.read();
+        if (std::holds_alternative<EndOfInput>(input)) return 0;
+        auto event = std::get_if<Event>(&input);
+        auto key = event ? std::get_if<KeyEvent>(event) : nullptr;
+        if (!key) continue;
+        if (key->matches(U'q') || key->matches(KeyCode::Escape)) return 0;
+        if (key->matches(KeyCode::ArrowDown))
+            selected = (selected + 1) % choices.size();
+        if (key->matches(KeyCode::ArrowUp))
+            selected = (selected + choices.size() - 1) % choices.size();
+        if (key->matches(KeyCode::Enter)) break;
+    }
+    terminal.close();
+    write("Selected ", choices[selected], "\n");
+    flush();
+}
 ```
 
-Pass a `TerminalProfile` before commands for capability-aware encoding.
-Best effort adapts colors and traits; strict mode rejects losses. Unsupported
-geometry and protocol modes throw. Profiles and caller-supplied palettes are
-ordinary values. `resolve_profile(environment, output_is_terminal)` is pure;
-`snapshot_environment()` explicitly reads current environment values. Exact
-TERM matches use the documented heuristic table and return per-feature evidence.
+Arrow keys select a destination; Enter accepts it. The alternate screen and
+cursor are restored before printing the selection. Styles compose with `|`,
+and `styled` restores the surrounding appearance after each label.
 
-## Sessions and input
+## Build
 
-```cpp
-auto terminal = esc::Terminal::open(esc::TerminalOptions::interactive());
-terminal.write(esc::BlankScreen{}, esc::Cursor{},
-               esc::styled("Hello 👽", esc::fg(esc::colors::cyan) | esc::bold));
-terminal.flush();
-
-auto result = terminal.read(std::chrono::milliseconds{100});
-esc::match(result,
-    [](esc::Event const& event) { /* Visit keys, mouse, resize, focus, paste, replies. */ },
-    [](esc::Timeout) { /* No event before the deadline. */ },
-    [](esc::EndOfInput) { /* Input is exhausted. */ });
-terminal.close(); // Reports cleanup errors; destruction also attempts cleanup.
-```
-
-Sessions borrow input/output streams referring to the same terminal device.
-Only one session owns a device's modes in this process. Passive options preserve
-modes; interactive options request immediate input, echo off, alternate screen,
-and a hidden cursor. Mouse, focus, and paste are explicit opt-ins. Closing restores
-captured input settings and changed protocol modes to the supplied initial state.
-The host application owns signal handling.
-
-On Windows, opening a session enables VT output, selects UTF-8 output, and puts
-its borrowed output descriptor in binary mode; closing restores the captured
-console modes, code pages, and descriptor mode. Input uses Unicode console
-records with key repeats, deadlines, and canonical line editing. The automatic
-profile assumes only sixteen colors, bold/underline/inverse, alternate screen,
-and cursor visibility. Mouse, focus, paste, and richer styles need an explicit
-profile for the connection. Windows Terminal and the Windows console host are
-manual validation targets. Console sessions require native console handles;
-redirected files and pipes use `Reader`/`Output` directly. MSYS/mintty pipe handles
-are not native console sessions.
-
-For standalone `Output` on Windows, open byte streams in binary mode (`"wb"`,
-or host-owned `_setmode(_fileno(stream), _O_BINARY)`) to prevent CRT newline
-translation. `Output` itself preserves the borrowed stream's mode.
-
-`Output` also writes directly to a borrowed FILE* without a terminal session.
-Raw byte views preserve their full length, including nulls. UTF-32 output is
-validated before a variadic write and encoded in bounded chunks. No output API
-adds separators, newlines, private buffering, or automatic flushing.
-
-`Parser` owns bounded incomplete input and performs no I/O or clock access.
-`Reader` combines it with descriptor reads, monotonic deadlines, and explicit
-Event/Timeout/EndOfInput variant results. A Reader's input must not have unread stdio
-buffering or concurrent fread/getchar/iostreams users. Parser protocol changes
-apply only to new sequence beginnings. Unknown input stays owned and bounded;
-paste preserves original bytes. Ordinary keys and mouse events allocate nothing
-after parser construction.
-
-Scoped frames, cursor styles, scrolling/editing controls, validated titles and
-hyperlinks, and host event-loop readiness are implemented. Extensions require
-explicit capability selection or an explicit synchronization probe. See
-[their contract and usage](docs/terminal-extensions.md) and the compiling
-[event-loop example](examples/event-loop.cpp).
-
-## Unicode and glyphs
-
-```cpp
-auto scalars = esc::utf8_to_utf32("Hello 👽");
-auto text = esc::styled("Hello 👽", esc::fg(esc::colors::cyan));
-auto highlighted = text | esc::bold; // text is unchanged
-esc::write(highlighted);
-
-auto glyphs = esc::glyphs("Hello 👽"); // Explicit per-scalar storage.
-esc::style_in_place(glyphs, esc::bold);
-esc::write(glyphs);
-```
-
-Conversions are strict. `UnicodeError::offset()` identifies invalid input.
-`GlyphString` is a vector of styled Unicode scalars; a glyph does not promise
-one screen cell. Pipes return values; named append and mutation APIs support
-reusable storage. Borrowed grapheme views and explicit cell-width policies are available through
-`graphemes`, `cell_width`, and `grapheme_width`; see [text layout](docs/text-layout.md).
-
-## Build and install
-
-Requires a C++20 compiler and CMake 3.16+. Session backends target Linux, macOS,
-and Windows 10/11 consoles with VT output support. Windows builds support MSVC;
-the public headers contain no platform console types.
-Terminfo is not supported. Capability selection uses profiles, environment
-heuristics, and explicit queries. No third-party library is fetched or required.
-Python 3 enables package/header
-verification tests.
+Requires CMake 3.16+ and a C++20 compiler.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release --parallel
 ctest --test-dir build -C Release --output-on-failure
-cmake --build build --config Release --target termcaps escape.examples.pong
+./build/examples/escape.tutorial.picker
 ```
 
-Run `./build/tools/termcaps` for the interactive capability tester: color and
-Unicode samples, input events, cursor controls, links, sound, and terminal queries.
-See the
-[termcaps guide](docs/termcaps.md) for controls and plain reports.
+For your own project, link `Escape::escape` with `add_subdirectory` or
+`find_package(Escape CONFIG REQUIRED)`. See [building and installing](docs/building.md).
 
-Run the true-color mouse demo:
+## More
 
-```sh
-cmake --build build --target escape.examples.lumen
-./build/examples/escape.examples.lumen
-```
+- [Tutorial walkthrough](docs/tutorials.md): styled output, Unicode columns, then the picker.
+- [API reference](docs/reference.md): function guide and optional generated HTML.
+- [Terminal behavior](docs/behavior.md): colors, ownership, modes, and errors.
+- [Demos](docs/demos.md): Lumen, Pong, and the terminal capability tester.
 
-Lumen is a gallery of four interactive demos. Switch with Tab/Shift+Tab, Left/Right,
-`1`–`4`, or click a tab. Space pauses the active scene; `q` quits.
-
-| Demo | Interaction |
-| --- | --- |
-| Liquid | A glowing spring-driven comet; move to steer, click for ripples, wheel for color |
-| Tide | A damped wave simulation with refracted light; move to disturb, click to splash, wheel for strength |
-| Warp | A perspective starfield; move to steer, click to boost, wheel for speed |
-| Julia | An animated Julia fractal; left-drag to morph, wheel up to zoom in at the pointer and down to zoom out |
-
-Julia has no fixed magnification cap. Hovering leaves its shape unchanged;
-hold the left mouse button and drag to morph it. Smooth zoom keeps the point
-under the mouse fixed throughout the animation. Deeper views
-use more iterations and extended precision where available. Floating-point
-precision eventually limits visible detail, so this is not arbitrary-precision
-infinite zoom.
-
-Each scene keeps its state when switching tabs. The gallery uses half-block pixels
-and requests SGR mouse motion and true color explicitly, including when NO_COLOR
-is set. Frames use synchronized output when the terminal confirms support. All
-scenes fill the terminal and follow resizing, targeting 60 frames per second.
-The renderer repaints changed cells and always redraws on resize or a tab change.
-Large frames use a reusable worker pool to calculate and encode rows in parallel.
-Scene buffers are allocated when first opened and resized when next visited.
-Use a Release build for smooth animation in large windows.
-
-`ESCAPE_BUILD_TESTS` and `ESCAPE_BUILD_EXAMPLES` default on for a top-level
-build and off for add_subdirectory consumers. `ESCAPE_BUILD_CONTRACT_TESTS`
-remains an opt-in compatibility switch. Fault injection is private to test builds.
-
-```sh
-cmake -S . -B build-install -DESCAPE_BUILD_TESTS=OFF -DESCAPE_BUILD_EXAMPLES=OFF \
-    -DCMAKE_INSTALL_PREFIX=/your/prefix
-cmake --build build-install --config Release
-cmake --install build-install --config Release
-```
-
-Consumers use `Escape::escape` after either `add_subdirectory(Escape)` or
-`find_package(Escape CONFIG REQUIRED)`. The development package version is
-0.3.0; this branch has not been published as a release.
-
-See [contract tests](tests/contract/README.md) for verification and
-[the acceptance matrix](tests/contract/live-terminals.md) for real terminal
-validation. Synthetic fixtures and PTYs check library behavior, not emulator
-rendering or every terminal's advertised capabilities. CI builds and runs behavior
-tests on Linux, macOS, and Windows; a configured CI job is not a recorded passing
-run. Terminal-specific width validation remains future work.
-Explicit queries, capability observations, and negotiated Kitty keyboard input are
-implemented; see [their interface and usage](docs/queries-and-keyboard.md).
-
-See the [implementation review](docs/implementation-review.md) for corrected
-Windows input/echo behavior and the measured paste parsing optimization.
-See the [performance review](docs/performance-review.md) for subsequent encoding,
-palette, Unicode, layout, and reader optimizations and their measurements.
-
-[TermOx](https://github.com/a-n-t-h-o-n-y/TermOx) provides a higher-level widget
-library; its callers need migration to this revised interface.
-
-## Benchmarks
-
-Set `ESCAPE_BUILD_BENCHMARKS=ON` for the standalone `escape.benchmarks` target
-(default off). See [workloads, commands, and the local baseline](benchmarks/README.md)
-for encoding, reused buffers, parser, reader, and output measurements.
-
-Bell and optional DECPS note playback compose with output through `esc::Bell{}`
-and `esc::PlayNotes`. See [sound commands](docs/terminal-extensions.md#bell-and-note-playback)
-for durations, volume, and terminal capability requirements.
+[TermOx](https://github.com/a-n-t-h-o-n-y/TermOx) builds widgets on top of Escape.

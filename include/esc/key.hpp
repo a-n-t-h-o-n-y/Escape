@@ -5,6 +5,7 @@
 
 namespace esc {
 
+/// Named navigation, function, keypad, media, and modifier key identities.
 enum class KeyCode {
     Escape,
     Enter,
@@ -119,19 +120,23 @@ enum class KeyCode {
     IsoLevel5Shift,
 };
 
+/// A Kitty functional-key identifier without a named KeyCode mapping.
 struct KittyKey {
     unsigned code;
     friend auto operator==(KittyKey const&, KittyKey const&) -> bool = default;
 };
 
+/// Scalar character, named key, or unnamed Kitty identifier.
 using Key = std::variant<char32_t, KeyCode, KittyKey>;
 
+/// Reported modifier and lock bits; equality compares every bit.
 struct Modifiers {
     bool shift = false, ctrl = false, alt = false, meta = false;
     bool super = false, hyper = false, caps_lock = false, num_lock = false;
     friend auto operator==(Modifiers const&, Modifiers const&) -> bool = default;
 };
 
+/// Return scalar identity if present; named keys and Kitty identifiers give nullopt.
 [[nodiscard]] inline auto text_scalar(Key const& key) noexcept
     -> std::optional<char32_t>
 {

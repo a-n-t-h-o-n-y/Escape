@@ -1,0 +1,18 @@
+/**
+\mainpage Escape API reference
+
+Escape is a C++20 library for terminal output and typed input.
+All public names are in the esc namespace.
+
+- \ref esc::Terminal owns terminal modes, drawing, and input for a session.
+- \ref esc::Output and \ref esc::Reader borrow streams for direct I/O.
+- \ref esc::Parser decodes incremental byte input without I/O.
+- \ref esc::Style and \ref esc::StylePatch describe appearance.
+- \ref esc::TerminalProfile describes capability assumptions and fallback.
+- \ref esc::GraphemeView and \ref esc::WidthPolicy support Unicode layout.
+
+The namespace page lists free functions, command values, events, and color names.
+Use the search box to find an overload or type. The repository's README and
+`docs/tutorials.md` contain complete programs; `docs/behavior.md` explains
+borrowing, validation, and restoration.
+*/

@@ -13,16 +13,18 @@ namespace esc {
 struct Glyph;
 inline constexpr std::string_view layout_unicode_version = "17.0.0";
 
-// Return the first extended grapheme cluster, borrowing input. Empty input gives
-// an empty view. Strict decoding validates the cluster and its boundary lookahead.
+/// Return the first extended grapheme cluster, borrowing input. Empty input gives
+/// an empty view. Strict decoding validates the cluster and its boundary lookahead.
 [[nodiscard]] auto next_grapheme(std::string_view input) -> std::string_view;
 
+/// Return the first borrowed cluster, validating scalars and boundary lookahead.
 [[nodiscard]] auto next_grapheme(std::u32string_view input) -> std::u32string_view;
 
-// Styled scalar spans borrow their original glyphs; brushes do not change boundaries.
+/// Styled scalar spans borrow their original glyphs; styles do not change boundaries.
 [[nodiscard]] auto next_grapheme(std::span<Glyph const> input)
     -> std::span<Glyph const>;
 
+/// A forward range of borrowed grapheme clusters; decoding happens during iteration.
 template <class Char>
 class GraphemeView : public std::ranges::view_interface<GraphemeView<Char>> {
     static_assert(std::same_as<Char, char> || std::same_as<Char, char32_t>);
@@ -95,20 +97,25 @@ class GraphemeView : public std::ranges::view_interface<GraphemeView<Char>> {
 
     GraphemeView() = default;
 
+    /// Borrow input; the source must outlive all iterators.
     explicit GraphemeView(View input) noexcept : input_{input} {}
 
+    /// Start iteration, validating the first cluster.
     [[nodiscard]] auto begin() const -> Iterator { return Iterator{input_}; }
 
+    /// Return the end sentinel.
     [[nodiscard]] auto end() const noexcept -> std::default_sentinel_t { return {}; }
 
    private:
     View input_{};
 };
 
+/// Borrow UTF-8 as a lazy range of extended grapheme clusters.
 [[nodiscard]] inline auto graphemes(std::string_view input) noexcept
     -> GraphemeView<char>
 { return GraphemeView<char>{input}; }
 
+/// Borrow UTF-32 as a lazy range of extended grapheme clusters.
 [[nodiscard]] inline auto graphemes(std::u32string_view input) noexcept
     -> GraphemeView<char32_t>
 { return GraphemeView<char32_t>{input}; }
@@ -128,6 +135,7 @@ struct ScalarWidthOverride {
     std::uint8_t cells;  // 0..2; unique scalars in ascending order.
 };
 
+/// Deterministic cell-width assumptions. Overrides borrow sorted, unique scalars.
 struct WidthPolicy {
     AmbiguousWidth ambiguous = AmbiguousWidth::One;
     EmojiWidth emoji = EmojiWidth::Two;
@@ -137,31 +145,38 @@ struct WidthPolicy {
     std::span<ScalarWidthOverride const> overrides{};
 };
 
-// A deterministic estimate under the supplied policy, without I/O or locale.
-// nullopt means cursor-dependent controls or an unknown unassigned scalar.
-// Invalid encoding/policy throws. The complete input is always validated.
+/// A deterministic estimate under the supplied policy, without I/O or locale.
+/// nullopt means cursor-dependent controls or an unknown unassigned scalar.
+/// Invalid encoding/policy throws. The complete input is always validated.
 [[nodiscard]] auto cell_width(std::string_view input, WidthPolicy policy = {})
     -> std::optional<std::size_t>;
 
+/// Validate and estimate the full input width under the supplied policy.
 [[nodiscard]] auto cell_width(std::u32string_view input, WidthPolicy policy = {})
     -> std::optional<std::size_t>;
 
-// Empty => 0; more than one cluster => invalid_argument.
+/// Empty => 0; more than one cluster => invalid_argument.
 [[nodiscard]] auto grapheme_width(std::string_view cluster, WidthPolicy policy = {})
     -> std::optional<std::size_t>;
 
+/// Estimate one cluster; reject input containing more than one cluster.
 [[nodiscard]] auto grapheme_width(std::u32string_view cluster, WidthPolicy policy = {})
     -> std::optional<std::size_t>;
 
+/// Estimate the width of styled scalars; appearances do not affect width.
 [[nodiscard]] auto cell_width(std::span<Glyph const> input, WidthPolicy policy = {})
     -> std::optional<std::size_t>;
 
+/// Estimate one styled cluster, ignoring its appearances.
 [[nodiscard]] auto grapheme_width(std::span<Glyph const> cluster,
                                   WidthPolicy policy = {})
     -> std::optional<std::size_t>;
 }  // namespace esc
 
+/// @cond INTERNAL
 namespace std::ranges {
 template <class Char>
 inline constexpr bool enable_borrowed_range<esc::GraphemeView<Char>> = true;
 }
+
+/// @endcond

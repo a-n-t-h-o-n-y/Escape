@@ -71,8 +71,7 @@ frequency, scheduling, or background activity.
 
 Recorded on 2026-10-11, macOS 13.7.8/x86_64, Apple Clang 15.0.0,
 CMake Release (`-O3 -DNDEBUG`), static library, tests/examples disabled,
-seven samples targeting 100 ms each. Source: branch `refactor/terminal-api`,
-commit `f0db34b` plus the uncommitted platform and benchmark work.
+seven samples targeting 100 ms each, before the later layout and encoding optimizations.
 The [raw results](results/macos-clang15.txt) include batch sizes and ranges.
 This is one laptop run, not a portable performance guarantee.
 
@@ -100,14 +99,6 @@ return and span encoding about 37% less time. Buffered 32-byte writes took about
 reusable-buffer APIs and batching output; they do not justify changing the
 ordinary string-return interface by themselves.
 
-## Review optimization
-
-The [implementation review](../docs/implementation-review.md) records the first
-measured optimization: bounded bulk paste parsing. A same-laptop before/after
-comparison reduced the 4 KiB / 64-byte-fragment case from 34,016 to 2,148 ns,
-about 15.8 times faster. Three alternating pairs confirmed the improvement.
-Raw runs and the remaining platform-validation limits are linked in the review.
-
 ## Text layout local baseline
 
 Unicode 17 layout, macOS 13.7.8 x86_64, Apple Clang 15, Release, tests disabled.
@@ -125,12 +116,3 @@ The mixed input is 34 UTF-8 bytes / five clusters / eight estimated cells.
 Printable ASCII uses a measured optimization that preserves the last scalar
 for possible combining/emoji lookahead. These figures are a baseline for future
 changes; scheduling, CPU frequency, and background activity remain uncontrolled.
-
-## Subsequent performance review
-
-The [2026-10-12 performance review](../docs/performance-review.md) records
-optimizations to decimal serialization, exact palette selection, validated
-Unicode encoding, ASCII scanning, property lookup, and polling readers.
-Its three alternating before/after runs use commit `4ccc7b4` as the baseline
-with the same expanded runner on both sides. The full raw results include
-unchanged workloads as well as the optimized paths.

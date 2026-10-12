@@ -27,35 +27,40 @@ namespace esc {
 
 struct TerminalProfile;
 
-// Positions are zero-based; movement deltas are signed.
+/// Absolute zero-based cell position; negative coordinates are invalid.
 struct Cursor {
     int x = 0;
     int y = 0;
 };
 
+/// Signed relative cursor movement.
 struct MoveCursor {
     int dx = 0;
     int dy = 0;
 };
 
+/// Convert a Point into an absolute cursor command.
 [[nodiscard]] constexpr auto cursor(Point p) -> Cursor { return {p.x, p.y}; }
 
 enum class Erase { ToEnd, ToBeginning, All };
 
+/// Erase part or all of the current row. Default: the whole row.
 struct BlankRow {
     Erase extent = Erase::All;
 };
 
+/// Erase part or all of the screen. Default: the whole screen.
 struct BlankScreen {
     Erase extent = Erase::All;
 };
 
+/// Reset all SGR appearance.
 struct ResetStyle {};
 
-// Request the terminal's configured audible/visual bell. Does not flush output.
+/// Request the terminal's configured audible/visual bell. Does not flush output.
 struct Bell {};
 
-// DECPS note identities: Rest = 0; C5 through C7 = 1 through 25.
+/// DECPS note identities: Rest = 0; C5 through C7 = 1 through 25.
 enum class Note : std::uint8_t {
     Rest,
     C5,
@@ -85,19 +90,20 @@ enum class Note : std::uint8_t {
     C7
 };
 
-// Exact DECPS timing: one tick is 1/32 second (31,250 microseconds).
+/// Exact DECPS timing: one tick is 1/32 second (31,250 microseconds).
 using NoteDuration = std::chrono::duration<int, std::ratio<1, 32>>;
 
-// Owns the melody. Duration is per note, including rests; no application sleeps.
-// Duration rounds to the nearest tick, ties up; positive values use at least one.
-// Require 0..7,968,750us and volume 0..7. Empty notes emit nothing.
-// Long melodies are encoded as consecutive DECPS commands of up to 16 notes.
+/// Owns the melody. Duration is per note, including rests; no application sleeps.
+/// Duration rounds to the nearest tick, ties up; positive values use at least one.
+/// Require 0..7,968,750us and volume 0..7. Empty notes emit nothing.
+/// Long melodies are encoded as consecutive DECPS commands of up to 16 notes.
 struct PlayNotes {
     std::vector<Note> notes;
     std::chrono::microseconds duration = std::chrono::milliseconds{125};
     unsigned volume = 4;
 };
 
+/// Default, blinking, or steady block/underline/bar cursor shape.
 enum class CursorStyle {
     Default,
     BlinkingBlock,
@@ -108,50 +114,63 @@ enum class CursorStyle {
     SteadyBar
 };
 
+/// Save state in the terminal's single DEC slot, not an application stack.
 struct SaveCursor {};
 
+/// Restore state from the terminal's DEC saved-state slot.
 struct RestoreCursor {};
 
+/// Set zero-based inclusive margins; require 0 <= top < bottom.
 struct ScrollRegion {
     int top;
     int bottom;
 };  // zero-based inclusive, top < bottom
 
+/// Reset the scrolling margins to the full screen.
 struct ResetScrollRegion {};
 
+/// Scroll up within the current margins; zero count does nothing.
 struct ScrollUp {
     unsigned count = 1;
 };
 
+/// Scroll down within the current margins; zero count does nothing.
 struct ScrollDown {
     unsigned count = 1;
 };
 
+/// Insert blank cells at the cursor; zero count does nothing.
 struct InsertCharacters {
     unsigned count = 1;
 };
 
+/// Delete cells at the cursor; zero count does nothing.
 struct DeleteCharacters {
     unsigned count = 1;
 };
 
+/// Insert lines at the cursor within current margins.
 struct InsertLines {
     unsigned count = 1;
 };
 
+/// Delete lines at the cursor within current margins.
 struct DeleteLines {
     unsigned count = 1;
 };
 
+/// Borrow a UTF-8 title; controls are forbidden and encoding validates it.
 struct WindowTitle {
     std::string_view text;
 };
 
+/// Borrow a nonempty UTF-8 URI and optional ID for an OSC 8 link.
 struct BeginHyperlink {
     std::string_view uri;
     std::string_view id{};
 };
 
+/// End the current OSC 8 link.
 struct EndHyperlink {};
 
 enum class SynchronizedOutput { Off, On };
@@ -213,15 +232,16 @@ concept Escapable = DrawingCommand<T> || detail::AnyOf<std::remove_cvref_t<T>,
                                                        BracketedPaste,
                                                        SynchronizedOutput>;
 
+/// Bounded encoding result. A short span has written=0 and full required size.
 struct EncodeResult {
     std::size_t written;
     std::size_t required;
 };
 
 namespace detail {
-// A null destination measures only. Both passes share the canonical serializer.
-// Command validation occurs during measurement, before caller storage is changed.
-// A writing pass requires the same commands to have been measured first.
+/// A null destination measures only. Both passes share the canonical serializer.
+/// Command validation occurs during measurement, before caller storage is changed.
+/// A writing pass requires the same commands to have been measured first.
 class SequenceWriter {
    public:
     explicit SequenceWriter(char* output = nullptr) : output_{output} {}
@@ -315,7 +335,7 @@ void encode(SequenceWriter&, EndHyperlink);
 
 void encode(SequenceWriter&, SynchronizedOutput);
 
-// A complete style adapted to the selected profile, using stack storage.
+/// A complete style adapted to the selected profile, using stack storage.
 struct PreparedStyle {
     std::optional<ColorBG> background;
     std::optional<ColorFG> foreground;
@@ -344,7 +364,7 @@ auto prepare(TerminalProfile const&, ResetStyle const&) -> std::optional<ResetSt
 
 auto prepare(TerminalProfile const&, Bell const&) -> std::optional<Bell>;
 
-// Borrow the owned payload for this encoding pass, avoiding melody copies.
+/// Borrow the owned payload for this encoding pass, avoiding melody copies.
 auto prepare(TerminalProfile const&, PlayNotes const&) -> PlayNotes const*;
 
 auto prepare(TerminalProfile const&, Traits const&) -> std::optional<Traits>;
@@ -409,8 +429,8 @@ auto prepare(TerminalProfile const&, EndHyperlink const&)
 auto prepare(TerminalProfile const&, SynchronizedOutput const&)
     -> std::optional<SynchronizedOutput>;
 
-// These are borrowed command payloads; their overlap checks are also used by
-// the recursive encoder for text and nested compositions.
+/// These are borrowed command payloads; their overlap checks are also used by
+/// the recursive encoder for text and nested compositions.
 auto overlaps(std::string_view input, char const* storage, std::size_t size) noexcept
     -> bool;
 
@@ -424,14 +444,14 @@ void relocate_payload(WindowTitle&, char const*, std::size_t, char const*);
 
 void relocate_payload(BeginHyperlink&, char const*, std::size_t, char const*);
 
-// Full styles replace all modeled traits. Patches enable/disable selected traits.
+/// Full styles replace all modeled traits. Patches enable/disable selected traits.
 void replace_traits(SequenceWriter&, Traits);
 
 void encode_patch(SequenceWriter&, TerminalProfile const*, Style&, StylePatch const&);
 
 void encode_style(SequenceWriter&, TerminalProfile const*, Style const&);
 
-// A single concept controls all sinks; composition is checked recursively.
+/// A single concept controls all sinks; composition is checked recursively.
 template <class T, bool DrawingOnly = false>
 inline constexpr bool encodable = [] {
     using V = std::remove_cvref_t<T>;
@@ -666,16 +686,19 @@ concept Encodable = detail::encodable<T>;
 template <class T>
 concept Drawable = detail::encodable<T, true>;
 
+/// Append raw encoded values. Validate before changing storage; handle aliases.
 template <Encodable... Values>
 void append_encoded(std::string& output, Values const&... values)
 { detail::append_values(output, nullptr, values...); }
 
+/// Append through a capability profile. Validate before changing storage.
 template <Encodable... Values>
 void append_encoded(std::string& output,
                     TerminalProfile const& profile,
                     Values const&... values)
 { detail::append_values(output, &profile, values...); }
 
+/// Return raw encoded bytes in an owning string, without I/O.
 template <Encodable... Values>
 [[nodiscard]] auto encode(Values const&... values) -> std::string
 {
@@ -684,6 +707,7 @@ template <Encodable... Values>
     return output;
 }
 
+/// Return encoded bytes after applying capability policy.
 template <Encodable... Values>
 [[nodiscard]] auto encode(TerminalProfile const& profile, Values const&... values)
     -> std::string
@@ -693,12 +717,15 @@ template <Encodable... Values>
     return output;
 }
 
-// All-or-nothing, no terminator, no allocation, untouched on insufficient space.
+/// All-or-nothing, no terminator, no allocation, untouched on insufficient space.
+/// Encode into caller storage without allocation or a terminator.
+/// A short span is unchanged; inspectable overlap with payloads is rejected.
 template <Encodable... Values>
 [[nodiscard]] auto encode_to(std::span<char> output, Values const&... values)
     -> EncodeResult
 { return detail::bounded_values(output, nullptr, values...); }
 
+/// Bounded, all-or-nothing encoding through a capability profile.
 template <Encodable... Values>
 [[nodiscard]] auto encode_to(std::span<char> output,
                              TerminalProfile const& profile,

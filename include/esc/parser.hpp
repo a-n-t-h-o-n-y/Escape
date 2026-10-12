@@ -8,6 +8,7 @@
 #include <string>
 
 namespace esc {
+/// Opt-in mouse, focus, paste, reply, and keyboard grammars.
 struct InputProtocols {
     MouseProtocol mouse = MouseProtocol::None;
     bool focus = false;
@@ -16,11 +17,13 @@ struct InputProtocols {
     KeyboardProtocol keyboard = KeyboardProtocol::Legacy;
 };
 
+/// Escape/sequence deadlines and bounds on incomplete input and paste chunks.
 struct ParserOptions {
     std::chrono::milliseconds escape_timeout{25}, sequence_timeout{250};
     std::size_t sequence_limit = 256, paste_chunk_size = 4096;
 };
 
+/// Consumed bytes and at most one event. Advance input even without an event.
 struct ParseResult {
     std::size_t consumed;
     std::optional<Event> event;
@@ -28,21 +31,28 @@ struct ParseResult {
 
 enum class PendingTimeout { Escape, Sequence };
 
-// Owns only a bounded incomplete unit, never an event queue. No clock or I/O.
+/// Owns a bounded incomplete unit, never an event queue. No clock or I/O.
 class Parser {
    public:
+    /// Create empty parsing state with the supplied limits and protocols.
     explicit Parser(ParserOptions options = {}, InputProtocols protocols = {});
 
+    /// Consume a prefix and return at most one event. Advance by consumed.
     auto next(std::span<char const> input) -> ParseResult;
 
+    /// Return the kind of deadline needed for the current incomplete unit.
     auto pending_timeout() const noexcept -> std::optional<PendingTimeout>;
 
+    /// Resolve the incomplete unit after its reported deadline has elapsed.
     auto expire() -> std::optional<Event>;
 
+    /// Signal EOF and drain incomplete input; call until no event remains.
     auto finish() -> std::optional<Event>;
 
+    /// Use these protocols for new units; keep the current unit under its old grammar.
     void configure(InputProtocols protocols);
 
+    /// Clear buffered input and EOF state while retaining protocol configuration.
     void reset() noexcept;
 
    private:

@@ -8,7 +8,7 @@
 #include <type_traits>
 
 namespace esc {
-// A complete appearance. Applying it replaces colors and modeled traits.
+/// A complete appearance. Applying it replaces colors and modeled traits.
 struct Style {
     Color background = default_color;
     Color foreground = default_color;
@@ -16,7 +16,7 @@ struct Style {
     [[nodiscard]] constexpr bool operator==(Style const&) const = default;
 };
 
-// A partial change. Absence preserves a component; default color resets it.
+/// A partial change. Absence preserves a component; default color resets it.
 struct StylePatch {
     std::optional<Color> background;
     std::optional<Color> foreground;
@@ -25,6 +25,7 @@ struct StylePatch {
     [[nodiscard]] constexpr bool operator==(StylePatch const&) const = default;
 };
 
+/// A complete style or a partial appearance change accepted by styling functions.
 template <class T>
 concept Attribute = detail::AnyOf<std::remove_cvref_t<T>,
                                   ColorFG,
@@ -35,6 +36,7 @@ concept Attribute = detail::AnyOf<std::remove_cvref_t<T>,
                                   StylePatch,
                                   Style>;
 
+/// A partial appearance change; excludes complete Style replacement.
 template <class T>
 concept PatchAttribute = Attribute<T> && !std::same_as<std::remove_cvref_t<T>, Style>;
 
@@ -106,6 +108,7 @@ constexpr void apply_attribute(Style& style, A const& attribute)
 }
 }  // namespace detail
 
+/// Apply an attribute to a style copy. Complete styles replace the whole appearance.
 template <Attribute A>
 [[nodiscard]] constexpr auto operator|(Style style, A const& attribute) -> Style
 {
@@ -115,6 +118,7 @@ template <Attribute A>
     return style;
 }
 
+/// Compose partial changes from left to right; the rightmost component wins.
 template <PatchAttribute A, PatchAttribute B>
 [[nodiscard]] constexpr auto operator|(A const& first, B const& second) -> StylePatch
 {
@@ -126,6 +130,7 @@ template <PatchAttribute A, PatchAttribute B>
     return left;
 }
 
+/// A complete style on the right replaces all earlier changes.
 template <PatchAttribute A>
 [[nodiscard]] constexpr auto operator|(A const& first, Style const& replacement)
     -> Style

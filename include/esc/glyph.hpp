@@ -15,7 +15,7 @@
 
 namespace esc {
 
-// A styled Unicode scalar, without an implied terminal cell width.
+/// A styled Unicode scalar, without an implied terminal cell width.
 struct Glyph {
     char32_t symbol = U' ';
     Style style = {};
@@ -32,12 +32,16 @@ template <class T>
 concept Character =
     detail::AnyOf<std::remove_cvref_t<T>, char, signed char, unsigned char, char32_t>;
 
+/// Validate UTF-8 and return styled scalars; a glyph does not imply one cell.
 [[nodiscard]] auto glyphs(std::string_view utf8, Style style = {}) -> GlyphString;
 
+/// Validate UTF-32 and return styled scalars.
 [[nodiscard]] auto glyphs(std::u32string_view utf32, Style style = {}) -> GlyphString;
 
+/// Append validated UTF-8 as styled scalars.
 void append_glyphs(GlyphString& output, std::string_view utf8, Style style = {});
 
+/// Append validated UTF-32 as styled scalars.
 void append_glyphs(GlyphString& output, std::u32string_view utf32, Style style = {});
 
 namespace detail {
@@ -89,9 +93,8 @@ template <class Range>
 }
 }  // namespace detail
 
-// No intermediate container. Input and style are validated before any insertion;
-
-// insertion failures are allowed to leave the caller's destination partially filled.
+/// Write styled UTF-8 scalars to an iterator and return its advanced position.
+/// Input and style are validated first; insertion failures can leave a written prefix.
 template <std::output_iterator<Glyph> Output>
 auto append_glyphs_to(Output output, std::string_view utf8, Style style = {}) -> Output
 {
@@ -102,6 +105,7 @@ auto append_glyphs_to(Output output, std::string_view utf8, Style style = {}) ->
     return output;
 }
 
+/// Write styled UTF-32 scalars to an iterator and return its advanced position.
 template <std::output_iterator<Glyph> Output>
 auto append_glyphs_to(Output output, std::u32string_view utf32, Style style = {})
     -> Output
@@ -113,6 +117,7 @@ auto append_glyphs_to(Output output, std::u32string_view utf32, Style style = {}
     return output;
 }
 
+/// Return a glyph with the appearance applied; leave the original unchanged.
 template <Attribute A>
 [[nodiscard]] constexpr auto operator|(Glyph glyph, A const& attribute) -> Glyph
 {
@@ -122,10 +127,12 @@ template <Attribute A>
     return glyph;
 }
 
+/// Create a styled glyph from a scalar character.
 template <Character C, Attribute A>
 [[nodiscard]] constexpr auto operator|(C character, A const& attribute) -> Glyph
 { return Glyph{detail::character_scalar(character)} | attribute; }
 
+/// Mutate each glyph appearance after validating the complete range.
 template <class Range, Attribute A>
     requires GlyphRange<Range> &&
              std::same_as<std::ranges::range_reference_t<Range>, Glyph&>
@@ -139,6 +146,7 @@ void style_in_place(Range& input, A const& attribute)
         detail::apply_attribute(glyph.style, attribute);
 }
 
+/// Return an owning copy of a glyph range with the appearance applied.
 template <class Range, Attribute A>
     requires GlyphRange<Range const>
 [[nodiscard]] auto styled(Range const& input, A const& attribute) -> GlyphString
@@ -155,11 +163,13 @@ template <class Range, Attribute A>
     return result;
 }
 
+/// Return a styled glyph string without changing the source range.
 template <class Range, Attribute A>
     requires GlyphRange<Range const>
 [[nodiscard]] auto operator|(Range const& input, A const& attribute) -> GlyphString
 { return styled(input, attribute); }
 
+/// Style a moved glyph string, reusing its storage.
 template <Attribute A>
 [[nodiscard]] auto operator|(GlyphString&& input, A const& attribute) -> GlyphString
 {
@@ -167,9 +177,8 @@ template <Attribute A>
     return std::move(input);
 }
 
-// Contiguous sources need only the destination allocation, including self-append
-// and overlapping spans. General forward ranges are snapshotted before mutation:
-// their iterators or lazy projections may depend on the destination's storage.
+/// Append a validated glyph range; self-append is supported.
+/// Contiguous sources reuse storage. Other forward ranges are snapshotted first.
 template <class Range>
     requires GlyphRange<Range const>
 auto operator+=(GlyphString& output, Range const& input) -> GlyphString&
@@ -268,8 +277,8 @@ void append_operand(GlyphString& output, T const& input)
 }
 }  // namespace detail
 
-// Restrict operators to the owning vector and glyph values. Named APIs/ranges
-// provide customization without adding operators to arbitrary standard containers.
+/// Concatenate glyphs, scalar characters, text, or glyph ranges into an owning string.
+/// At least one operand must be a Glyph or GlyphString.
 template <detail::GlyphOperand Left, detail::GlyphOperand Right>
     requires(detail::AnyOf<Left, Glyph, GlyphString> ||
              detail::AnyOf<Right, Glyph, GlyphString>)

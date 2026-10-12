@@ -37,8 +37,8 @@ characters or byte fragments are substituted.
 Styled text also has zero-copy `next_grapheme`, `cell_width`, and `grapheme_width`
 overloads for `span<Glyph const>` (including implicit spans from GlyphString).
 Offsets and lengths count glyphs. `next_grapheme` returns the original glyph span,
-preserving brushes even when styles change within a cluster. Only symbols are
-validated/measured; brushes are ignored. Iterate with `subspan(cluster.size())`
+preserving styles even when styles change within a cluster. Only symbols are
+validated/measured; styles are ignored. Iterate with `subspan(cluster.size())`
 to advance without extracting or allocating a separate plain string.
 
 ## Cell-width policy
@@ -121,42 +121,15 @@ those choices. Select policies from verified application knowledge. Applications
 needing sequence-specific tailoring can iterate `graphemes`, supply their own
 width for selected clusters, and use `grapheme_width` for the rest.
 
-## Data, performance, and verification
+## Unicode data
 
-The algorithm uses constant-space forward context for Indic linking, emoji ZWJ,
-and regional indicators, avoiding backward rescans on long combining sequences.
-Width calculation segments and measures in one pass. Printable ASCII runs use
-a direct path while preserving the final scalar for Unicode lookahead. ASCII properties bypass
-lookup; non-ASCII uses a compile-time page index to narrow a binary search within
-2,138 coalesced property intervals. The index adds about 8.5 KiB of immutable data.
-Printable ASCII width runs are scanned eight bytes at a time without reading
-outside the input view. Grapheme iteration selects interior ASCII clusters
-directly while retaining Unicode lookahead at the run boundary.
-Measurement and iteration allocate nothing, including first
-use; no lazy initialization or mutable global cache is involved. Range iteration
-also decodes Unicode boundary lookahead on the next step. Policy table validation is
-O(overrides); scalar searches are O(log overrides).
+The tables are pinned to Unicode 17.0.0 and checked into the source tree. Normal
+builds neither download data nor run a generator. `tools/unicode/generate.py`
+regenerates the tables and conformance fixtures from files supplied locally;
+`sources.json` records their URLs and checksums. Unicode-derived files carry
+`LICENSE.unicode`, which is installed with Escape.
 
-`tools/unicode/generate.py` regenerates the checked-in tables and conformance
-fixture from official files supplied by the developer. `sources.json` records
-pinned URLs and SHA-256 checksums; generation is offline and standard-library-only.
-Normal builds do not download data or run Python. Hangul syllable break properties
-are computed arithmetically. Unicode-derived files carry `LICENSE.unicode`, also
-installed in the package's licenses directory.
-
-Tests execute all 766 official Unicode 17 GraphemeBreakTest cases through both
-UTF-8 and UTF-32 APIs. Additional independent goldens cover width policies,
-controls, malformed input/error offsets, font overrides, emoji presentation,
-keycaps, Hangul/Indic, range borrowing, and 100,000 combining marks under an
-allocation-rejecting scope. UTF-8/UTF-32 width results are compared over every
-conformance fixture. These establish the declared policy, not emulator rendering.
-
-The protocol basis is [Unicode 17 UAX #29](https://www.unicode.org/reports/tr29/tr29-47.html),
-[East Asian Width](https://www.unicode.org/reports/tr11/tr11-44.html), and
-[Unicode emoji properties](https://www.unicode.org/Public/17.0.0/ucd/emoji/emoji-data.txt).
-East Asian Width explicitly requires tailoring for terminal use.
-
-Local verification on macOS uses Apple Clang 15 release, independent public
-headers, installed static/shared/subproject consumers, and ASan/UBSan layout
-tests. Linux and Windows cross-builds compile and link the portable tests; native
-runtime tests and font/emulator width comparisons are still separate validation.
+The segmentation rules follow [UAX #29](https://www.unicode.org/reports/tr29/tr29-47.html).
+Width estimates use [East Asian Width](https://www.unicode.org/reports/tr11/tr11-44.html)
+and [emoji properties](https://www.unicode.org/Public/17.0.0/ucd/emoji/emoji-data.txt).
+Terminal widths still depend on font and configuration.

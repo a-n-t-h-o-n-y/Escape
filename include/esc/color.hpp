@@ -15,39 +15,21 @@
 
 namespace esc {
 
-// -------------------------------------------------------------------------------------
-
-/**
- * The default (foreground or background) color set by the terminal application.
- * @details Foreground/Background is determined by the encode(...) function overload set
- * depending on if ColorFG or ColorBG is used.
- */
+/// The terminal theme's default color. Select a channel with fg() or bg().
 struct DefaultColor {
     [[nodiscard]] constexpr bool operator==(DefaultColor const&) const = default;
 };
 
 inline constexpr DefaultColor default_color{};
 
-// -------------------------------------------------------------------------------------
-
-/**
- * Represents a color index for XTerm like palette.
- * @details The color index is a value from 0 to 255.
- *     [0, 7] ----- Classic XTerm system colors.
- *     [8, 15] ---- 'Bright' versions of the classic colors.
- *     [16, 231] -- 216 non-system colors.
- *     [232, 255] - Grayscale colors.
- * The actual color values are defined by your terminal.
- * @details The colors namespace names the first 16 terminal palette slots.
- * @see https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit
- * @see https://www.ditig.com/publications/256-colors-cheat-sheet
- */
+/// A terminal palette slot: 0–15 are theme colors, 16–231 the color cube,
+/// 232–255 grayscale. The terminal owns the actual palette.
 struct IndexedColor {
     std::uint8_t value = 0;
     [[nodiscard]] constexpr bool operator==(IndexedColor const&) const = default;
 };
 
-// These select terminal palette slots, preserving the user's configured theme.
+/// These select terminal palette slots, preserving the user's configured theme.
 namespace colors {
 inline constexpr IndexedColor black{0};
 inline constexpr IndexedColor red{1};
@@ -67,13 +49,9 @@ inline constexpr IndexedColor bright_cyan{14};
 inline constexpr IndexedColor bright_white{15};
 }  // namespace colors
 
-// -------------------------------------------------------------------------------------
-
-/**
- * A terminal RGB color with byte channels and checked packed-hex/HSL construction.
- */
 struct HSL;
 
+/// Explicit 24-bit color, independent of the terminal's palette.
 struct RGB {
    public:
     std::uint8_t red;
@@ -81,21 +59,12 @@ struct RGB {
     std::uint8_t blue;
 
    public:
-    /**
-     * Direct construction with red, green and blue values.
-     * @param r The red value.
-     * @param g The green value.
-     * @param b The blue value.
-     */
+    /// Construct from three byte channels.
     constexpr RGB(std::uint8_t r, std::uint8_t g, std::uint8_t b)
         : red{r}, green{g}, blue{b}
     {}
 
-    /**
-     * Takes a checked 24-bit value and extracts its three byte channels.
-     * @details RGB{0x7f9860} 0x7f is red, 0x98 is green, 0x60 is blue.
-     * @param hex The hex value to use.
-     */
+    /// Construct from 0xRRGGBB; values above 0xFFFFFF throw invalid_argument.
     explicit constexpr RGB(std::uint32_t hex)
         : red{static_cast<std::uint8_t>(hex >> 16 & 0xFF)},
           green{static_cast<std::uint8_t>(hex >> 8 & 0xFF)},
@@ -105,16 +74,14 @@ struct RGB {
             throw std::invalid_argument{"RGB: packed value exceeds 24 bits"};
     }
 
+    /// Convert validated HSL to byte channels.
     explicit constexpr RGB(HSL value);
 
     [[nodiscard]] constexpr auto operator==(RGB const&) const -> bool = default;
 };
 
-/**
- * Hue, Saturation, Lightness values of a color.
- * @details Hue is in degrees [0, 359], Saturation is in percent [0, 100], Lightness is
- * in percent [0, 100].
- */
+/// Hue in degrees [0,359], saturation and lightness in percent [0,100].
+/// Conversion validates the components.
 struct HSL {
     std::uint16_t hue;
     std::uint8_t saturation;
@@ -125,32 +92,19 @@ struct HSL {
 
 namespace detail {
 
-/**
- * Calculate the absolute value of a number; constexpr.
- * @param x The number to calculate the absolute value of.
- * @return The absolute value of the number.
- */
+/// Constexpr absolute value.
 template <typename T>
 auto constexpr abs(T x) -> T
 { return x < T(0) ? -x : x; }
 
-/**
- * Calculate the modulo of two numbers; constexpr.
- * @param x The dividend.
- * @param y The divisor.
- * @return The modulo of the two numbers.
- */
+/// Constexpr floating-point remainder.
 template <typename T>
 auto constexpr fmod(const T x, const T y) -> T
 { return (x - T(static_cast<long long>(x / y)) * y); }
 
 }  // namespace detail
 
-/**
- * Convert HSL to RGB.
- * @param v The HSL value to convert.
- * @return The RGB value.
- */
+/// Convert valid HSL to RGB, rounding channels to the nearest byte.
 auto constexpr hsl_to_rgb(HSL v) -> RGB
 {
     if (v.hue >= 360 || v.saturation > 100 || v.lightness > 100)
@@ -176,11 +130,7 @@ auto constexpr hsl_to_rgb(HSL v) -> RGB
     return {0, 0, 0};
 }
 
-/**
- * Convert RGB to HSL.
- * @param v The RGB value to convert.
- * @return The HSL value.
- */
+/// Convert RGB to HSL, rounding hue and percentages to whole numbers.
 auto constexpr rgb_to_hsl(RGB v) -> HSL
 {
     double const r_prime = v.red / 255.;
@@ -213,8 +163,6 @@ auto constexpr rgb_to_hsl(RGB v) -> HSL
             static_cast<std::uint8_t>(lightness * 100 + 0.5)};
 }
 
-// -------------------------------------------------------------------------------------
-
 constexpr RGB::RGB(HSL value) : RGB{hsl_to_rgb(value)} {}
 
 /**
@@ -224,36 +172,22 @@ constexpr RGB::RGB(HSL value) : RGB{hsl_to_rgb(value)} {}
  */
 using Color = std::variant<DefaultColor, IndexedColor, RGB>;
 
-// -------------------------------------------------------------------------------------
-
-/**
- * Represents a foreground color for the terminal display.
- */
+/// A foreground color attribute.
 struct ColorFG {
     Color value;
     [[nodiscard]] constexpr auto operator==(ColorFG const&) const -> bool = default;
 };
 
-/**
- * Represents a background color for the terminal display.
- */
+/// A background color attribute.
 struct ColorBG {
     Color value;
     [[nodiscard]] constexpr auto operator==(ColorBG const&) const -> bool = default;
 };
 
-/**
- * Return a background tag type to use with encode(...) function.
- * @param c The color to use as the background.
- * @return A background tag type to use with encode(...) function.
- */
+/// Select the background channel for this color.
 [[nodiscard]] constexpr auto bg(Color c) -> ColorBG { return {c}; }
 
-/**
- * Return a foreground tag type to use with encode(...) function.
- * @param c The color to use as the foreground.
- * @return A foreground tag type to use with encode(...) function.
- */
+/// Select the foreground channel for this color.
 [[nodiscard]] constexpr auto fg(Color c) -> ColorFG { return {c}; }
 
 }  // namespace esc

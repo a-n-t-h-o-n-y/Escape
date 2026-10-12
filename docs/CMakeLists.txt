@@ -1,0 +1,21 @@
+find_package(Doxygen 1.12 REQUIRED COMPONENTS doxygen)
+
+set(DOXYGEN_PROJECT_BRIEF "C++20 terminal I/O")
+set(DOXYGEN_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/docs")
+set(DOXYGEN_EXTRACT_ALL YES)
+set(DOXYGEN_JAVADOC_AUTOBRIEF YES)
+set(DOXYGEN_EXTRACT_PRIVATE NO)
+set(DOXYGEN_EXTRACT_STATIC NO)
+set(DOXYGEN_EXCLUDE_SYMBOLS "esc::detail" "esc::detail::*" "std::*")
+set(DOXYGEN_EXCLUDE_PATTERNS "*/include/esc/detail/*")
+set(DOXYGEN_GENERATE_LATEX NO)
+set(DOXYGEN_HAVE_DOT NO)
+set(DOXYGEN_GENERATE_TREEVIEW YES)
+set(DOXYGEN_FULL_PATH_NAMES NO)
+set(DOXYGEN_QUIET YES)
+set(DOXYGEN_WARN_LOGFILE "${PROJECT_BINARY_DIR}/docs/warnings.log")
+
+doxygen_add_docs(escape.docs
+    "${PROJECT_SOURCE_DIR}/include/esc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/api.dox"
+    COMMENT "Building Escape API reference")

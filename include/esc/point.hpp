@@ -16,12 +16,15 @@ struct Point {
     constexpr auto operator==(Point const& other) const -> bool = default;
     constexpr auto operator!=(Point const& other) const -> bool = default;
 
+    /// Add horizontal and vertical components independently.
     [[nodiscard]] constexpr auto operator+(Point const& other) const -> Point
     { return Point{x + other.x, y + other.y}; }
 
+    /// Subtract horizontal and vertical components independently.
     [[nodiscard]] constexpr auto operator-(Point const& other) const -> Point
     { return Point{x - other.x, y - other.y}; }
 
+    /// Compare x first, then y; this is lexicographic, not component-wise.
     [[nodiscard]] constexpr auto operator<(Point const& other) const -> bool
     { return std::tie(x, y) < std::tie(other.x, other.y); }
 };

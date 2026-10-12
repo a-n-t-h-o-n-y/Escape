@@ -25,6 +25,14 @@ if(UNIX AND (ESCAPE_BUILD_TESTS OR ESCAPE_BUILD_CONTRACT_TESTS))
                 --event-loop "$<TARGET_FILE:escape.examples.event-loop>")
         set_tests_properties(escape.contract.EXAMPLES.smoke
             PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
+        add_test(NAME escape.docs.examples
+            COMMAND "${Python3_EXECUTABLE}"
+                "${PROJECT_SOURCE_DIR}/tests/contract/verify_docs.py"
+                --source "${PROJECT_SOURCE_DIR}"
+                --output "$<TARGET_FILE:escape.tutorial.output>"
+                --layout "$<TARGET_FILE:escape.tutorial.layout>"
+                --picker "$<TARGET_FILE:escape.tutorial.picker>")
+        set_tests_properties(escape.docs.examples PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE)
         add_test(NAME escape.contract.LUMEN.interactive
             COMMAND "${Python3_EXECUTABLE}"
                 "${PROJECT_SOURCE_DIR}/tests/contract/smoke_lumen.py"
@@ -56,3 +64,9 @@ if(ESCAPE_BUILD_TESTS OR ESCAPE_BUILD_CONTRACT_TESTS)
     add_test(NAME escape.contract.LUMEN.canvas COMMAND escape.tests.lumen-canvas)
     set_tests_properties(escape.contract.LUMEN.canvas PROPERTIES TIMEOUT 30)
 endif()
+
+foreach(example output layout picker)
+    add_executable(escape.tutorial.${example} tutorials/${example}.cpp)
+    target_compile_options(escape.tutorial.${example} PRIVATE ${ESCAPE_WARNINGS})
+    target_link_libraries(escape.tutorial.${example} PRIVATE escape)
+endforeach()

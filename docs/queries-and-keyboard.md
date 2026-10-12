@@ -190,20 +190,9 @@ support. Pipe input remains byte-oriented without a worker.
 `termcaps --probe` and `termcaps --kitty` exercise the opt-in paths. Without these
 arguments, the tool's behavior remains unchanged.
 
-## Protocol basis and verification
+## Protocol references
 
-The contracts follow the [Kitty keyboard specification](https://sw.kovidgoyal.net/kitty/keyboard-protocol/),
-[xterm DA/DECRQM replies](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html),
-[Windows VT input documentation](https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences),
-and [CancelSynchronousIo](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-cancelsynchronousio).
-Tests use independently authored literal requests/replies and semantic events.
-Synthetic PTYs verify negotiation/order/restoration; they do not verify an emulator.
-Native Windows runtime and live terminal results remain pending until executed.
-
-On macOS, the release suite passes all 15 CTest groups and the ASan/UBSan suite
-passes all 13 non-package groups. This includes 222 behavior cases, independent
-headers, installed static/shared and subproject consumers, PTY examples, and
-benchmark smoke. Linux and Windows libraries, examples, portable/platform tests,
-and benchmarks cross-compile and link; cross-builds do not execute their tests.
-The Windows suite includes 40 native platform cases, five added for the VT
-transport. No native Windows/MSVC or live Kitty emulator pass is claimed.
+- [Kitty keyboard protocol](https://sw.kovidgoyal.net/kitty/keyboard-protocol/)
+- [xterm control sequences](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html)
+- [Windows VT input](https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences)
+- [Windows input cancellation](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-cancelsynchronousio)
